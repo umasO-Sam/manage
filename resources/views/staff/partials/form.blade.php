@@ -26,13 +26,13 @@
 
 <div>
     <x-input-label for="password" :value="$isEdit ? 'パスワード（変更する場合のみ入力）' : '初期パスワード'" />
-    <x-text-input id="password" name="password" type="password" class="mt-1 block w-full" {{ $isEdit ? '' : 'required' }} />
+    <x-text-input id="password" name="password" type="password" class="mt-1 block w-full" :required="! $isEdit" />
     <x-input-error class="mt-2" :messages="$errors->get('password')" />
 </div>
 
 <div class="flex items-center">
     <input id="is_procurement_manager" name="is_procurement_manager" type="checkbox" value="1"
-        class="rounded border-gray-300 text-teal-700 shadow-sm focus:ring-teal-600"
+        class="rounded border-slate-300 text-blue-600 shadow-sm focus:ring-blue-500"
         @checked(old('is_procurement_manager', $staff?->is_procurement_manager)) />
-    <label for="is_procurement_manager" class="ms-2 text-sm text-gray-700">資材管理担当者（カードの移動・担当者管理を行える）</label>
+    <label for="is_procurement_manager" class="ms-2 text-sm text-slate-700">資材管理担当者（カードの移動・担当者管理を行える）</label>
 </div>

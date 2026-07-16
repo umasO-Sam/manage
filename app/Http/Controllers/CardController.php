@@ -31,7 +31,7 @@ class CardController extends Controller
         $workflowType = WorkflowType::where('slug', 'purchase')->firstOrFail();
 
         $cards = $workflowType->cards()
-            ->with(['creator', 'stageLogs.actor'])
+            ->with(['creator', 'stageLogs.actor', 'attachments'])
             ->orderBy('due_date')
             ->get()
             ->groupBy('current_stage');

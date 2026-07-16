@@ -27,12 +27,12 @@
         <!-- Remember Me -->
         <div class="block mt-4">
             <label for="remember_me" class="inline-flex items-center">
-                <input id="remember_me" type="checkbox" class="rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500" name="remember">
-                <span class="ms-2 text-sm text-gray-600">ログイン状態を保持する</span>
+                <input id="remember_me" type="checkbox" class="rounded border-slate-300 text-blue-600 shadow-sm focus:ring-blue-500" name="remember">
+                <span class="ms-2 text-sm text-slate-600">ログイン状態を保持する</span>
             </label>
         </div>
 
-        <p class="mt-4 text-sm text-gray-600">
+        <p class="mt-4 text-sm text-slate-500">
             ID・パスワードが分からない場合は資材管理担当者にお問い合わせください。
         </p>
 

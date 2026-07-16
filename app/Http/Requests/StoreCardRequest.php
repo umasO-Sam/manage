@@ -28,6 +28,7 @@ class StoreCardRequest extends FormRequest
             'item_name' => ['required', 'string', 'max:255'],
             'manufacturer' => ['required', 'string', 'max:255'],
             'quantity' => ['required', 'integer', 'min:1'],
+            'unit' => ['required', 'string', 'max:20'],
             'due_date' => ['required', 'date'],
             'attachments' => ['array'],
             'attachments.*' => ['file', 'max:10240'], // 10MB (KB単位)

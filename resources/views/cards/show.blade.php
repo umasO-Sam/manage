@@ -1,11 +1,13 @@
 <x-app-layout>
     <x-slot name="header">
         <div class="flex items-center justify-between">
-            <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-                {{ $card->item_name }}
-                <span class="ml-2 text-sm font-mono text-gray-400">{{ $card->order_no }}</span>
-            </h2>
-            <a href="{{ route('cards.index') }}" class="text-sm text-gray-500 hover:text-gray-700">← ボードへ戻る</a>
+            <div class="flex items-center gap-2">
+                <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-800">購入手配</span>
+                <h2 class="font-bold text-slate-900 text-lg font-mono">{{ $card->order_no }}</h2>
+            </div>
+            <a href="{{ route('cards.index') }}" class="text-sm text-slate-500 hover:text-slate-700 flex items-center gap-1">
+                <i data-lucide="arrow-left" class="w-4 h-4"></i>ボードへ戻る
+            </a>
         </div>
     </x-slot>
 
@@ -13,65 +15,88 @@
         <div class="max-w-3xl mx-auto sm:px-6 lg:px-8 space-y-6">
 
             @if (session('status') === 'card-moved')
-                <div class="p-3 rounded-md bg-green-50 text-green-800 text-sm">カードを移動しました。</div>
+                <div class="p-3 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-800 text-sm">カードを移動しました。</div>
             @endif
 
-            <div class="bg-white shadow sm:rounded-lg p-6">
-                <div class="flex items-center justify-between mb-4">
-                    <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-teal-50 text-teal-700">
+            <div class="bg-white shadow-sm border border-slate-200 rounded-2xl p-6">
+                <div class="flex items-center justify-between mb-5">
+                    <h3 class="font-bold text-slate-900 text-base">{{ $card->item_name }}</h3>
+                    <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-blue-50 text-blue-700">
                         現在の状態: {{ $card->currentStageLabel() }}
                     </span>
                 </div>
-                <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 text-sm">
+                <div class="grid grid-cols-2 gap-y-4 gap-x-6">
                     <div>
-                        <dt class="text-gray-400">注番</dt>
-                        <dd class="font-mono text-gray-800">{{ $card->order_no }}</dd>
+                        <span class="text-xs font-semibold text-slate-400 block">品名</span>
+                        <span class="text-sm font-bold text-slate-900">{{ $card->item_name }}</span>
                     </div>
                     <div>
-                        <dt class="text-gray-400">品名</dt>
-                        <dd class="text-gray-800">{{ $card->item_name }}</dd>
+                        <span class="text-xs font-semibold text-slate-400 block">メーカー</span>
+                        <span class="text-sm font-bold text-slate-900">{{ $card->manufacturer }}</span>
                     </div>
                     <div>
-                        <dt class="text-gray-400">メーカー</dt>
-                        <dd class="text-gray-800">{{ $card->manufacturer }}</dd>
+                        <span class="text-xs font-semibold text-slate-400 block">数量</span>
+                        <span class="text-sm font-bold text-slate-900">{{ $card->quantity }}{{ $card->unit }}</span>
                     </div>
                     <div>
-                        <dt class="text-gray-400">数量</dt>
-                        <dd class="text-gray-800">{{ $card->quantity }}</dd>
+                        <span class="text-xs font-semibold text-slate-400 block">希望納期</span>
+                        <span class="text-sm font-bold text-slate-900">{{ $card->due_date->format('Y-m-d') }}</span>
                     </div>
-                    <div>
-                        <dt class="text-gray-400">希望納期</dt>
-                        <dd class="text-gray-800">{{ $card->due_date->format('Y-m-d') }}</dd>
+                    <div class="col-span-2">
+                        <span class="text-xs font-semibold text-slate-400 block">依頼者</span>
+                        <span class="text-sm font-bold text-slate-900">{{ $card->creator->name }}（{{ $card->creator->department }}）</span>
                     </div>
-                    <div>
-                        <dt class="text-gray-400">依頼者</dt>
-                        <dd class="text-gray-800">{{ $card->creator->name }}（{{ $card->creator->department }}）</dd>
-                    </div>
-                </dl>
+                </div>
             </div>
 
-            <div class="bg-white shadow sm:rounded-lg p-6">
-                <h3 class="font-semibold text-gray-700 mb-3">添付資料</h3>
-                @forelse ($card->attachments as $attachment)
-                    <div class="flex items-center justify-between py-2 border-b border-gray-100 last:border-0 text-sm">
-                        <span class="text-gray-700">{{ $attachment->file_name }}</span>
-                        <a href="{{ route('attachments.download', $attachment) }}" class="text-teal-700 hover:underline">ダウンロード</a>
-                    </div>
-                @empty
-                    <p class="text-sm text-gray-400">添付資料はありません。</p>
-                @endforelse
+            <div class="bg-white shadow-sm border border-slate-200 rounded-2xl p-6">
+                <span class="text-xs font-semibold text-slate-400 block mb-2">添付資料</span>
+                <div class="space-y-1.5">
+                    @forelse ($card->attachments as $attachment)
+                        <div class="flex justify-between items-center bg-slate-50 p-2.5 rounded-lg border border-slate-200 text-xs">
+                            <div class="flex items-center gap-2 text-slate-700">
+                                <i data-lucide="file-text" class="w-4 h-4 text-slate-400"></i>
+                                <span class="font-medium">{{ $attachment->file_name }}</span>
+                            </div>
+                            <a href="{{ route('attachments.download', $attachment) }}" class="text-blue-600 hover:text-blue-800 flex items-center gap-1 font-semibold">
+                                <i data-lucide="download" class="w-3.5 h-3.5"></i>
+                                <span>ダウンロード</span>
+                            </a>
+                        </div>
+                    @empty
+                        <span class="text-xs text-slate-400 italic">添付資料はありません</span>
+                    @endforelse
+                </div>
             </div>
 
-            <div class="bg-white shadow sm:rounded-lg p-6">
-                <h3 class="font-semibold text-gray-700 mb-3">ステージ履歴</h3>
-                <ol class="space-y-3">
-                    @foreach ($card->stageLogs as $log)
-                        <li class="flex items-center justify-between text-sm">
-                            <span class="text-gray-700">{{ $log->stage_label }}: {{ $log->actor->name }}</span>
-                            <span class="text-gray-400">{{ $log->moved_at->format('Y-m-d H:i') }}</span>
-                        </li>
+            <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-3">
+                <h4 class="font-bold text-xs text-slate-700 uppercase tracking-wider">アサイン状況</h4>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+                    @foreach ($card->workflowType->stage_definition as $index => $stage)
+                        @php($log = $card->stageLogs->firstWhere('stage_index', $index))
+                        <div class="bg-white p-2.5 rounded-lg border border-slate-200">
+                            <span class="text-slate-400 block mb-1 font-medium">{{ $index + 1 }}. {{ $stage['actor_label'] }}</span>
+                            <span class="font-bold {{ $index === 0 ? 'text-slate-800' : ($index === $card->workflowType->lastStageIndex() ? 'text-emerald-600' : 'text-blue-600') }}">
+                                {{ $log?->actor?->name ?? '未割当' }}
+                            </span>
+                        </div>
                     @endforeach
-                </ol>
+                </div>
+            </div>
+
+            <div class="bg-white shadow-sm border border-slate-200 rounded-2xl p-6">
+                <span class="text-xs font-bold text-slate-700 block mb-3">📂 ステージ履歴</span>
+                <div class="relative border-l border-slate-200 pl-4 ml-2 space-y-4">
+                    @foreach ($card->stageLogs as $log)
+                        <div class="relative">
+                            <span class="absolute -left-[21px] top-1 bg-white border border-slate-300 w-3.5 h-3.5 rounded-full flex items-center justify-center">
+                                <span class="w-1.5 h-1.5 bg-blue-500 rounded-full"></span>
+                            </span>
+                            <div class="text-xs text-slate-400 font-medium">{{ $log->moved_at->format('Y-m-d H:i') }}</div>
+                            <div class="text-xs text-slate-700 mt-0.5 font-bold">{{ $log->stage_label }}: {{ $log->actor->name }}</div>
+                        </div>
+                    @endforeach
+                </div>
             </div>
 
         </div>

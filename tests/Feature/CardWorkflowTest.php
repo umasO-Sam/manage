@@ -35,6 +35,7 @@ class CardWorkflowTest extends TestCase
             'item_name' => 'テスト部品',
             'manufacturer' => 'テストメーカー',
             'quantity' => 2,
+            'unit' => '個',
             'due_date' => now()->addWeek()->toDateString(),
         ]);
 
@@ -73,6 +74,7 @@ class CardWorkflowTest extends TestCase
             'item_name' => 'テスト部品',
             'manufacturer' => 'テストメーカー',
             'quantity' => 1,
+            'unit' => '個',
             'due_date' => now()->addWeek(),
             'created_by' => $requester->id,
             'current_stage' => 0,
