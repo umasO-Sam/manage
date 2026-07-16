@@ -45,10 +45,12 @@
                     <tbody class="divide-y divide-slate-100 text-sm">
                         @foreach ($orderNumbers as $orderNumber)
                             <tr class="hover:bg-slate-50">
-                                <td class="p-4 font-mono font-semibold text-slate-800">{{ $orderNumber->code }}</td>
+                                <td class="p-4 font-semibold text-slate-800 {{ $orderNumber->matchesStandardFormat() ? 'font-mono' : '' }}">{{ $orderNumber->code }}</td>
                                 <td class="p-4">
                                     @if ($orderNumber->is_protected)
                                         <span class="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600">既定（削除不可）</span>
+                                    @elseif (! $orderNumber->matchesStandardFormat())
+                                        <span class="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-700">自由入力（形式チェック解除）</span>
                                     @else
                                         <span class="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700">登録済み</span>
                                     @endif

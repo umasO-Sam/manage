@@ -43,6 +43,30 @@ class OrderNumberTest extends TestCase
         $response->assertSessionHasErrors('code');
     }
 
+    public function test_bypassing_format_check_allows_japanese_text(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+
+        $response = $this->actingAs($manager)->post(route('order-numbers.store'), [
+            'code' => '〇〇工事現場支給品',
+            'bypass_format_check' => '1',
+        ]);
+
+        $response->assertRedirect(route('order-numbers.index'));
+        $this->assertDatabaseHas('order_numbers', ['code' => '〇〇工事現場支給品', 'is_protected' => false]);
+    }
+
+    public function test_without_bypass_japanese_text_is_still_rejected(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+
+        $response = $this->actingAs($manager)->post(route('order-numbers.store'), [
+            'code' => '〇〇工事現場支給品',
+        ]);
+
+        $response->assertSessionHasErrors('code');
+    }
+
     public function test_default_order_numbers_exist_after_seeding(): void
     {
         $this->seed();
@@ -90,6 +114,16 @@ class OrderNumberTest extends TestCase
             ->assertSessionHasErrors('code');
 
         $this->assertDatabaseHas('order_numbers', ['id' => $orderNumber->id]);
+    }
+
+    public function test_freeform_order_number_is_labeled_in_the_list(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        OrderNumber::create(['code' => '〇〇工事現場支給品', 'is_protected' => false]);
+
+        $response = $this->actingAs($manager)->get(route('order-numbers.index'));
+
+        $response->assertSee('自由入力（形式チェック解除）');
     }
 
     public function test_unused_order_number_can_be_deleted(): void
