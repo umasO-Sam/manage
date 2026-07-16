@@ -25,7 +25,7 @@
     @endphp
 
     <div class="py-8">
-        <div class="max-w-3xl mx-auto sm:px-6 lg:px-8 space-y-6">
+        <div class="max-w-6xl mx-auto sm:px-6 lg:px-8 space-y-6">
 
             @if (session('status') === 'card-moved')
                 <div class="p-3 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-800 text-sm">カードを移動しました。</div>
@@ -42,6 +42,9 @@
                     このカードは履歴（アーカイブ）として保存されています。ボード上には表示されません。
                 </div>
             @endif
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+            <div class="lg:col-span-2 space-y-6">
 
             <div class="bg-white shadow-sm border border-slate-200 rounded-2xl p-6">
                 <div class="flex items-center justify-between mb-5">
@@ -109,6 +112,10 @@
                 </div>
             </div>
 
+            </div>
+
+            <div class="lg:col-span-1 space-y-6">
+
             <div class="bg-white shadow-sm border border-slate-200 rounded-2xl p-6">
                 <span class="text-xs font-bold text-slate-700 block mb-3">📂 ステージ履歴</span>
                 <div class="relative border-l border-slate-200 pl-4 ml-2 space-y-4">
@@ -166,6 +173,9 @@
                         </div>
                     </form>
                 @endif
+            </div>
+
+            </div>
             </div>
 
         </div>
