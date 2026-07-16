@@ -14,9 +14,11 @@ use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
+use Throwable;
 
 class CardController extends Controller
 {
@@ -150,7 +152,8 @@ class CardController extends Controller
         $actorLabel = $workflowType->actorLabel($nextStage);
         $headline = "注番 {$card->orderNumber->code} の状態が「{$workflowType->stageLabel($nextStage)}」になりました";
 
-        Mail::to($card->creator->email)->send(
+        $this->sendNotification(
+            $card->creator->email,
             new CardNotificationMail($card->fresh(), $headline, "{$actorLabel}: {$staff->name}")
         );
 
@@ -201,7 +204,7 @@ class CardController extends Controller
             return back()->withErrors(['stage' => '他の操作でカードの状態が変わったため差し戻せませんでした。画面を更新してください。']);
         }
 
-        Mail::to($card->creator->email)->send(new CardNotificationMail(
+        $this->sendNotification($card->creator->email, new CardNotificationMail(
             $card->fresh(),
             "注番 {$card->orderNumber->code} が「{$workflowType->stageLabel($targetStage)}」に差し戻されました",
             "差し戻し操作: {$staff->name}"
@@ -237,8 +240,26 @@ class CardController extends Controller
     {
         $managers = Staff::where('is_procurement_manager', true)->get();
 
+        if ($managers->isEmpty()) {
+            Log::warning("資材管理担当者が0人のため、新規依頼(card_id={$card->id})の通知先がありません。");
+        }
+
         foreach ($managers as $manager) {
-            Mail::to($manager->email)->send(new CardNotificationMail($card, $headline));
+            $this->sendNotification($manager->email, new CardNotificationMail($card, $headline));
+        }
+    }
+
+    /**
+     * メール送信に失敗しても、既に成功しているDB更新まで失敗扱い（500エラー）に
+     * しない。ユーザーが再送信して重複登録を生む事態を避けるため、
+     * 通知の失敗はログに残すだけにとどめる。
+     */
+    private function sendNotification(string $toEmail, CardNotificationMail $mail): void
+    {
+        try {
+            Mail::to($toEmail)->send($mail);
+        } catch (Throwable $e) {
+            Log::error("通知メールの送信に失敗しました（宛先: {$toEmail}）: {$e->getMessage()}");
         }
     }
 }
