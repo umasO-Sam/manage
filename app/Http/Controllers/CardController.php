@@ -144,6 +144,61 @@ class CardController extends Controller
         return back()->with('status', 'card-moved');
     }
 
+    /**
+     * 誤って移動した際の差し戻し。1段階前に戻し、差し戻し自体も履歴として記録する。
+     */
+    public function revert(Request $request, Card $card): RedirectResponse
+    {
+        $this->authorize('revert', $card);
+
+        if ($card->current_stage === 0) {
+            return back()->withErrors(['stage' => 'これ以上前の段階には戻せません。']);
+        }
+
+        $workflowType = $card->workflowType;
+        $targetStage = $card->current_stage - 1;
+
+        /** @var Staff $staff */
+        $staff = $request->user();
+
+        DB::transaction(function () use ($card, $targetStage, $workflowType, $staff) {
+            $card->update(['current_stage' => $targetStage]);
+
+            CardStageLog::create([
+                'card_id' => $card->id,
+                'stage_index' => $targetStage,
+                'stage_label' => "差し戻し（{$workflowType->stageLabel($targetStage)}へ）",
+                'is_reversal' => true,
+                'actor_id' => $staff->id,
+                'moved_at' => now(),
+            ]);
+        });
+
+        Mail::to($card->creator->email)->send(new CardNotificationMail(
+            $card->fresh(),
+            "注番 {$card->order_no} が「{$workflowType->stageLabel($targetStage)}」に差し戻されました",
+            "差し戻し操作: {$staff->name}"
+        ));
+
+        return back()->with('status', 'card-reverted');
+    }
+
+    /**
+     * 最終段階のカードを保持期間を待たずに今すぐ非表示（論理削除）にする。
+     */
+    public function archiveNow(Card $card): RedirectResponse
+    {
+        $this->authorize('archive', $card);
+
+        if ($card->current_stage !== $card->workflowType->lastStageIndex()) {
+            return back()->withErrors(['stage' => '最終段階のカードのみ非表示にできます。']);
+        }
+
+        $card->delete();
+
+        return back()->with('status', 'card-archived');
+    }
+
     public function downloadAttachment(Attachment $attachment): mixed
     {
         $this->authorize('view', $attachment->card);

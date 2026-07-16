@@ -33,7 +33,7 @@ class Card extends Model
 
     public function stageLogs(): HasMany
     {
-        return $this->hasMany(CardStageLog::class)->orderBy('stage_index');
+        return $this->hasMany(CardStageLog::class)->orderBy('moved_at');
     }
 
     public function attachments(): HasMany
@@ -49,5 +49,23 @@ class Card extends Model
     public function isAtFinalStage(): bool
     {
         return $this->current_stage >= $this->workflowType->lastStageIndex();
+    }
+
+    /**
+     * ある段階に「現在」誰が紐付いているかを返す。差し戻し操作のログは
+     * 紐付けとしては無視し、直近の正規の移動ログのみを見る。
+     * 依頼者はcreated_byが常に正なので、段階0はcreatorを直接返す。
+     */
+    public function latestActorForStage(int $stageIndex): ?Staff
+    {
+        if ($stageIndex === 0) {
+            return $this->creator;
+        }
+
+        return $this->stageLogs
+            ->where('stage_index', $stageIndex)
+            ->where('is_reversal', false)
+            ->last()
+            ?->actor;
     }
 }

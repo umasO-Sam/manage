@@ -28,6 +28,16 @@
                     <i data-lucide="check-circle-2" class="w-4 h-4"></i>カードを移動しました。依頼者に通知しました。
                 </div>
             @endif
+            @if (session('status') === 'card-reverted')
+                <div class="mb-4 p-3 rounded-xl bg-amber-50 border border-amber-100 text-amber-800 text-sm flex items-center gap-2">
+                    <i data-lucide="undo-2" class="w-4 h-4"></i>カードを1段階前に差し戻しました。依頼者に通知しました。
+                </div>
+            @endif
+            @if (session('status') === 'card-archived')
+                <div class="mb-4 p-3 rounded-xl bg-slate-100 border border-slate-200 text-slate-700 text-sm flex items-center gap-2">
+                    <i data-lucide="archive" class="w-4 h-4"></i>カードを非表示にしました。
+                </div>
+            @endif
             @if ($errors->any())
                 <div class="mb-4 p-3 rounded-xl bg-red-50 border border-red-100 text-red-800 text-sm">
                     @foreach ($errors->all() as $error)
@@ -95,21 +105,19 @@
                                                     <span>依頼者:</span>
                                                     <span class="font-medium text-slate-700">{{ $card->creator->name }}</span>
                                                 </div>
-                                                @php($handlerLog = $card->stageLogs->firstWhere('stage_index', 1))
                                                 <div class="flex justify-between text-slate-500">
                                                     <span>{{ $workflowType->actorLabel(1) }}:</span>
                                                     <span class="font-medium text-blue-600 flex items-center gap-1 justify-end">
                                                         <i data-lucide="user-check" class="w-3.5 h-3.5"></i>
-                                                        {{ $handlerLog?->actor?->name }}
+                                                        {{ $card->latestActorForStage(1)?->name }}
                                                     </span>
                                                 </div>
                                                 @if ($index === $workflowType->lastStageIndex())
-                                                    @php($receiverLog = $card->stageLogs->firstWhere('stage_index', $index))
                                                     <div class="flex justify-between text-slate-500">
                                                         <span>{{ $workflowType->actorLabel($index) }}:</span>
                                                         <span class="font-medium text-emerald-700 flex items-center gap-1 justify-end">
                                                             <i data-lucide="shield-check" class="w-3.5 h-3.5"></i>
-                                                            {{ $receiverLog?->actor?->name }}
+                                                            {{ $card->latestActorForStage($index)?->name }}
                                                         </span>
                                                     </div>
                                                 @endif
@@ -137,13 +145,40 @@
                                         @endif
                                     </a>
 
-                                    @if ($canAdvance)
-                                        <form id="move-form-{{ $card->id }}" method="POST" action="{{ route('cards.move', $card) }}" class="mt-2">
-                                            @csrf
-                                            <button type="submit" class="w-full text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-100 rounded-lg py-1.5 hover:bg-blue-100 transition-colors flex items-center justify-center gap-1">
-                                                <span>→ {{ $workflowType->stageLabel($index + 1) }}へ進める</span>
-                                            </button>
-                                        </form>
+                                    @if (Auth::user()->is_procurement_manager && ($canAdvance || $index > 0))
+                                        <div class="mt-2 flex gap-1.5">
+                                            @if ($index > 0)
+                                                <form method="POST" action="{{ route('cards.revert', $card) }}" onsubmit="return confirm('このカードを1段階前に差し戻します。よろしいですか？');">
+                                                    @csrf
+                                                    <button type="submit" title="1段階前に戻す" class="text-xs font-semibold text-slate-500 bg-slate-100 border border-slate-200 rounded-lg py-1.5 px-2.5 hover:bg-slate-200 transition-colors flex items-center justify-center gap-1">
+                                                        <i data-lucide="undo-2" class="w-3.5 h-3.5"></i>
+                                                    </button>
+                                                </form>
+                                            @endif
+                                            @if ($canAdvance)
+                                                <form id="move-form-{{ $card->id }}" method="POST" action="{{ route('cards.move', $card) }}" class="flex-grow">
+                                                    @csrf
+                                                    <button type="submit" class="w-full text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-100 rounded-lg py-1.5 hover:bg-blue-100 transition-colors flex items-center justify-center gap-1">
+                                                        <span>→ {{ $workflowType->stageLabel($index + 1) }}へ進める</span>
+                                                    </button>
+                                                </form>
+                                            @endif
+                                        </div>
+                                    @endif
+
+                                    @if ($index === $workflowType->lastStageIndex() && Auth::user()->is_procurement_manager)
+                                        <div class="mt-2 flex items-center justify-between text-[10px] text-slate-500">
+                                            <span class="flex items-center gap-1 text-slate-400">
+                                                <i data-lucide="clock" class="w-3.5 h-3.5"></i>
+                                                {{ $workflowType->retention_days }}日で自動非表示
+                                            </span>
+                                            <form method="POST" action="{{ route('cards.archiveNow', $card) }}" onsubmit="return confirm('このカードを今すぐ非表示（履歴へ移動）にします。よろしいですか？');">
+                                                @csrf
+                                                <button type="submit" class="text-[10px] bg-slate-200 hover:bg-slate-300 text-slate-700 font-medium px-2 py-0.5 rounded transition-all">
+                                                    今すぐ非表示に
+                                                </button>
+                                            </form>
+                                        </div>
                                     @endif
                                 </div>
                             @endforeach

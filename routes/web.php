@@ -13,6 +13,8 @@ Route::middleware('auth')->group(function () {
     Route::post('/cards', [CardController::class, 'store'])->name('cards.store');
     Route::get('/cards/{card}', [CardController::class, 'show'])->name('cards.show');
     Route::post('/cards/{card}/move', [CardController::class, 'move'])->name('cards.move');
+    Route::post('/cards/{card}/revert', [CardController::class, 'revert'])->name('cards.revert');
+    Route::post('/cards/{card}/archive-now', [CardController::class, 'archiveNow'])->name('cards.archiveNow');
     Route::get('/attachments/{attachment}/download', [CardController::class, 'downloadAttachment'])->name('attachments.download');
 
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');

@@ -35,4 +35,21 @@ class CardPolicy
     {
         return $staff->is_procurement_manager;
     }
+
+    /**
+     * Only procurement managers may undo an accidental move back one stage.
+     */
+    public function revert(Staff $staff, Card $card): bool
+    {
+        return $staff->is_procurement_manager;
+    }
+
+    /**
+     * Only procurement managers may hide a completed card immediately,
+     * instead of waiting out the retention period.
+     */
+    public function archive(Staff $staff, Card $card): bool
+    {
+        return $staff->is_procurement_manager;
+    }
 }

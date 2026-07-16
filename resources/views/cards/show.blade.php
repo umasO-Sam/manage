@@ -17,6 +17,9 @@
             @if (session('status') === 'card-moved')
                 <div class="p-3 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-800 text-sm">カードを移動しました。</div>
             @endif
+            @if (session('status') === 'card-reverted')
+                <div class="p-3 rounded-xl bg-amber-50 border border-amber-100 text-amber-800 text-sm">カードを1段階前に差し戻しました。</div>
+            @endif
 
             <div class="bg-white shadow-sm border border-slate-200 rounded-2xl p-6">
                 <div class="flex items-center justify-between mb-5">
@@ -73,11 +76,11 @@
                 <h4 class="font-bold text-xs text-slate-700 uppercase tracking-wider">アサイン状況</h4>
                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
                     @foreach ($card->workflowType->stage_definition as $index => $stage)
-                        @php($log = $card->stageLogs->firstWhere('stage_index', $index))
+                        @php($actor = $card->latestActorForStage($index))
                         <div class="bg-white p-2.5 rounded-lg border border-slate-200">
                             <span class="text-slate-400 block mb-1 font-medium">{{ $index + 1 }}. {{ $stage['actor_label'] }}</span>
                             <span class="font-bold {{ $index === 0 ? 'text-slate-800' : ($index === $card->workflowType->lastStageIndex() ? 'text-emerald-600' : 'text-blue-600') }}">
-                                {{ $log?->actor?->name ?? '未割当' }}
+                                {{ $actor?->name ?? '未割当' }}
                             </span>
                         </div>
                     @endforeach
@@ -89,11 +92,16 @@
                 <div class="relative border-l border-slate-200 pl-4 ml-2 space-y-4">
                     @foreach ($card->stageLogs as $log)
                         <div class="relative">
-                            <span class="absolute -left-[21px] top-1 bg-white border border-slate-300 w-3.5 h-3.5 rounded-full flex items-center justify-center">
-                                <span class="w-1.5 h-1.5 bg-blue-500 rounded-full"></span>
+                            <span class="absolute -left-[21px] top-1 bg-white border w-3.5 h-3.5 rounded-full flex items-center justify-center {{ $log->is_reversal ? 'border-amber-300' : 'border-slate-300' }}">
+                                <span class="w-1.5 h-1.5 rounded-full {{ $log->is_reversal ? 'bg-amber-500' : 'bg-blue-500' }}"></span>
                             </span>
                             <div class="text-xs text-slate-400 font-medium">{{ $log->moved_at->format('Y-m-d H:i') }}</div>
-                            <div class="text-xs text-slate-700 mt-0.5 font-bold">{{ $log->stage_label }}: {{ $log->actor->name }}</div>
+                            <div class="text-xs mt-0.5 font-bold {{ $log->is_reversal ? 'text-amber-700' : 'text-slate-700' }}">
+                                @if ($log->is_reversal)
+                                    <i data-lucide="undo-2" class="w-3 h-3 inline-block align-text-bottom"></i>
+                                @endif
+                                {{ $log->stage_label }}: {{ $log->actor->name }}
+                            </div>
                         </div>
                     @endforeach
                 </div>

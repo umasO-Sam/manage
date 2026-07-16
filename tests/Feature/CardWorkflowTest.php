@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Staff;
 use App\Models\WorkflowType;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Mail;
 use Tests\TestCase;
 
 class CardWorkflowTest extends TestCase
@@ -87,5 +88,100 @@ class CardWorkflowTest extends TestCase
         $this->actingAs($manager)->post("/cards/{$card->id}/move")->assertRedirect();
 
         $this->assertSame(1, $card->fresh()->current_stage);
+    }
+
+    public function test_procurement_manager_can_revert_a_card_and_it_is_logged(): void
+    {
+        Mail::fake();
+
+        $workflowType = $this->purchaseWorkflow();
+        $requester = Staff::factory()->create();
+        $manager = Staff::factory()->procurementManager()->create();
+
+        $card = $workflowType->cards()->create([
+            'order_no' => 'ZZ999-N99T99',
+            'item_name' => 'テスト部品',
+            'manufacturer' => 'テストメーカー',
+            'quantity' => 1,
+            'unit' => '個',
+            'due_date' => now()->addWeek(),
+            'created_by' => $requester->id,
+            'current_stage' => 1,
+        ]);
+
+        $this->actingAs($requester)->post("/cards/{$card->id}/revert")->assertForbidden();
+        $this->assertSame(1, $card->fresh()->current_stage);
+
+        $response = $this->actingAs($manager)->post("/cards/{$card->id}/revert");
+        $response->assertRedirect();
+
+        $this->assertSame(0, $card->fresh()->current_stage);
+        $this->assertDatabaseHas('card_stage_logs', [
+            'card_id' => $card->id,
+            'stage_index' => 0,
+            'is_reversal' => true,
+            'actor_id' => $manager->id,
+        ]);
+    }
+
+    public function test_card_cannot_be_reverted_before_the_first_stage(): void
+    {
+        $workflowType = $this->purchaseWorkflow();
+        $manager = Staff::factory()->procurementManager()->create();
+
+        $card = $workflowType->cards()->create([
+            'order_no' => 'ZZ999-N99T99',
+            'item_name' => 'テスト部品',
+            'manufacturer' => 'テストメーカー',
+            'quantity' => 1,
+            'unit' => '個',
+            'due_date' => now()->addWeek(),
+            'created_by' => $manager->id,
+            'current_stage' => 0,
+        ]);
+
+        $this->actingAs($manager)->post("/cards/{$card->id}/revert")->assertSessionHasErrors('stage');
+        $this->assertSame(0, $card->fresh()->current_stage);
+    }
+
+    public function test_procurement_manager_can_archive_a_card_at_the_final_stage_immediately(): void
+    {
+        $workflowType = $this->purchaseWorkflow();
+        $manager = Staff::factory()->procurementManager()->create();
+
+        $card = $workflowType->cards()->create([
+            'order_no' => 'ZZ999-N99T99',
+            'item_name' => 'テスト部品',
+            'manufacturer' => 'テストメーカー',
+            'quantity' => 1,
+            'unit' => '個',
+            'due_date' => now()->addWeek(),
+            'created_by' => $manager->id,
+            'current_stage' => $workflowType->lastStageIndex(),
+        ]);
+
+        $this->actingAs($manager)->post("/cards/{$card->id}/archive-now")->assertRedirect();
+
+        $this->assertSoftDeleted('cards', ['id' => $card->id]);
+    }
+
+    public function test_card_not_at_final_stage_cannot_be_archived_immediately(): void
+    {
+        $workflowType = $this->purchaseWorkflow();
+        $manager = Staff::factory()->procurementManager()->create();
+
+        $card = $workflowType->cards()->create([
+            'order_no' => 'ZZ999-N99T99',
+            'item_name' => 'テスト部品',
+            'manufacturer' => 'テストメーカー',
+            'quantity' => 1,
+            'unit' => '個',
+            'due_date' => now()->addWeek(),
+            'created_by' => $manager->id,
+            'current_stage' => 0,
+        ]);
+
+        $this->actingAs($manager)->post("/cards/{$card->id}/archive-now")->assertSessionHasErrors('stage');
+        $this->assertDatabaseHas('cards', ['id' => $card->id, 'deleted_at' => null]);
     }
 }

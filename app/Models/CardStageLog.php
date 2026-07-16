@@ -6,13 +6,14 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['card_id', 'stage_index', 'stage_label', 'actor_id', 'moved_at'])]
+#[Fillable(['card_id', 'stage_index', 'stage_label', 'is_reversal', 'actor_id', 'moved_at'])]
 class CardStageLog extends Model
 {
     protected function casts(): array
     {
         return [
             'moved_at' => 'datetime',
+            'is_reversal' => 'boolean',
         ];
     }
 
