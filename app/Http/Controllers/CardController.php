@@ -111,7 +111,8 @@ class CardController extends Controller
         $this->authorize('advance', $card);
 
         $workflowType = $card->workflowType;
-        $nextStage = $card->current_stage + 1;
+        $currentStage = $card->current_stage;
+        $nextStage = $currentStage + 1;
 
         if ($nextStage > $workflowType->lastStageIndex()) {
             return back()->withErrors(['stage' => 'このカードはすでに最終段階です。']);
@@ -120,8 +121,16 @@ class CardController extends Controller
         /** @var Staff $staff */
         $staff = $request->user();
 
-        DB::transaction(function () use ($card, $nextStage, $workflowType, $staff) {
-            $card->update(['current_stage' => $nextStage]);
+        // current_stageが読み取り時のままの場合のみ更新する（連打・複数タブによる
+        // 同時操作でステージ履歴・通知メールが二重に生成されるのを防ぐ）。
+        $moved = DB::transaction(function () use ($card, $currentStage, $nextStage, $workflowType, $staff) {
+            $updated = Card::where('id', $card->id)
+                ->where('current_stage', $currentStage)
+                ->update(['current_stage' => $nextStage]);
+
+            if ($updated === 0) {
+                return false;
+            }
 
             CardStageLog::create([
                 'card_id' => $card->id,
@@ -130,7 +139,13 @@ class CardController extends Controller
                 'actor_id' => $staff->id,
                 'moved_at' => now(),
             ]);
+
+            return true;
         });
+
+        if (! $moved) {
+            return back()->withErrors(['stage' => '他の操作でカードの状態が変わったため移動できませんでした。画面を更新してください。']);
+        }
 
         $actorLabel = $workflowType->actorLabel($nextStage);
         $headline = "注番 {$card->orderNumber->code} の状態が「{$workflowType->stageLabel($nextStage)}」になりました";
@@ -149,18 +164,26 @@ class CardController extends Controller
     {
         $this->authorize('revert', $card);
 
-        if ($card->current_stage === 0) {
+        $currentStage = $card->current_stage;
+
+        if ($currentStage === 0) {
             return back()->withErrors(['stage' => 'これ以上前の段階には戻せません。']);
         }
 
         $workflowType = $card->workflowType;
-        $targetStage = $card->current_stage - 1;
+        $targetStage = $currentStage - 1;
 
         /** @var Staff $staff */
         $staff = $request->user();
 
-        DB::transaction(function () use ($card, $targetStage, $workflowType, $staff) {
-            $card->update(['current_stage' => $targetStage]);
+        $reverted = DB::transaction(function () use ($card, $currentStage, $targetStage, $workflowType, $staff) {
+            $updated = Card::where('id', $card->id)
+                ->where('current_stage', $currentStage)
+                ->update(['current_stage' => $targetStage]);
+
+            if ($updated === 0) {
+                return false;
+            }
 
             CardStageLog::create([
                 'card_id' => $card->id,
@@ -170,7 +193,13 @@ class CardController extends Controller
                 'actor_id' => $staff->id,
                 'moved_at' => now(),
             ]);
+
+            return true;
         });
+
+        if (! $reverted) {
+            return back()->withErrors(['stage' => '他の操作でカードの状態が変わったため差し戻せませんでした。画面を更新してください。']);
+        }
 
         Mail::to($card->creator->email)->send(new CardNotificationMail(
             $card->fresh(),

@@ -144,6 +144,58 @@ class CardWorkflowTest extends TestCase
         $this->assertSame(1, $card->fresh()->current_stage);
     }
 
+    public function test_card_is_not_advanced_twice_by_a_concurrent_move(): void
+    {
+        $workflowType = $this->purchaseWorkflow();
+        $orderNumber = $this->orderNumber();
+        $manager = Staff::factory()->procurementManager()->create();
+
+        $card = $workflowType->cards()->create([
+            'order_number_id' => $orderNumber->id,
+            'item_name' => 'テスト部品',
+            'manufacturer' => 'テストメーカー',
+            'quantity' => 1,
+            'unit' => '個',
+            'due_date' => now()->addWeek(),
+            'created_by' => $manager->id,
+            'current_stage' => 0,
+        ]);
+
+        $this->actingAs($manager)->post("/cards/{$card->id}/move")->assertRedirect();
+        $this->assertSame(1, $card->fresh()->current_stage);
+
+        // 「まだstage=0を読んでいた」2つ目の同時リクエストを模す。move()が使う
+        // where(current_stage, 読み取り時の値)のガードが効いていれば0件更新になる。
+        $affected = \App\Models\Card::where('id', $card->id)->where('current_stage', 0)->update(['current_stage' => 1]);
+        $this->assertSame(0, $affected);
+
+        // ステージ履歴が二重に記録されていないこと
+        // (このカードはEloquentで直接作成しているため作成時ログは無く、移動の1件のみ)
+        $this->assertSame(1, $card->stageLogs()->count());
+    }
+
+    public function test_attachment_with_disallowed_file_type_is_rejected(): void
+    {
+        $workflowType = $this->purchaseWorkflow();
+        $orderNumber = $this->orderNumber();
+        $staff = Staff::factory()->create();
+
+        $response = $this->actingAs($staff)->post(route('cards.store', $workflowType), [
+            'order_number_id' => $orderNumber->id,
+            'item_name' => 'テスト部品',
+            'manufacturer' => 'テストメーカー',
+            'quantity' => 1,
+            'unit' => '個',
+            'due_date' => now()->addWeek()->toDateString(),
+            'attachments' => [
+                \Illuminate\Http\UploadedFile::fake()->create('malicious.php', 10),
+            ],
+        ]);
+
+        $response->assertSessionHasErrors('attachments.0');
+        $this->assertDatabaseCount('cards', 0);
+    }
+
     public function test_procurement_manager_can_revert_a_card_and_it_is_logged(): void
     {
         Mail::fake();

@@ -3,10 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Models\Staff;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 /**
@@ -37,11 +39,17 @@ class StaffController extends Controller
             'password' => ['required', 'string', 'min:8'],
         ]);
 
-        Staff::create([
-            ...$data,
-            'password' => Hash::make($data['password']),
-            'is_procurement_manager' => $request->boolean('is_procurement_manager'),
-        ]);
+        // アプリ側のunique検証後に別リクエストが割り込む競合状態に備え、
+        // DB側の一意制約違反も500エラーにせず通常の入力エラーとして扱う。
+        try {
+            Staff::create([
+                ...$data,
+                'password' => Hash::make($data['password']),
+                'is_procurement_manager' => $request->boolean('is_procurement_manager'),
+            ]);
+        } catch (UniqueConstraintViolationException) {
+            throw ValidationException::withMessages(['login_id' => 'このログインIDまたはメールアドレスはすでに使用されています。']);
+        }
 
         return redirect()->route('staff.index')->with('status', 'staff-created');
     }
@@ -74,7 +82,11 @@ class StaffController extends Controller
             $staff->password = Hash::make($data['password']);
         }
 
-        $staff->save();
+        try {
+            $staff->save();
+        } catch (UniqueConstraintViolationException) {
+            throw ValidationException::withMessages(['login_id' => 'このログインIDまたはメールアドレスはすでに使用されています。']);
+        }
 
         return redirect()->route('staff.index')->with('status', 'staff-updated');
     }

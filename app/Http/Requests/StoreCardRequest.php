@@ -30,7 +30,7 @@ class StoreCardRequest extends FormRequest
             'unit' => ['required', 'string', 'max:20'],
             'due_date' => ['required', 'date'],
             'attachments' => ['array'],
-            'attachments.*' => ['file', 'max:10240'], // 10MB (KB単位)
+            'attachments.*' => ['file', 'max:10240', 'mimes:pdf,jpg,jpeg,png,gif,webp,doc,docx,xls,xlsx'], // 10MB (KB単位)
         ];
     }
 
@@ -40,6 +40,7 @@ class StoreCardRequest extends FormRequest
             'order_number_id.required' => '注番を選択してください。',
             'order_number_id.exists' => '選択された注番が見つかりません。',
             'attachments.*.max' => '添付ファイルは1ファイルあたり10MBまでです。',
+            'attachments.*.mimes' => '添付ファイルはPDF・画像・Office文書のみアップロードできます。',
         ];
     }
 }

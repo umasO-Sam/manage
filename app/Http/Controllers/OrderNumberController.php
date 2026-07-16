@@ -3,8 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Models\OrderNumber;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 /**
@@ -44,7 +46,14 @@ class OrderNumberController extends Controller
             'code.unique' => 'この注番はすでに登録されています。',
         ]);
 
-        OrderNumber::create(['code' => $data['code'], 'is_protected' => false]);
+        // アプリ側のunique検証と登録の間に別リクエストが割り込む競合状態
+        // （連打・複数タブでの同時登録）に備え、DB側の一意制約違反も
+        // 500エラーにせず通常の入力エラーとして扱う。
+        try {
+            OrderNumber::create(['code' => $data['code'], 'is_protected' => false]);
+        } catch (UniqueConstraintViolationException) {
+            throw ValidationException::withMessages(['code' => 'この注番はすでに登録されています。']);
+        }
 
         return redirect()->route('order-numbers.index')->with('status', 'order-number-created');
     }
