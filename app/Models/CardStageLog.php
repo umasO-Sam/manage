@@ -19,7 +19,7 @@ class CardStageLog extends Model
 
     public function card(): BelongsTo
     {
-        return $this->belongsTo(Card::class);
+        return $this->belongsTo(Card::class)->withTrashed();
     }
 
     public function actor(): BelongsTo

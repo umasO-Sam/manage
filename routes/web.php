@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\ArchiveController;
 use App\Http\Controllers\CardController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\StaffController;
@@ -12,11 +13,14 @@ Route::middleware('auth')->group(function () {
     Route::get('/boards/{workflow}/create', [CardController::class, 'create'])->name('cards.create');
     Route::post('/boards/{workflow}', [CardController::class, 'store'])->name('cards.store');
 
-    Route::get('/cards/{card}', [CardController::class, 'show'])->name('cards.show');
+    // withTrashed: アーカイブ(論理削除)済みカードの詳細も履歴検索から参照できるようにする
+    Route::get('/cards/{card}', [CardController::class, 'show'])->name('cards.show')->withTrashed();
     Route::post('/cards/{card}/move', [CardController::class, 'move'])->name('cards.move');
     Route::post('/cards/{card}/revert', [CardController::class, 'revert'])->name('cards.revert');
     Route::post('/cards/{card}/archive-now', [CardController::class, 'archiveNow'])->name('cards.archiveNow');
     Route::get('/attachments/{attachment}/download', [CardController::class, 'downloadAttachment'])->name('attachments.download');
+
+    Route::get('/archive', [ArchiveController::class, 'index'])->name('archive.index');
 
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');

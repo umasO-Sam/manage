@@ -8,9 +8,15 @@
                 <span class="text-[10px] font-bold px-2 py-0.5 rounded-full {{ $accent['badge_solid_bg'] }} {{ $accent['badge_solid_text'] }}">{{ $card->workflowType->name }}</span>
                 <h2 class="font-bold text-slate-900 text-lg font-mono">{{ $card->order_no }}</h2>
             </div>
-            <a href="{{ route('cards.index', $card->workflowType) }}" class="text-sm text-slate-500 hover:text-slate-700 flex items-center gap-1">
-                <i data-lucide="arrow-left" class="w-4 h-4"></i>ボードへ戻る
-            </a>
+            @if ($card->trashed())
+                <a href="{{ route('archive.index') }}" class="text-sm text-slate-500 hover:text-slate-700 flex items-center gap-1">
+                    <i data-lucide="arrow-left" class="w-4 h-4"></i>履歴一覧へ戻る
+                </a>
+            @else
+                <a href="{{ route('cards.index', $card->workflowType) }}" class="text-sm text-slate-500 hover:text-slate-700 flex items-center gap-1">
+                    <i data-lucide="arrow-left" class="w-4 h-4"></i>ボードへ戻る
+                </a>
+            @endif
         </div>
     </x-slot>
 
@@ -26,6 +32,12 @@
             @endif
             @if (session('status') === 'card-reverted')
                 <div class="p-3 rounded-xl bg-amber-50 border border-amber-100 text-amber-800 text-sm">カードを1段階前に差し戻しました。</div>
+            @endif
+            @if ($card->trashed())
+                <div class="p-3 rounded-xl bg-slate-100 border border-slate-200 text-slate-600 text-sm flex items-center gap-2">
+                    <i data-lucide="archive" class="w-4 h-4"></i>
+                    このカードは履歴（アーカイブ）として保存されています。ボード上には表示されません。
+                </div>
             @endif
 
             <div class="bg-white shadow-sm border border-slate-200 rounded-2xl p-6">

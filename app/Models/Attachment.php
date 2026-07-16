@@ -9,9 +9,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 #[Fillable(['card_id', 'file_name', 'path', 'size_bytes', 'uploaded_by'])]
 class Attachment extends Model
 {
+    /**
+     * アーカイブ済み（論理削除済み）カードの添付資料も参照できるよう withTrashed。
+     */
     public function card(): BelongsTo
     {
-        return $this->belongsTo(Card::class);
+        return $this->belongsTo(Card::class)->withTrashed();
     }
 
     public function uploader(): BelongsTo
