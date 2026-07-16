@@ -11,7 +11,7 @@
 | 品名 | {{ $card->item_name }} |
 | メーカー | {{ $card->manufacturer }} |
 | 数量 | {{ $card->quantity }}{{ $card->unit }} |
-| 希望納期 | {{ $card->due_date->format('Y-m-d') }} |
+| {{ $card->workflowType->due_date_label }} | {{ $card->due_date->format('Y-m-d') }} |
 | 依頼者 | {{ $card->creator->name }} |
 | 現在の状態 | {{ $card->currentStageLabel() }} |
 

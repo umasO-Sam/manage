@@ -22,38 +22,34 @@ class CardController extends Controller
     use AuthorizesRequests;
 
     /**
-     * カンバンボード表示（購入部品手配ワークフロー）
+     * カンバンボード表示（ワークフロー種別ごと）
      */
-    public function index(): View
+    public function index(WorkflowType $workflow): View
     {
         $this->authorize('viewAny', Card::class);
 
-        $workflowType = WorkflowType::where('slug', 'purchase')->firstOrFail();
-
-        $cards = $workflowType->cards()
+        $cards = $workflow->cards()
             ->with(['creator', 'stageLogs.actor', 'attachments'])
             ->orderBy('due_date')
             ->get()
             ->groupBy('current_stage');
 
         return view('cards.index', [
-            'workflowType' => $workflowType,
+            'workflowType' => $workflow,
             'cardsByStage' => $cards,
         ]);
     }
 
-    public function create(): View
+    public function create(WorkflowType $workflow): View
     {
         $this->authorize('create', Card::class);
 
-        $workflowType = WorkflowType::where('slug', 'purchase')->firstOrFail();
-
-        return view('cards.create', ['workflowType' => $workflowType]);
+        return view('cards.create', ['workflowType' => $workflow]);
     }
 
-    public function store(StoreCardRequest $request): RedirectResponse
+    public function store(StoreCardRequest $request, WorkflowType $workflow): RedirectResponse
     {
-        $workflowType = WorkflowType::where('slug', 'purchase')->firstOrFail();
+        $workflowType = $workflow;
 
         /** @var Staff $staff */
         $staff = $request->user();
@@ -89,7 +85,7 @@ class CardController extends Controller
             return $card;
         });
 
-        $this->notifyProcurementManagers($card, '新しい購入部品手配の依頼が届きました');
+        $this->notifyProcurementManagers($card, "新しい{$workflowType->name}の依頼が届きました");
 
         return redirect()->route('cards.show', $card)->with('status', 'card-created');
     }
@@ -133,9 +129,7 @@ class CardController extends Controller
         });
 
         $actorLabel = $workflowType->actorLabel($nextStage);
-        $headline = $nextStage === $workflowType->lastStageIndex()
-            ? "注番 {$card->order_no} が入荷しました"
-            : "注番 {$card->order_no} の手配を開始しました";
+        $headline = "注番 {$card->order_no} の状態が「{$workflowType->stageLabel($nextStage)}」になりました";
 
         Mail::to($card->creator->email)->send(
             new CardNotificationMail($card->fresh(), $headline, "{$actorLabel}: {$staff->name}")

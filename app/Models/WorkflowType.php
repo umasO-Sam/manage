@@ -6,14 +6,23 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['slug', 'name', 'stage_definition', 'retention_days'])]
+#[Fillable(['slug', 'name', 'due_date_label', 'icon', 'allows_reference_order_no', 'stage_definition', 'retention_days'])]
 class WorkflowType extends Model
 {
     protected function casts(): array
     {
         return [
             'stage_definition' => 'array',
+            'allows_reference_order_no' => 'boolean',
         ];
+    }
+
+    /**
+     * ルートモデル結合で {workflow} を slug から解決する（IDではなく）。
+     */
+    public function getRouteKeyName(): string
+    {
+        return 'slug';
     }
 
     public function cards(): HasMany

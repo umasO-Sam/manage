@@ -1,7 +1,7 @@
 <x-app-layout>
     <x-slot name="header">
         <h2 class="font-semibold text-xl text-slate-900 flex items-center gap-2">
-            <i data-lucide="shopping-cart" class="w-5 h-5 text-blue-600"></i>
+            <i data-lucide="{{ $workflowType->icon }}" class="w-5 h-5 text-blue-600"></i>
             <span>{{ $workflowType->name }} — 新規依頼</span>
         </h2>
     </x-slot>
@@ -10,16 +10,22 @@
         <div class="max-w-2xl mx-auto sm:px-6 lg:px-8">
             <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
                 <div class="p-5 bg-slate-50 border-b border-slate-200">
-                    <h3 class="font-bold text-slate-900 text-base">部品手配の新規依頼</h3>
+                    <h3 class="font-bold text-slate-900 text-base">{{ $workflowType->name }}の新規依頼</h3>
                 </div>
 
-                <form method="POST" action="{{ route('cards.store') }}" enctype="multipart/form-data" class="p-6 space-y-5">
+                <form method="POST" action="{{ route('cards.store', $workflowType) }}" enctype="multipart/form-data" class="p-6 space-y-5">
                     @csrf
 
                     <div>
                         <x-input-label for="order_no" value="注番" />
-                        <x-text-input id="order_no" name="order_no" type="text" class="mt-1 block w-full font-mono" :value="old('order_no')" required placeholder="例: ZZ999-N99T99" />
-                        <p class="mt-1 text-[11px] text-slate-400">英数5〜7文字 - 英数3〜10文字</p>
+                        <x-text-input id="order_no" name="order_no" type="text" class="mt-1 block w-full font-mono" :value="old('order_no')" required
+                            placeholder="{{ $workflowType->allows_reference_order_no ? '例: ZZ999-N99T99 または 参考' : '例: ZZ999-N99T99' }}" />
+                        <p class="mt-1 text-[11px] text-slate-400">
+                            英数5〜7文字 - 英数3〜10文字
+                            @if ($workflowType->allows_reference_order_no)
+                                （注番を取得していない場合は「参考」と入力）
+                            @endif
+                        </p>
                         <x-input-error class="mt-2" :messages="$errors->get('order_no')" />
                     </div>
 
@@ -49,7 +55,7 @@
                     </div>
 
                     <div>
-                        <x-input-label for="due_date" value="希望納期" />
+                        <x-input-label for="due_date" :value="$workflowType->due_date_label" />
                         <x-text-input id="due_date" name="due_date" type="date" class="mt-1 block w-full" :value="old('due_date')" required />
                         <x-input-error class="mt-2" :messages="$errors->get('due_date')" />
                     </div>
@@ -67,7 +73,7 @@
                     </div>
 
                     <div class="flex justify-end gap-3 pt-4 border-t border-slate-100">
-                        <a href="{{ route('cards.index') }}" class="px-4 py-2 text-sm font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors">
+                        <a href="{{ route('cards.index', $workflowType) }}" class="px-4 py-2 text-sm font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors">
                             キャンセル
                         </a>
                         <x-primary-button>依頼を送信</x-primary-button>

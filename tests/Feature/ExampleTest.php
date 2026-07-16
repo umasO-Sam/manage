@@ -13,7 +13,7 @@ class ExampleTest extends TestCase
     public function test_root_redirects_to_the_board_which_requires_login(): void
     {
         $response = $this->get('/');
-        $response->assertRedirect('/cards');
+        $response->assertRedirect('/boards/purchase');
 
         $this->followingRedirects()->get('/')->assertViewIs('auth.login');
     }

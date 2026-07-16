@@ -2,10 +2,10 @@
     <x-slot name="header">
         <div class="flex items-center justify-between">
             <div class="flex items-center gap-2">
-                <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-800">購入手配</span>
+                <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-800">{{ $card->workflowType->name }}</span>
                 <h2 class="font-bold text-slate-900 text-lg font-mono">{{ $card->order_no }}</h2>
             </div>
-            <a href="{{ route('cards.index') }}" class="text-sm text-slate-500 hover:text-slate-700 flex items-center gap-1">
+            <a href="{{ route('cards.index', $card->workflowType) }}" class="text-sm text-slate-500 hover:text-slate-700 flex items-center gap-1">
                 <i data-lucide="arrow-left" class="w-4 h-4"></i>ボードへ戻る
             </a>
         </div>
@@ -42,7 +42,7 @@
                         <span class="text-sm font-bold text-slate-900">{{ $card->quantity }}{{ $card->unit }}</span>
                     </div>
                     <div>
-                        <span class="text-xs font-semibold text-slate-400 block">希望納期</span>
+                        <span class="text-xs font-semibold text-slate-400 block">{{ $card->workflowType->due_date_label }}</span>
                         <span class="text-sm font-bold text-slate-900">{{ $card->due_date->format('Y-m-d') }}</span>
                     </div>
                     <div class="col-span-2">

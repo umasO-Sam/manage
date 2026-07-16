@@ -3,12 +3,12 @@
         <div class="flex justify-between items-center flex-wrap gap-4">
             <div>
                 <h1 class="text-2xl font-bold text-slate-900 flex items-center gap-2">
-                    <i data-lucide="shopping-cart" class="text-blue-600 w-6 h-6"></i>
+                    <i data-lucide="{{ $workflowType->icon }}" class="text-blue-600 w-6 h-6"></i>
                     <span>{{ $workflowType->name }}ボード</span>
                 </h1>
-                <p class="text-xs text-slate-500 mt-1">社内の部品調達プロセスを一括して可視化・管理するカンバンボードです</p>
+                <p class="text-xs text-slate-500 mt-1">社内の{{ $workflowType->name }}プロセスを一括して可視化・管理するカンバンボードです</p>
             </div>
-            <a href="{{ route('cards.create') }}" class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-xl shadow-sm hover:shadow flex items-center gap-2 text-sm transition-all">
+            <a href="{{ route('cards.create', $workflowType) }}" class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-xl shadow-sm hover:shadow flex items-center gap-2 text-sm transition-all">
                 <i data-lucide="plus-circle" class="w-4 h-4"></i>
                 <span>新規依頼を作成</span>
             </a>

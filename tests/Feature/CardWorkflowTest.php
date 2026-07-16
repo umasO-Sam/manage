@@ -17,6 +17,9 @@ class CardWorkflowTest extends TestCase
         return WorkflowType::create([
             'slug' => 'purchase',
             'name' => '購入部品手配',
+            'due_date_label' => '希望納期',
+            'icon' => 'shopping-cart',
+            'allows_reference_order_no' => false,
             'stage_definition' => [
                 ['label' => '新規依頼', 'actor_label' => '依頼者'],
                 ['label' => '手配中', 'actor_label' => '手配担当者'],
@@ -26,12 +29,29 @@ class CardWorkflowTest extends TestCase
         ]);
     }
 
+    private function estimateWorkflow(): WorkflowType
+    {
+        return WorkflowType::create([
+            'slug' => 'estimate',
+            'name' => '見積り依頼',
+            'due_date_label' => '希望回答期限',
+            'icon' => 'file-text',
+            'allows_reference_order_no' => true,
+            'stage_definition' => [
+                ['label' => '新規依頼', 'actor_label' => '依頼者'],
+                ['label' => '見積依頼中', 'actor_label' => '手配担当者'],
+                ['label' => '回答受領', 'actor_label' => '確認担当者'],
+            ],
+            'retention_days' => 7,
+        ]);
+    }
+
     public function test_any_staff_member_can_create_a_card(): void
     {
-        $this->purchaseWorkflow();
+        $workflowType = $this->purchaseWorkflow();
         $staff = Staff::factory()->create();
 
-        $response = $this->actingAs($staff)->post('/cards', [
+        $response = $this->actingAs($staff)->post(route('cards.store', $workflowType), [
             'order_no' => 'ZZ999-N99T99',
             'item_name' => 'テスト部品',
             'manufacturer' => 'テストメーカー',
@@ -50,18 +70,78 @@ class CardWorkflowTest extends TestCase
 
     public function test_order_no_must_match_the_required_format(): void
     {
-        $this->purchaseWorkflow();
+        $workflowType = $this->purchaseWorkflow();
         $staff = Staff::factory()->create();
 
-        $response = $this->actingAs($staff)->post('/cards', [
+        $response = $this->actingAs($staff)->post(route('cards.store', $workflowType), [
             'order_no' => 'invalid!!',
             'item_name' => 'テスト部品',
             'manufacturer' => 'テストメーカー',
             'quantity' => 2,
+            'unit' => '個',
             'due_date' => now()->addWeek()->toDateString(),
         ]);
 
         $response->assertSessionHasErrors('order_no');
+    }
+
+    public function test_estimate_workflow_allows_reference_order_no(): void
+    {
+        $workflowType = $this->estimateWorkflow();
+        $staff = Staff::factory()->create();
+
+        $response = $this->actingAs($staff)->post(route('cards.store', $workflowType), [
+            'order_no' => '参考',
+            'item_name' => 'テスト部品',
+            'manufacturer' => 'テストメーカー',
+            'quantity' => 2,
+            'unit' => '個',
+            'due_date' => now()->addWeek()->toDateString(),
+        ]);
+
+        $response->assertRedirect();
+        $this->assertDatabaseHas('cards', ['order_no' => '参考', 'workflow_type_id' => $workflowType->id]);
+    }
+
+    public function test_purchase_workflow_rejects_reference_order_no(): void
+    {
+        $workflowType = $this->purchaseWorkflow();
+        $staff = Staff::factory()->create();
+
+        $response = $this->actingAs($staff)->post(route('cards.store', $workflowType), [
+            'order_no' => '参考',
+            'item_name' => 'テスト部品',
+            'manufacturer' => 'テストメーカー',
+            'quantity' => 2,
+            'unit' => '個',
+            'due_date' => now()->addWeek()->toDateString(),
+        ]);
+
+        $response->assertSessionHasErrors('order_no');
+    }
+
+    public function test_boards_only_show_cards_from_their_own_workflow(): void
+    {
+        $purchase = $this->purchaseWorkflow();
+        $estimate = $this->estimateWorkflow();
+        $staff = Staff::factory()->create();
+
+        $purchase->cards()->create([
+            'order_no' => 'ZZ999-N99T99', 'item_name' => 'ポンプ試験用パーツ', 'manufacturer' => 'メーカーA',
+            'quantity' => 1, 'unit' => '個', 'due_date' => now()->addWeek(), 'created_by' => $staff->id, 'current_stage' => 0,
+        ]);
+        $estimate->cards()->create([
+            'order_no' => '参考', 'item_name' => '筐体見積り対象品', 'manufacturer' => 'メーカーB',
+            'quantity' => 1, 'unit' => '個', 'due_date' => now()->addWeek(), 'created_by' => $staff->id, 'current_stage' => 0,
+        ]);
+
+        // ナビゲーションには両方のボードへのリンクが常に表示されるため、
+        // 各ワークフロー固有の品名（カード内容）で判定する。
+        $purchaseBoard = $this->actingAs($staff)->get(route('cards.index', $purchase));
+        $purchaseBoard->assertSee('ポンプ試験用パーツ')->assertDontSee('筐体見積り対象品');
+
+        $estimateBoard = $this->actingAs($staff)->get(route('cards.index', $estimate));
+        $estimateBoard->assertSee('筐体見積り対象品')->assertDontSee('ポンプ試験用パーツ');
     }
 
     public function test_only_procurement_managers_can_advance_a_card(): void

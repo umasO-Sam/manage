@@ -27,10 +27,27 @@ class DatabaseSeeder extends Seeder
         WorkflowType::create([
             'slug' => 'purchase',
             'name' => '購入部品手配',
+            'due_date_label' => '希望納期',
+            'icon' => 'shopping-cart',
+            'allows_reference_order_no' => false,
             'stage_definition' => [
                 ['label' => '新規依頼', 'actor_label' => '依頼者'],
                 ['label' => '手配中', 'actor_label' => '手配担当者'],
                 ['label' => '入荷', 'actor_label' => '受入担当者'],
+            ],
+            'retention_days' => 7,
+        ]);
+
+        WorkflowType::create([
+            'slug' => 'estimate',
+            'name' => '見積り依頼',
+            'due_date_label' => '希望回答期限',
+            'icon' => 'file-text',
+            'allows_reference_order_no' => true,
+            'stage_definition' => [
+                ['label' => '新規依頼', 'actor_label' => '依頼者'],
+                ['label' => '見積依頼中', 'actor_label' => '手配担当者'],
+                ['label' => '回答受領', 'actor_label' => '確認担当者'],
             ],
             'retention_days' => 7,
         ]);

@@ -5,12 +5,13 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\StaffController;
 use Illuminate\Support\Facades\Route;
 
-Route::redirect('/', '/cards');
+Route::redirect('/', '/boards/purchase');
 
 Route::middleware('auth')->group(function () {
-    Route::get('/cards', [CardController::class, 'index'])->name('cards.index');
-    Route::get('/cards/create', [CardController::class, 'create'])->name('cards.create');
-    Route::post('/cards', [CardController::class, 'store'])->name('cards.store');
+    Route::get('/boards/{workflow}', [CardController::class, 'index'])->name('cards.index');
+    Route::get('/boards/{workflow}/create', [CardController::class, 'create'])->name('cards.create');
+    Route::post('/boards/{workflow}', [CardController::class, 'store'])->name('cards.store');
+
     Route::get('/cards/{card}', [CardController::class, 'show'])->name('cards.show');
     Route::post('/cards/{card}/move', [CardController::class, 'move'])->name('cards.move');
     Route::post('/cards/{card}/revert', [CardController::class, 'revert'])->name('cards.revert');
