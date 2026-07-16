@@ -57,7 +57,7 @@
                             @forelse ($cards as $card)
                                 @php($rowAccent = $card->workflowType->accentClasses())
                                 <tr class="hover:bg-slate-50">
-                                    <td class="p-4 font-mono font-semibold text-slate-800">{{ $card->order_no }}</td>
+                                    <td class="p-4 font-mono font-semibold text-slate-800">{{ $card->orderNumber->code }}</td>
                                     <td class="p-4">
                                         <span class="text-[11px] font-bold px-2.5 py-0.5 rounded-full {{ $rowAccent['badge_solid_bg'] }} {{ $rowAccent['badge_solid_text'] }}">{{ $card->workflowType->name }}</span>
                                     </td>

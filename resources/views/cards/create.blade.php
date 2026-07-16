@@ -24,16 +24,20 @@
                     @csrf
 
                     <div>
-                        <x-input-label for="order_no" value="注番" />
-                        <x-text-input id="order_no" name="order_no" type="text" class="mt-1 block w-full font-mono" :value="old('order_no')" required
-                            placeholder="{{ $workflowType->allows_reference_order_no ? '例: ZZ999-N99T99 または 参考' : '例: ZZ999-N99T99' }}" />
+                        <x-input-label for="order_number_id" value="注番" />
+                        <select id="order_number_id" name="order_number_id" required
+                                class="mt-1 block w-full font-mono border-slate-300 focus:border-blue-500 focus:ring-blue-500 rounded-lg shadow-sm text-sm">
+                            <option value="" disabled selected>選択してください</option>
+                            @foreach ($orderNumbers as $orderNumber)
+                                <option value="{{ $orderNumber->id }}" @selected((string) old('order_number_id') === (string) $orderNumber->id)>
+                                    {{ $orderNumber->code }}
+                                </option>
+                            @endforeach
+                        </select>
                         <p class="mt-1 text-[11px] text-slate-400">
-                            英数5〜7文字 - 英数3〜10文字
-                            @if ($workflowType->allows_reference_order_no)
-                                （注番を取得していない場合は「参考」と入力）
-                            @endif
+                            注番が一覧にない場合は資材管理担当者に登録を依頼してください（未取得の場合は「未定」、社内利用の場合は「社内」を選択）。
                         </p>
-                        <x-input-error class="mt-2" :messages="$errors->get('order_no')" />
+                        <x-input-error class="mt-2" :messages="$errors->get('order_number_id')" />
                     </div>
 
                     <div>

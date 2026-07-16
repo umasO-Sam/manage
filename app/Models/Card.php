@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-#[Fillable(['workflow_type_id', 'order_no', 'item_name', 'manufacturer', 'quantity', 'unit', 'due_date', 'created_by', 'current_stage'])]
+#[Fillable(['workflow_type_id', 'order_number_id', 'item_name', 'manufacturer', 'quantity', 'unit', 'due_date', 'created_by', 'current_stage'])]
 class Card extends Model
 {
     use SoftDeletes;
@@ -24,6 +24,11 @@ class Card extends Model
     public function workflowType(): BelongsTo
     {
         return $this->belongsTo(WorkflowType::class);
+    }
+
+    public function orderNumber(): BelongsTo
+    {
+        return $this->belongsTo(OrderNumber::class);
     }
 
     public function creator(): BelongsTo

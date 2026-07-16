@@ -30,7 +30,7 @@ class CardNotificationMail extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: "【部品調達管理】{$this->headline}（注番: {$this->card->order_no}）",
+            subject: "【部品調達管理】{$this->headline}（注番: {$this->card->orderNumber->code}）",
         );
     }
 

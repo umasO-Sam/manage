@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\OrderNumber;
 use App\Models\Staff;
 use App\Models\WorkflowType;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -20,7 +21,6 @@ class CardWorkflowTest extends TestCase
             'due_date_label' => '希望納期',
             'icon' => 'shopping-cart',
             'accent' => 'blue',
-            'allows_reference_order_no' => false,
             'stage_definition' => [
                 ['label' => '新規依頼', 'actor_label' => '依頼者'],
                 ['label' => '手配中', 'actor_label' => '手配担当者'],
@@ -38,7 +38,6 @@ class CardWorkflowTest extends TestCase
             'due_date_label' => '希望回答期限',
             'icon' => 'file-text',
             'accent' => 'orange',
-            'allows_reference_order_no' => true,
             'stage_definition' => [
                 ['label' => '新規依頼', 'actor_label' => '依頼者'],
                 ['label' => '見積依頼中', 'actor_label' => '手配担当者'],
@@ -48,13 +47,19 @@ class CardWorkflowTest extends TestCase
         ]);
     }
 
+    private function orderNumber(string $code = 'ZZ999-N99T99'): OrderNumber
+    {
+        return OrderNumber::create(['code' => $code, 'is_protected' => false]);
+    }
+
     public function test_any_staff_member_can_create_a_card(): void
     {
         $workflowType = $this->purchaseWorkflow();
+        $orderNumber = $this->orderNumber();
         $staff = Staff::factory()->create();
 
         $response = $this->actingAs($staff)->post(route('cards.store', $workflowType), [
-            'order_no' => 'ZZ999-N99T99',
+            'order_number_id' => $orderNumber->id,
             'item_name' => 'テスト部品',
             'manufacturer' => 'テストメーカー',
             'quantity' => 2,
@@ -64,19 +69,19 @@ class CardWorkflowTest extends TestCase
 
         $response->assertRedirect();
         $this->assertDatabaseHas('cards', [
-            'order_no' => 'ZZ999-N99T99',
+            'order_number_id' => $orderNumber->id,
             'created_by' => $staff->id,
             'current_stage' => 0,
         ]);
     }
 
-    public function test_order_no_must_match_the_required_format(): void
+    public function test_order_number_must_be_a_registered_one(): void
     {
         $workflowType = $this->purchaseWorkflow();
         $staff = Staff::factory()->create();
 
         $response = $this->actingAs($staff)->post(route('cards.store', $workflowType), [
-            'order_no' => 'invalid!!',
+            'order_number_id' => 99999,
             'item_name' => 'テスト部品',
             'manufacturer' => 'テストメーカー',
             'quantity' => 2,
@@ -84,56 +89,22 @@ class CardWorkflowTest extends TestCase
             'due_date' => now()->addWeek()->toDateString(),
         ]);
 
-        $response->assertSessionHasErrors('order_no');
-    }
-
-    public function test_estimate_workflow_allows_reference_order_no(): void
-    {
-        $workflowType = $this->estimateWorkflow();
-        $staff = Staff::factory()->create();
-
-        $response = $this->actingAs($staff)->post(route('cards.store', $workflowType), [
-            'order_no' => '参考',
-            'item_name' => 'テスト部品',
-            'manufacturer' => 'テストメーカー',
-            'quantity' => 2,
-            'unit' => '個',
-            'due_date' => now()->addWeek()->toDateString(),
-        ]);
-
-        $response->assertRedirect();
-        $this->assertDatabaseHas('cards', ['order_no' => '参考', 'workflow_type_id' => $workflowType->id]);
-    }
-
-    public function test_purchase_workflow_rejects_reference_order_no(): void
-    {
-        $workflowType = $this->purchaseWorkflow();
-        $staff = Staff::factory()->create();
-
-        $response = $this->actingAs($staff)->post(route('cards.store', $workflowType), [
-            'order_no' => '参考',
-            'item_name' => 'テスト部品',
-            'manufacturer' => 'テストメーカー',
-            'quantity' => 2,
-            'unit' => '個',
-            'due_date' => now()->addWeek()->toDateString(),
-        ]);
-
-        $response->assertSessionHasErrors('order_no');
+        $response->assertSessionHasErrors('order_number_id');
     }
 
     public function test_boards_only_show_cards_from_their_own_workflow(): void
     {
         $purchase = $this->purchaseWorkflow();
         $estimate = $this->estimateWorkflow();
+        $orderNumber = $this->orderNumber();
         $staff = Staff::factory()->create();
 
         $purchase->cards()->create([
-            'order_no' => 'ZZ999-N99T99', 'item_name' => 'ポンプ試験用パーツ', 'manufacturer' => 'メーカーA',
+            'order_number_id' => $orderNumber->id, 'item_name' => 'ポンプ試験用パーツ', 'manufacturer' => 'メーカーA',
             'quantity' => 1, 'unit' => '個', 'due_date' => now()->addWeek(), 'created_by' => $staff->id, 'current_stage' => 0,
         ]);
         $estimate->cards()->create([
-            'order_no' => '参考', 'item_name' => '筐体見積り対象品', 'manufacturer' => 'メーカーB',
+            'order_number_id' => $orderNumber->id, 'item_name' => '筐体見積り対象品', 'manufacturer' => 'メーカーB',
             'quantity' => 1, 'unit' => '個', 'due_date' => now()->addWeek(), 'created_by' => $staff->id, 'current_stage' => 0,
         ]);
 
@@ -149,11 +120,12 @@ class CardWorkflowTest extends TestCase
     public function test_only_procurement_managers_can_advance_a_card(): void
     {
         $workflowType = $this->purchaseWorkflow();
+        $orderNumber = $this->orderNumber();
         $requester = Staff::factory()->create();
         $manager = Staff::factory()->procurementManager()->create();
 
         $card = $workflowType->cards()->create([
-            'order_no' => 'ZZ999-N99T99',
+            'order_number_id' => $orderNumber->id,
             'item_name' => 'テスト部品',
             'manufacturer' => 'テストメーカー',
             'quantity' => 1,
@@ -177,11 +149,12 @@ class CardWorkflowTest extends TestCase
         Mail::fake();
 
         $workflowType = $this->purchaseWorkflow();
+        $orderNumber = $this->orderNumber();
         $requester = Staff::factory()->create();
         $manager = Staff::factory()->procurementManager()->create();
 
         $card = $workflowType->cards()->create([
-            'order_no' => 'ZZ999-N99T99',
+            'order_number_id' => $orderNumber->id,
             'item_name' => 'テスト部品',
             'manufacturer' => 'テストメーカー',
             'quantity' => 1,
@@ -209,10 +182,11 @@ class CardWorkflowTest extends TestCase
     public function test_card_cannot_be_reverted_before_the_first_stage(): void
     {
         $workflowType = $this->purchaseWorkflow();
+        $orderNumber = $this->orderNumber();
         $manager = Staff::factory()->procurementManager()->create();
 
         $card = $workflowType->cards()->create([
-            'order_no' => 'ZZ999-N99T99',
+            'order_number_id' => $orderNumber->id,
             'item_name' => 'テスト部品',
             'manufacturer' => 'テストメーカー',
             'quantity' => 1,
@@ -229,10 +203,11 @@ class CardWorkflowTest extends TestCase
     public function test_procurement_manager_can_archive_a_card_at_the_final_stage_immediately(): void
     {
         $workflowType = $this->purchaseWorkflow();
+        $orderNumber = $this->orderNumber();
         $manager = Staff::factory()->procurementManager()->create();
 
         $card = $workflowType->cards()->create([
-            'order_no' => 'ZZ999-N99T99',
+            'order_number_id' => $orderNumber->id,
             'item_name' => 'テスト部品',
             'manufacturer' => 'テストメーカー',
             'quantity' => 1,
@@ -250,10 +225,11 @@ class CardWorkflowTest extends TestCase
     public function test_card_not_at_final_stage_cannot_be_archived_immediately(): void
     {
         $workflowType = $this->purchaseWorkflow();
+        $orderNumber = $this->orderNumber();
         $manager = Staff::factory()->procurementManager()->create();
 
         $card = $workflowType->cards()->create([
-            'order_no' => 'ZZ999-N99T99',
+            'order_number_id' => $orderNumber->id,
             'item_name' => 'テスト部品',
             'manufacturer' => 'テストメーカー',
             'quantity' => 1,

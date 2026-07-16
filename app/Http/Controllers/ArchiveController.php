@@ -25,7 +25,7 @@ class ArchiveController extends Controller
         $keyword = $request->string('keyword')->trim()->value();
 
         $query = Card::onlyTrashed()
-            ->with(['workflowType', 'creator', 'stageLogs.actor']);
+            ->with(['workflowType', 'orderNumber', 'creator', 'stageLogs.actor']);
 
         if ($workflowSlug !== '' && $workflowSlug !== 'all') {
             $query->whereHas('workflowType', fn ($q) => $q->where('slug', $workflowSlug));
@@ -34,8 +34,8 @@ class ArchiveController extends Controller
         if ($keyword !== '') {
             $query->where(function ($q) use ($keyword) {
                 $q->where('item_name', 'like', "%{$keyword}%")
-                    ->orWhere('order_no', 'like', "%{$keyword}%")
-                    ->orWhere('manufacturer', 'like', "%{$keyword}%");
+                    ->orWhere('manufacturer', 'like', "%{$keyword}%")
+                    ->orWhereHas('orderNumber', fn ($oq) => $oq->where('code', 'like', "%{$keyword}%"));
             });
         }
 

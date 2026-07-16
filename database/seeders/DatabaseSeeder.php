@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Models\OrderNumber;
 use App\Models\Staff;
 use App\Models\WorkflowType;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
@@ -24,13 +25,15 @@ class DatabaseSeeder extends Seeder
             'password' => bcrypt('password'),
         ]);
 
+        OrderNumber::create(['code' => '未定', 'is_protected' => true]);
+        OrderNumber::create(['code' => '社内', 'is_protected' => true]);
+
         WorkflowType::create([
             'slug' => 'purchase',
             'name' => '購入部品手配',
             'due_date_label' => '希望納期',
             'icon' => 'shopping-cart',
             'accent' => 'blue',
-            'allows_reference_order_no' => false,
             'stage_definition' => [
                 ['label' => '新規依頼', 'actor_label' => '依頼者'],
                 ['label' => '手配中', 'actor_label' => '手配担当者'],
@@ -45,7 +48,6 @@ class DatabaseSeeder extends Seeder
             'due_date_label' => '希望回答期限',
             'icon' => 'file-text',
             'accent' => 'orange',
-            'allows_reference_order_no' => true,
             'stage_definition' => [
                 ['label' => '新規依頼', 'actor_label' => '依頼者'],
                 ['label' => '見積依頼中', 'actor_label' => '手配担当者'],

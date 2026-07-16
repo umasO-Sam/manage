@@ -97,7 +97,7 @@
                                 >
                                     <a href="{{ route('cards.show', $card) }}" class="block" draggable="false">
                                         <div class="flex justify-between items-start gap-2 mb-2">
-                                            <span class="text-xs font-mono font-bold px-2 py-0.5 rounded {{ $index === $workflowType->lastStageIndex() ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-700' }}">{{ $card->order_no }}</span>
+                                            <span class="text-xs font-mono font-bold px-2 py-0.5 rounded {{ $index === $workflowType->lastStageIndex() ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-700' }}">{{ $card->orderNumber->code }}</span>
                                             <i data-lucide="external-link" class="w-4 h-4 text-slate-400"></i>
                                         </div>
                                         <h3 class="font-bold text-slate-950 text-sm mb-1 {{ $index === $workflowType->lastStageIndex() ? 'line-through text-slate-500' : '' }}">{{ $card->item_name }}</h3>

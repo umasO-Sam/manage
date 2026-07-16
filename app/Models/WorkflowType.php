@@ -7,14 +7,13 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['slug', 'name', 'due_date_label', 'icon', 'accent', 'allows_reference_order_no', 'stage_definition', 'retention_days'])]
+#[Fillable(['slug', 'name', 'due_date_label', 'icon', 'accent', 'stage_definition', 'retention_days'])]
 class WorkflowType extends Model
 {
     protected function casts(): array
     {
         return [
             'stage_definition' => 'array',
-            'allows_reference_order_no' => 'boolean',
         ];
     }
 

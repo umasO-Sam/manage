@@ -7,6 +7,7 @@ use App\Mail\CardNotificationMail;
 use App\Models\Attachment;
 use App\Models\Card;
 use App\Models\CardStageLog;
+use App\Models\OrderNumber;
 use App\Models\Staff;
 use App\Models\WorkflowType;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -29,7 +30,7 @@ class CardController extends Controller
         $this->authorize('viewAny', Card::class);
 
         $cards = $workflow->cards()
-            ->with(['creator', 'stageLogs.actor', 'attachments'])
+            ->with(['orderNumber', 'creator', 'stageLogs.actor', 'attachments'])
             ->orderBy('due_date')
             ->get()
             ->groupBy('current_stage');
@@ -44,7 +45,10 @@ class CardController extends Controller
     {
         $this->authorize('create', Card::class);
 
-        return view('cards.create', ['workflowType' => $workflow]);
+        return view('cards.create', [
+            'workflowType' => $workflow,
+            'orderNumbers' => OrderNumber::orderBy('code')->get(),
+        ]);
     }
 
     public function store(StoreCardRequest $request, WorkflowType $workflow): RedirectResponse
@@ -94,7 +98,7 @@ class CardController extends Controller
     {
         $this->authorize('view', $card);
 
-        $card->load(['workflowType', 'creator', 'stageLogs.actor', 'attachments.uploader']);
+        $card->load(['workflowType', 'orderNumber', 'creator', 'stageLogs.actor', 'attachments.uploader']);
 
         return view('cards.show', ['card' => $card]);
     }
@@ -129,7 +133,7 @@ class CardController extends Controller
         });
 
         $actorLabel = $workflowType->actorLabel($nextStage);
-        $headline = "注番 {$card->order_no} の状態が「{$workflowType->stageLabel($nextStage)}」になりました";
+        $headline = "注番 {$card->orderNumber->code} の状態が「{$workflowType->stageLabel($nextStage)}」になりました";
 
         Mail::to($card->creator->email)->send(
             new CardNotificationMail($card->fresh(), $headline, "{$actorLabel}: {$staff->name}")
@@ -170,7 +174,7 @@ class CardController extends Controller
 
         Mail::to($card->creator->email)->send(new CardNotificationMail(
             $card->fresh(),
-            "注番 {$card->order_no} が「{$workflowType->stageLabel($targetStage)}」に差し戻されました",
+            "注番 {$card->orderNumber->code} が「{$workflowType->stageLabel($targetStage)}」に差し戻されました",
             "差し戻し操作: {$staff->name}"
         ));
 

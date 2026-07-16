@@ -6,7 +6,7 @@
         <div class="flex items-center justify-between">
             <div class="flex items-center gap-2">
                 <span class="text-[10px] font-bold px-2 py-0.5 rounded-full {{ $accent['badge_solid_bg'] }} {{ $accent['badge_solid_text'] }}">{{ $card->workflowType->name }}</span>
-                <h2 class="font-bold text-slate-900 text-lg font-mono">{{ $card->order_no }}</h2>
+                <h2 class="font-bold text-slate-900 text-lg font-mono">{{ $card->orderNumber->code }}</h2>
             </div>
             @if ($card->trashed())
                 <a href="{{ route('archive.index') }}" class="text-sm text-slate-500 hover:text-slate-700 flex items-center gap-1">

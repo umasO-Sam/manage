@@ -7,7 +7,7 @@
 
 | 項目 | 内容 |
 |:---|:---|
-| 注番 | {{ $card->order_no }} |
+| 注番 | {{ $card->orderNumber->code }} |
 | 品名 | {{ $card->item_name }} |
 | メーカー | {{ $card->manufacturer }} |
 | 数量 | {{ $card->quantity }}{{ $card->unit }} |
