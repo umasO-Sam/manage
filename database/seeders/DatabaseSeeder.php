@@ -29,6 +29,7 @@ class DatabaseSeeder extends Seeder
             'name' => '購入部品手配',
             'due_date_label' => '希望納期',
             'icon' => 'shopping-cart',
+            'accent' => 'blue',
             'allows_reference_order_no' => false,
             'stage_definition' => [
                 ['label' => '新規依頼', 'actor_label' => '依頼者'],
@@ -43,6 +44,7 @@ class DatabaseSeeder extends Seeder
             'name' => '見積り依頼',
             'due_date_label' => '希望回答期限',
             'icon' => 'file-text',
+            'accent' => 'orange',
             'allows_reference_order_no' => true,
             'stage_definition' => [
                 ['label' => '新規依頼', 'actor_label' => '依頼者'],

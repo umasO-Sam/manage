@@ -1,10 +1,17 @@
 <x-app-layout>
     <x-slot name="header">
+        @php
+            $accent = $workflowType->accentClasses();
+        @endphp
         <h2 class="font-semibold text-xl text-slate-900 flex items-center gap-2">
-            <i data-lucide="{{ $workflowType->icon }}" class="w-5 h-5 text-blue-600"></i>
+            <i data-lucide="{{ $workflowType->icon }}" class="w-5 h-5 {{ $accent['icon'] }}"></i>
             <span>{{ $workflowType->name }} — 新規依頼</span>
         </h2>
     </x-slot>
+
+    @php
+        $accent = $workflowType->accentClasses();
+    @endphp
 
     <div class="py-8">
         <div class="max-w-2xl mx-auto sm:px-6 lg:px-8">
@@ -76,7 +83,9 @@
                         <a href="{{ route('cards.index', $workflowType) }}" class="px-4 py-2 text-sm font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors">
                             キャンセル
                         </a>
-                        <x-primary-button>依頼を送信</x-primary-button>
+                        <button type="submit" class="inline-flex items-center px-5 py-2 {{ $accent['button'] }} border border-transparent rounded-xl font-semibold text-sm text-white shadow-sm hover:shadow focus:outline-none focus:ring-2 {{ $accent['ring'] }} focus:ring-offset-2 transition-all">
+                            依頼を送信
+                        </button>
                     </div>
                 </form>
             </div>

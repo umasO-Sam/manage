@@ -7,6 +7,9 @@ export default {
         './vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php',
         './storage/framework/views/*.php',
         './resources/views/**/*.blade.php',
+        // BoardAccent がワークフローごとの色クラスを完全な文字列として保持しているため、
+        // Tailwindのスキャン対象にappディレクトリも含める（動的な文字列連結はしていない）。
+        './app/**/*.php',
     ],
 
     theme: {

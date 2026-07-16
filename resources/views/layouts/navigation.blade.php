@@ -15,7 +15,7 @@
                 <div class="hidden md:flex space-x-1 ml-8">
                     @foreach (\App\Models\WorkflowType::orderBy('id')->get() as $nav)
                         <a href="{{ route('cards.index', $nav) }}"
-                           class="px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors {{ request()->route('workflow')?->is($nav) ? 'bg-slate-100 text-blue-600' : 'text-slate-600 hover:bg-slate-50' }}">
+                           class="px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors {{ request()->route('workflow')?->is($nav) ? $nav->accentClasses()['nav_active'] : 'text-slate-600 hover:bg-slate-50' }}">
                             <i data-lucide="{{ $nav->icon }}" class="w-4 h-4"></i>
                             <span>{{ $nav->name }}ボード</span>
                         </a>
@@ -76,7 +76,7 @@
     <div :class="{'block': open, 'hidden': ! open}" class="hidden md:hidden border-t border-slate-200">
         <div class="pt-2 pb-3 space-y-1 px-2">
             @foreach (\App\Models\WorkflowType::orderBy('id')->get() as $nav)
-                <a href="{{ route('cards.index', $nav) }}" class="block px-3 py-2 rounded-lg text-sm font-medium {{ request()->route('workflow')?->is($nav) ? 'bg-slate-100 text-blue-600' : 'text-slate-600' }}">
+                <a href="{{ route('cards.index', $nav) }}" class="block px-3 py-2 rounded-lg text-sm font-medium {{ request()->route('workflow')?->is($nav) ? $nav->accentClasses()['nav_active'] : 'text-slate-600' }}">
                     {{ $nav->name }}ボード
                 </a>
             @endforeach

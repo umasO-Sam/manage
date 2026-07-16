@@ -2,11 +2,12 @@
 
 namespace App\Models;
 
+use App\Support\BoardAccent;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['slug', 'name', 'due_date_label', 'icon', 'allows_reference_order_no', 'stage_definition', 'retention_days'])]
+#[Fillable(['slug', 'name', 'due_date_label', 'icon', 'accent', 'allows_reference_order_no', 'stage_definition', 'retention_days'])]
 class WorkflowType extends Model
 {
     protected function casts(): array
@@ -48,5 +49,13 @@ class WorkflowType extends Model
     public function actorLabel(int $index): string
     {
         return $this->stage_definition[$index]['actor_label'] ?? '';
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function accentClasses(): array
+    {
+        return BoardAccent::classes($this->accent);
     }
 }

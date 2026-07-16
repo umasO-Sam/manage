@@ -1,19 +1,26 @@
 <x-app-layout>
     <x-slot name="header">
+        @php
+            $accent = $workflowType->accentClasses();
+        @endphp
         <div class="flex justify-between items-center flex-wrap gap-4">
             <div>
                 <h1 class="text-2xl font-bold text-slate-900 flex items-center gap-2">
-                    <i data-lucide="{{ $workflowType->icon }}" class="text-blue-600 w-6 h-6"></i>
+                    <i data-lucide="{{ $workflowType->icon }}" class="{{ $accent['icon'] }} w-6 h-6"></i>
                     <span>{{ $workflowType->name }}ボード</span>
                 </h1>
                 <p class="text-xs text-slate-500 mt-1">社内の{{ $workflowType->name }}プロセスを一括して可視化・管理するカンバンボードです</p>
             </div>
-            <a href="{{ route('cards.create', $workflowType) }}" class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-xl shadow-sm hover:shadow flex items-center gap-2 text-sm transition-all">
+            <a href="{{ route('cards.create', $workflowType) }}" class="{{ $accent['button'] }} text-white font-medium py-2 px-4 rounded-xl shadow-sm hover:shadow flex items-center gap-2 text-sm transition-all">
                 <i data-lucide="plus-circle" class="w-4 h-4"></i>
                 <span>新規依頼を作成</span>
             </a>
         </div>
     </x-slot>
+
+    @php
+        $accent = $workflowType->accentClasses();
+    @endphp
 
     <div class="py-8">
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
@@ -51,14 +58,14 @@
                 x-data="{ draggedCardId: null, draggedFromStage: null, dragOverStage: null }"
             >
                 @php
-                    $laneDots = ['bg-amber-500', 'bg-blue-500', 'bg-emerald-500'];
+                    $laneDots = ['bg-amber-500', $accent['dot'], 'bg-emerald-500'];
                     $emptyIcons = ['inbox', 'arrow-left-right', 'check-circle-2'];
                 @endphp
                 @foreach ($workflowType->stage_definition as $index => $stage)
                     @php($cardsInLane = $cardsByStage->get($index, []))
                     <div
                         class="rounded-2xl p-4 flex flex-col min-h-[500px] border transition-colors"
-                        :class="dragOverStage === {{ $index }} ? 'bg-teal-50 border-teal-300 border-dashed border-2' : 'bg-slate-100 border-slate-200'"
+                        :class="dragOverStage === {{ $index }} ? '{{ $accent['drop_zone'] }}' : 'bg-slate-100 border-slate-200'"
                         @dragover.prevent="if (draggedFromStage !== null && draggedFromStage + 1 === {{ $index }}) dragOverStage = {{ $index }}"
                         @dragleave="if (dragOverStage === {{ $index }}) dragOverStage = null"
                         @drop.prevent="
@@ -107,7 +114,7 @@
                                                 </div>
                                                 <div class="flex justify-between text-slate-500">
                                                     <span>{{ $workflowType->actorLabel(1) }}:</span>
-                                                    <span class="font-medium text-blue-600 flex items-center gap-1 justify-end">
+                                                    <span class="font-medium {{ $accent['text'] }} flex items-center gap-1 justify-end">
                                                         <i data-lucide="user-check" class="w-3.5 h-3.5"></i>
                                                         {{ $card->latestActorForStage(1)?->name }}
                                                     </span>
@@ -130,7 +137,7 @@
                                                 <span>{{ $card->due_date->format('Y-m-d') }}</span>
                                             </div>
                                             @if ($index === 0)
-                                                <div class="flex items-center gap-1 bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded font-medium">
+                                                <div class="flex items-center gap-1 {{ $accent['badge_soft_bg'] }} {{ $accent['badge_soft_text'] }} px-1.5 py-0.5 rounded font-medium">
                                                     <i data-lucide="user" class="w-3 h-3"></i>
                                                     <span>{{ $card->creator->name }}</span>
                                                 </div>
@@ -158,7 +165,7 @@
                                             @if ($canAdvance)
                                                 <form id="move-form-{{ $card->id }}" method="POST" action="{{ route('cards.move', $card) }}" class="flex-grow">
                                                     @csrf
-                                                    <button type="submit" class="w-full text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-100 rounded-lg py-1.5 hover:bg-blue-100 transition-colors flex items-center justify-center gap-1">
+                                                    <button type="submit" class="w-full text-xs font-semibold {{ $accent['badge_soft_text'] }} {{ $accent['badge_soft_bg'] }} border {{ $accent['badge_soft_border'] }} rounded-lg py-1.5 hover:opacity-80 transition-colors flex items-center justify-center gap-1">
                                                         <span>→ {{ $workflowType->stageLabel($index + 1) }}へ進める</span>
                                                     </button>
                                                 </form>

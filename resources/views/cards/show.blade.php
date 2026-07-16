@@ -1,8 +1,11 @@
 <x-app-layout>
     <x-slot name="header">
+        @php
+            $accent = $card->workflowType->accentClasses();
+        @endphp
         <div class="flex items-center justify-between">
             <div class="flex items-center gap-2">
-                <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-800">{{ $card->workflowType->name }}</span>
+                <span class="text-[10px] font-bold px-2 py-0.5 rounded-full {{ $accent['badge_solid_bg'] }} {{ $accent['badge_solid_text'] }}">{{ $card->workflowType->name }}</span>
                 <h2 class="font-bold text-slate-900 text-lg font-mono">{{ $card->order_no }}</h2>
             </div>
             <a href="{{ route('cards.index', $card->workflowType) }}" class="text-sm text-slate-500 hover:text-slate-700 flex items-center gap-1">
@@ -10,6 +13,10 @@
             </a>
         </div>
     </x-slot>
+
+    @php
+        $accent = $card->workflowType->accentClasses();
+    @endphp
 
     <div class="py-8">
         <div class="max-w-3xl mx-auto sm:px-6 lg:px-8 space-y-6">
@@ -24,7 +31,7 @@
             <div class="bg-white shadow-sm border border-slate-200 rounded-2xl p-6">
                 <div class="flex items-center justify-between mb-5">
                     <h3 class="font-bold text-slate-900 text-base">{{ $card->item_name }}</h3>
-                    <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-blue-50 text-blue-700">
+                    <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold {{ $accent['badge_soft_bg'] }} {{ $accent['badge_soft_text'] }}">
                         現在の状態: {{ $card->currentStageLabel() }}
                     </span>
                 </div>
@@ -61,7 +68,7 @@
                                 <i data-lucide="file-text" class="w-4 h-4 text-slate-400"></i>
                                 <span class="font-medium">{{ $attachment->file_name }}</span>
                             </div>
-                            <a href="{{ route('attachments.download', $attachment) }}" class="text-blue-600 hover:text-blue-800 flex items-center gap-1 font-semibold">
+                            <a href="{{ route('attachments.download', $attachment) }}" class="{{ $accent['link'] }} flex items-center gap-1 font-semibold">
                                 <i data-lucide="download" class="w-3.5 h-3.5"></i>
                                 <span>ダウンロード</span>
                             </a>
@@ -79,7 +86,7 @@
                         @php($actor = $card->latestActorForStage($index))
                         <div class="bg-white p-2.5 rounded-lg border border-slate-200">
                             <span class="text-slate-400 block mb-1 font-medium">{{ $index + 1 }}. {{ $stage['actor_label'] }}</span>
-                            <span class="font-bold {{ $index === 0 ? 'text-slate-800' : ($index === $card->workflowType->lastStageIndex() ? 'text-emerald-600' : 'text-blue-600') }}">
+                            <span class="font-bold {{ $index === 0 ? 'text-slate-800' : ($index === $card->workflowType->lastStageIndex() ? 'text-emerald-600' : $accent['text']) }}">
                                 {{ $actor?->name ?? '未割当' }}
                             </span>
                         </div>
@@ -93,7 +100,7 @@
                     @foreach ($card->stageLogs as $log)
                         <div class="relative">
                             <span class="absolute -left-[21px] top-1 bg-white border w-3.5 h-3.5 rounded-full flex items-center justify-center {{ $log->is_reversal ? 'border-amber-300' : 'border-slate-300' }}">
-                                <span class="w-1.5 h-1.5 rounded-full {{ $log->is_reversal ? 'bg-amber-500' : 'bg-blue-500' }}"></span>
+                                <span class="w-1.5 h-1.5 rounded-full {{ $log->is_reversal ? 'bg-amber-500' : $accent['dot'] }}"></span>
                             </span>
                             <div class="text-xs text-slate-400 font-medium">{{ $log->moved_at->format('Y-m-d H:i') }}</div>
                             <div class="text-xs mt-0.5 font-bold {{ $log->is_reversal ? 'text-amber-700' : 'text-slate-700' }}">
