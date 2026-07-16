@@ -46,6 +46,11 @@ class Card extends Model
         return $this->hasMany(Attachment::class);
     }
 
+    public function comments(): HasMany
+    {
+        return $this->hasMany(CardComment::class)->orderBy('created_at');
+    }
+
     public function currentStageLabel(): string
     {
         return $this->workflowType->stageLabel($this->current_stage);

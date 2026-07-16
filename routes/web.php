@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\ArchiveController;
+use App\Http\Controllers\CardCommentController;
 use App\Http\Controllers\CardController;
 use App\Http\Controllers\OrderNumberController;
 use App\Http\Controllers\ProfileController;
@@ -19,6 +20,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/cards/{card}/move', [CardController::class, 'move'])->name('cards.move');
     Route::post('/cards/{card}/revert', [CardController::class, 'revert'])->name('cards.revert');
     Route::post('/cards/{card}/archive-now', [CardController::class, 'archiveNow'])->name('cards.archiveNow');
+    Route::post('/cards/{card}/comments', [CardCommentController::class, 'store'])->name('cards.comments.store');
     Route::get('/attachments/{attachment}/download', [CardController::class, 'downloadAttachment'])->name('attachments.download');
 
     Route::get('/archive', [ArchiveController::class, 'index'])->name('archive.index');

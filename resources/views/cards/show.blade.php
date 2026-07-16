@@ -33,6 +33,9 @@
             @if (session('status') === 'card-reverted')
                 <div class="p-3 rounded-xl bg-amber-50 border border-amber-100 text-amber-800 text-sm">カードを1段階前に差し戻しました。</div>
             @endif
+            @if (session('status') === 'comment-added')
+                <div class="p-3 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-800 text-sm">コメントを追加しました。</div>
+            @endif
             @if ($card->trashed())
                 <div class="p-3 rounded-xl bg-slate-100 border border-slate-200 text-slate-600 text-sm flex items-center gap-2">
                     <i data-lucide="archive" class="w-4 h-4"></i>
@@ -124,6 +127,45 @@
                         </div>
                     @endforeach
                 </div>
+            </div>
+
+            <div class="bg-white shadow-sm border border-slate-200 rounded-2xl p-6">
+                <span class="text-xs font-bold text-slate-700 block mb-3">💬 コメント（{{ $card->comments->count() }}）</span>
+
+                <div class="space-y-4">
+                    @forelse ($card->comments as $comment)
+                        <div class="flex gap-3">
+                            <div class="w-8 h-8 shrink-0 bg-slate-100 text-slate-600 rounded-full flex items-center justify-center font-bold text-xs">
+                                {{ mb_substr($comment->author->name, 0, 1) }}
+                            </div>
+                            <div class="flex-grow min-w-0">
+                                <div class="flex items-baseline gap-2">
+                                    <span class="text-sm font-bold text-slate-800">{{ $comment->author->name }}</span>
+                                    <span class="text-[11px] text-slate-400">{{ $comment->created_at->format('Y-m-d H:i') }}</span>
+                                </div>
+                                <p class="text-sm text-slate-700 whitespace-pre-wrap mt-0.5">{{ $comment->body }}</p>
+                            </div>
+                        </div>
+                    @empty
+                        <p class="text-xs text-slate-400 italic">コメントはまだありません。</p>
+                    @endforelse
+                </div>
+
+                @if ($card->trashed())
+                    <p class="mt-4 pt-4 border-t border-slate-100 text-xs text-slate-400">アーカイブ済みのカードにはコメントを追加できません。</p>
+                @else
+                    <form method="POST" action="{{ route('cards.comments.store', $card) }}" class="mt-4 pt-4 border-t border-slate-100 space-y-2">
+                        @csrf
+                        <textarea name="body" rows="3" required maxlength="2000" placeholder="コメントを入力"
+                                  class="block w-full text-sm border-slate-300 focus:border-blue-500 focus:ring-blue-500 rounded-lg shadow-sm">{{ old('body') }}</textarea>
+                        <x-input-error :messages="$errors->get('body')" />
+                        <div class="flex justify-end">
+                            <button type="submit" class="inline-flex items-center px-4 py-1.5 {{ $accent['button'] }} border border-transparent rounded-lg font-semibold text-xs text-white shadow-sm hover:shadow transition-all">
+                                コメントする
+                            </button>
+                        </div>
+                    </form>
+                @endif
             </div>
 
         </div>

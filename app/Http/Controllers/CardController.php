@@ -98,7 +98,7 @@ class CardController extends Controller
     {
         $this->authorize('view', $card);
 
-        $card->load(['workflowType', 'orderNumber', 'creator', 'stageLogs.actor', 'attachments.uploader']);
+        $card->load(['workflowType', 'orderNumber', 'creator', 'stageLogs.actor', 'attachments.uploader', 'comments.author']);
 
         return view('cards.show', ['card' => $card]);
     }
