@@ -70,6 +70,21 @@ class StaffController extends Controller
             'password' => ['nullable', 'string', 'min:8'],
         ]);
 
+        $willRemainManager = $request->boolean('is_procurement_manager');
+
+        // 最後の1人を降格すると、担当者管理・注番管理に誰もアクセスできなくなるため禁止する。
+        if ($staff->is_procurement_manager && ! $willRemainManager) {
+            $otherManagers = Staff::where('is_procurement_manager', true)
+                ->where('id', '!=', $staff->id)
+                ->exists();
+
+            if (! $otherManagers) {
+                return back()->withErrors([
+                    'is_procurement_manager' => '資材管理担当者が0人になるため、この担当者の資材管理担当を外すことはできません。先に他の担当者を資材管理担当にしてください。',
+                ]);
+            }
+        }
+
         $staff->fill([
             'name' => $data['name'],
             'department' => $data['department'],

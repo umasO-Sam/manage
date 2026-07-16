@@ -67,7 +67,7 @@
 
                     <div>
                         <x-input-label for="due_date" :value="$workflowType->due_date_label" />
-                        <x-text-input id="due_date" name="due_date" type="date" class="mt-1 block w-full" :value="old('due_date')" required />
+                        <x-text-input id="due_date" name="due_date" type="date" class="mt-1 block w-full" :value="old('due_date')" min="{{ now()->toDateString() }}" required />
                         <x-input-error class="mt-2" :messages="$errors->get('due_date')" />
                     </div>
 

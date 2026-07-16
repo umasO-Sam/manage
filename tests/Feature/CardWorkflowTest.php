@@ -92,6 +92,42 @@ class CardWorkflowTest extends TestCase
         $response->assertSessionHasErrors('order_number_id');
     }
 
+    public function test_due_date_in_the_past_is_rejected(): void
+    {
+        $workflowType = $this->purchaseWorkflow();
+        $orderNumber = $this->orderNumber();
+        $staff = Staff::factory()->create();
+
+        $response = $this->actingAs($staff)->post(route('cards.store', $workflowType), [
+            'order_number_id' => $orderNumber->id,
+            'item_name' => 'テスト部品',
+            'manufacturer' => 'テストメーカー',
+            'quantity' => 2,
+            'unit' => '個',
+            'due_date' => now()->subDay()->toDateString(),
+        ]);
+
+        $response->assertSessionHasErrors('due_date');
+    }
+
+    public function test_due_date_of_today_is_accepted(): void
+    {
+        $workflowType = $this->purchaseWorkflow();
+        $orderNumber = $this->orderNumber();
+        $staff = Staff::factory()->create();
+
+        $response = $this->actingAs($staff)->post(route('cards.store', $workflowType), [
+            'order_number_id' => $orderNumber->id,
+            'item_name' => 'テスト部品',
+            'manufacturer' => 'テストメーカー',
+            'quantity' => 2,
+            'unit' => '個',
+            'due_date' => now()->toDateString(),
+        ]);
+
+        $response->assertSessionDoesntHaveErrors('due_date');
+    }
+
     public function test_boards_only_show_cards_from_their_own_workflow(): void
     {
         $purchase = $this->purchaseWorkflow();

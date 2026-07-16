@@ -36,3 +36,4 @@
         @checked(old('is_procurement_manager', $staff?->is_procurement_manager)) />
     <label for="is_procurement_manager" class="ms-2 text-sm text-slate-700">資材管理担当者（カードの移動・担当者管理を行える）</label>
 </div>
+<x-input-error class="-mt-3" :messages="$errors->get('is_procurement_manager')" />
