@@ -54,6 +54,14 @@ class CardPolicy
     }
 
     /**
+     * Only procurement managers may correct card details after creation.
+     */
+    public function update(Staff $staff, Card $card): bool
+    {
+        return $staff->is_procurement_manager;
+    }
+
+    /**
      * Every staff member may comment — same visibility as viewing the card.
      */
     public function comment(Staff $staff, Card $card): bool

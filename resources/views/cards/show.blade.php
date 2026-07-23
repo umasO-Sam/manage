@@ -36,6 +36,19 @@
             @if (session('status') === 'comment-added')
                 <div class="p-3 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-800 text-sm">コメントを追加しました。</div>
             @endif
+            @if (session('status') === 'card-updated')
+                <div class="p-3 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-800 text-sm">カード内容を修正しました。</div>
+            @endif
+            @if (session('status') === 'card-not-changed')
+                <div class="p-3 rounded-xl bg-slate-100 border border-slate-200 text-slate-600 text-sm">変更がなかったため、更新は行われませんでした。</div>
+            @endif
+            @if ($errors->any())
+                <div class="p-3 rounded-xl bg-red-50 border border-red-100 text-red-800 text-sm">
+                    @foreach ($errors->all() as $error)
+                        <p>{{ $error }}</p>
+                    @endforeach
+                </div>
+            @endif
             @if ($card->trashed())
                 <div class="p-3 rounded-xl bg-slate-100 border border-slate-200 text-slate-600 text-sm flex items-center gap-2">
                     <i data-lucide="archive" class="w-4 h-4"></i>
@@ -49,11 +62,23 @@
             <div class="bg-white shadow-sm border border-slate-200 rounded-2xl p-6">
                 <div class="flex items-center justify-between mb-5">
                     <h3 class="font-bold text-slate-900 text-base">{{ $card->item_name }}</h3>
-                    <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold {{ $accent['badge_soft_bg'] }} {{ $accent['badge_soft_text'] }}">
-                        現在の状態: {{ $card->currentStageLabel() }}
-                    </span>
+                    <div class="flex items-center gap-2">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold {{ $accent['badge_soft_bg'] }} {{ $accent['badge_soft_text'] }}">
+                            現在の状態: {{ $card->currentStageLabel() }}
+                        </span>
+                        @if (! $card->trashed() && Auth::user()->is_procurement_manager)
+                            <a href="{{ route('cards.edit', $card) }}" class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors">
+                                <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
+                                修正
+                            </a>
+                        @endif
+                    </div>
                 </div>
                 <div class="grid grid-cols-2 gap-y-4 gap-x-6">
+                    <div>
+                        <span class="text-xs font-semibold text-slate-400 block">注番</span>
+                        <span class="text-sm font-bold text-slate-900 font-mono">{{ $card->orderNumber->code }}</span>
+                    </div>
                     <div>
                         <span class="text-xs font-semibold text-slate-400 block">品名</span>
                         <span class="text-sm font-bold text-slate-900">{{ $card->item_name }}</span>
@@ -135,6 +160,33 @@
                     @endforeach
                 </div>
             </div>
+
+            @if ($card->editLogs->isNotEmpty())
+                <div class="bg-white shadow-sm border border-slate-200 rounded-2xl p-6">
+                    <span class="text-xs font-bold text-slate-700 block mb-3">📝 修正履歴（{{ $card->editLogs->count() }}）</span>
+                    <div class="relative border-l border-slate-200 pl-4 ml-2 space-y-4">
+                        @foreach ($card->editLogs as $log)
+                            <div class="relative">
+                                <span class="absolute -left-[21px] top-1 bg-white border border-slate-300 w-3.5 h-3.5 rounded-full flex items-center justify-center">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+                                </span>
+                                <div class="text-xs text-slate-400 font-medium">{{ $log->created_at->format('Y-m-d H:i') }}</div>
+                                <div class="text-xs mt-0.5 font-bold text-slate-700">{{ $log->editor->name }}が修正</div>
+                                <ul class="mt-1 space-y-0.5">
+                                    @foreach ($log->changes as $field => $change)
+                                        <li class="text-[11px] text-slate-500">
+                                            <span class="font-semibold text-slate-600">{{ $field }}</span>:
+                                            <span class="line-through">{{ $change['old'] }}</span>
+                                            →
+                                            <span class="font-semibold text-slate-700">{{ $change['new'] }}</span>
+                                        </li>
+                                    @endforeach
+                                </ul>
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+            @endif
 
             <div class="bg-white shadow-sm border border-slate-200 rounded-2xl p-6">
                 <span class="text-xs font-bold text-slate-700 block mb-3">💬 コメント（{{ $card->comments->count() }}）</span>

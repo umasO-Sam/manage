@@ -3,9 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\StoreCardRequest;
+use App\Http\Requests\UpdateCardRequest;
 use App\Mail\CardNotificationMail;
 use App\Models\Attachment;
 use App\Models\Card;
+use App\Models\CardEditLog;
 use App\Models\CardStageLog;
 use App\Models\OrderNumber;
 use App\Models\Staff;
@@ -100,9 +102,79 @@ class CardController extends Controller
     {
         $this->authorize('view', $card);
 
-        $card->load(['workflowType', 'orderNumber', 'creator', 'stageLogs.actor', 'attachments.uploader', 'comments.author']);
+        $card->load(['workflowType', 'orderNumber', 'creator', 'stageLogs.actor', 'attachments.uploader', 'comments.author', 'editLogs.editor']);
 
         return view('cards.show', ['card' => $card]);
+    }
+
+    public function edit(Card $card): View
+    {
+        $this->authorize('update', $card);
+
+        return view('cards.edit', [
+            'card' => $card,
+            'orderNumbers' => OrderNumber::orderBy('code')->get(),
+        ]);
+    }
+
+    /**
+     * カード内容の修正。変更があったフィールドのみ、変更前後の値を
+     * 人が読める形（注番はコードで、日付は文字列で）に整形してログへ残す。
+     */
+    public function update(UpdateCardRequest $request, Card $card): RedirectResponse
+    {
+        $this->authorize('update', $card);
+
+        $data = $request->safe()->all();
+
+        $fieldLabels = [
+            'order_number_id' => '注番',
+            'item_name' => '品名',
+            'manufacturer' => 'メーカー',
+            'quantity' => '数量',
+            'unit' => '単位',
+            'due_date' => $card->workflowType->due_date_label,
+        ];
+
+        $changes = [];
+        foreach ($data as $field => $newValue) {
+            if ($field === 'order_number_id') {
+                $oldDisplay = $card->orderNumber->code;
+                $newDisplay = OrderNumber::find($newValue)?->code;
+                $changed = (int) $card->order_number_id !== (int) $newValue;
+            } elseif ($field === 'due_date') {
+                $oldDisplay = $card->due_date->format('Y-m-d');
+                $newDisplay = $newValue;
+                $changed = $oldDisplay !== $newDisplay;
+            } else {
+                $oldDisplay = (string) $card->{$field};
+                $newDisplay = (string) $newValue;
+                $changed = $oldDisplay !== $newDisplay;
+            }
+
+            if ($changed) {
+                $changes[$fieldLabels[$field]] = ['old' => $oldDisplay, 'new' => $newDisplay];
+            }
+        }
+
+        if (empty($changes)) {
+            return redirect()->route('cards.show', $card)->with('status', 'card-not-changed');
+        }
+
+        /** @var Staff $staff */
+        $staff = $request->user();
+
+        DB::transaction(function () use ($card, $data, $changes, $staff) {
+            $card->update($data);
+
+            CardEditLog::create([
+                'card_id' => $card->id,
+                'editor_id' => $staff->id,
+                'changes' => $changes,
+            ]);
+        });
+
+        return redirect()->route('cards.show', $card)->with('status', 'card-updated');
     }
 
     /**

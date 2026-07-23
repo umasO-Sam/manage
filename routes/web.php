@@ -39,6 +39,9 @@ Route::middleware('auth')->group(function () {
         Route::get('/order-numbers/create', [OrderNumberController::class, 'create'])->name('order-numbers.create');
         Route::post('/order-numbers', [OrderNumberController::class, 'store'])->name('order-numbers.store');
         Route::delete('/order-numbers/{orderNumber}', [OrderNumberController::class, 'destroy'])->name('order-numbers.destroy');
+
+        Route::get('/cards/{card}/edit', [CardController::class, 'edit'])->name('cards.edit');
+        Route::put('/cards/{card}', [CardController::class, 'update'])->name('cards.update');
     });
 });
 
