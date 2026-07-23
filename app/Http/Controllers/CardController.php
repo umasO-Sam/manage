@@ -9,6 +9,7 @@ use App\Models\Attachment;
 use App\Models\Card;
 use App\Models\CardEditLog;
 use App\Models\CardStageLog;
+use App\Models\CardView;
 use App\Models\OrderNumber;
 use App\Models\Staff;
 use App\Models\WorkflowType;
@@ -29,12 +30,19 @@ class CardController extends Controller
     /**
      * カンバンボード表示（ワークフロー種別ごと）
      */
-    public function index(WorkflowType $workflow): View
+    public function index(Request $request, WorkflowType $workflow): View
     {
         $this->authorize('viewAny', Card::class);
 
+        /** @var Staff $staff */
+        $staff = $request->user();
+
         $cards = $workflow->cards()
-            ->with(['orderNumber', 'creator', 'stageLogs.actor', 'attachments'])
+            ->with([
+                'orderNumber', 'creator', 'stageLogs.actor', 'attachments',
+                'comments:id,card_id,created_at',
+                'views' => fn ($query) => $query->where('staff_id', $staff->id),
+            ])
             ->orderBy('due_date')
             ->get()
             ->groupBy('current_stage');
@@ -98,11 +106,16 @@ class CardController extends Controller
         return redirect()->route('cards.show', $card)->with('status', 'card-created');
     }
 
-    public function show(Card $card): View
+    public function show(Request $request, Card $card): View
     {
         $this->authorize('view', $card);
 
         $card->load(['workflowType', 'orderNumber', 'creator', 'stageLogs.actor', 'attachments.uploader', 'comments.author', 'editLogs.editor']);
+
+        CardView::updateOrCreate(
+            ['card_id' => $card->id, 'staff_id' => $request->user()->id],
+            ['viewed_at' => now()]
+        );
 
         return view('cards.show', ['card' => $card]);
     }

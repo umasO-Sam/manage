@@ -95,9 +95,21 @@
                                     @dragstart="draggedCardId = {{ $card->id }}; draggedFromStage = {{ $card->current_stage }}"
                                     @dragend="draggedCardId = null; draggedFromStage = null; dragOverStage = null"
                                 >
+                                    @php($unread = $card->unreadStatusFor(Auth::user()))
                                     <a href="{{ route('cards.show', $card) }}" class="block" draggable="false">
                                         <div class="flex justify-between items-start gap-2 mb-2">
-                                            <span class="text-xs font-mono font-bold px-2 py-0.5 rounded {{ $index === $workflowType->lastStageIndex() ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-700' }}">{{ $card->orderNumber->code }}</span>
+                                            <div class="flex items-center gap-1.5 flex-wrap">
+                                                <span class="text-xs font-mono font-bold px-2 py-0.5 rounded {{ $index === $workflowType->lastStageIndex() ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-700' }}">{{ $card->orderNumber->code }}</span>
+                                                @if ($unread === 'unconfirmed')
+                                                    <span class="inline-flex items-center gap-0.5 text-[10px] font-bold text-red-700 bg-red-50 border border-red-100 px-1.5 py-0.5 rounded-full">
+                                                        <i data-lucide="eye-off" class="w-3 h-3"></i>未確認
+                                                    </span>
+                                                @elseif ($unread === 'new_comment')
+                                                    <span class="inline-flex items-center gap-0.5 text-[10px] font-bold text-blue-700 bg-blue-50 border border-blue-100 px-1.5 py-0.5 rounded-full">
+                                                        <i data-lucide="message-circle" class="w-3 h-3"></i>新着コメント
+                                                    </span>
+                                                @endif
+                                            </div>
                                             <i data-lucide="external-link" class="w-4 h-4 text-slate-400"></i>
                                         </div>
                                         <h3 class="font-bold text-slate-950 text-sm mb-1 {{ $index === $workflowType->lastStageIndex() ? 'line-through text-slate-500' : '' }}">{{ $card->item_name }}</h3>

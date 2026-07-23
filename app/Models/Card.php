@@ -56,6 +56,34 @@ class Card extends Model
         return $this->hasMany(CardEditLog::class)->orderBy('created_at');
     }
 
+    public function views(): HasMany
+    {
+        return $this->hasMany(CardView::class);
+    }
+
+    /**
+     * あるスタッフから見た未確認状態。一度も詳細を開いていなければ'unconfirmed'、
+     * 開いた後に新しいコメントが付いていれば'new_comment'、それ以外はnull。
+     * 呼び出し側で views（staff_idで絞る）・comments をあらかじめeager loadしておくこと
+     * （board一覧のようにカード枚数分呼ぶ場合、都度クエリを発行するとN+1になるため）。
+     */
+    public function unreadStatusFor(Staff $staff): ?string
+    {
+        $lastViewedAt = $this->views->firstWhere('staff_id', $staff->id)?->viewed_at;
+
+        if (! $lastViewedAt) {
+            return 'unconfirmed';
+        }
+
+        $latestCommentAt = $this->comments->max('created_at');
+
+        if ($latestCommentAt && $latestCommentAt->gt($lastViewedAt)) {
+            return 'new_comment';
+        }
+
+        return null;
+    }
+
     public function currentStageLabel(): string
     {
         return $this->workflowType->stageLabel($this->current_stage);

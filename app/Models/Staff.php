@@ -35,4 +35,24 @@ class Staff extends Authenticatable
     {
         return $this->hasMany(CardStageLog::class, 'actor_id');
     }
+
+    /**
+     * ボード上（未アーカイブ）のカードのうち、このスタッフから見て
+     * 未確認・新着コメントありのものを、ワークフロー種別ごとに集計する。
+     * ナビゲーションのバッジ表示用。
+     *
+     * @return array<int, int> workflow_type_id => 件数
+     */
+    public function unreadCardCountsByWorkflow(): array
+    {
+        return Card::query()
+            ->with([
+                'comments:id,card_id,created_at',
+                'views' => fn ($query) => $query->where('staff_id', $this->id),
+            ])
+            ->get(['id', 'workflow_type_id'])
+            ->filter(fn (Card $card) => $card->unreadStatusFor($this) !== null)
+            ->countBy('workflow_type_id')
+            ->all();
+    }
 }
