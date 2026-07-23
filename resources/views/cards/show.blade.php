@@ -111,7 +111,7 @@
                                 @if ($attachment->isImage())
                                     <a href="{{ route('attachments.preview', $attachment) }}" target="_blank" rel="noopener" class="shrink-0">
                                         <img src="{{ route('attachments.preview', $attachment) }}" alt="{{ $attachment->file_name }}"
-                                             class="w-10 h-10 object-cover rounded border border-slate-200 bg-white">
+                                             class="w-6 h-6 object-cover rounded border border-slate-200 bg-white">
                                     </a>
                                 @else
                                     <i data-lucide="file-text" class="w-4 h-4 text-slate-400 shrink-0"></i>
