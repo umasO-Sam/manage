@@ -3,6 +3,13 @@ import { createIcons, icons } from 'lucide';
 
 window.Alpine = Alpine;
 
+/**
+ * lucideのアイコンはDOMContentLoaded時に一括変換されるため、Alpineのx-forなどで
+ * 実行時に追加された要素のdata-lucide属性は自動では変換されない。そうした箇所は
+ * 追加・削除のたびにこれを呼び直してアイコンを反映させる。
+ */
+window.refreshIcons = () => createIcons({ icons });
+
 Alpine.start();
 
 document.addEventListener('DOMContentLoaded', () => createIcons({ icons }));

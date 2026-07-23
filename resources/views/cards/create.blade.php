@@ -71,17 +71,7 @@
                         <x-input-error class="mt-2" :messages="$errors->get('due_date')" />
                     </div>
 
-                    <div>
-                        <x-input-label value="添付資料（任意・1ファイル10MBまで）" />
-                        <div class="border-2 border-dashed border-slate-200 rounded-lg p-4 text-center hover:bg-slate-50 transition-colors relative">
-                            <input id="attachments" name="attachments[]" type="file" multiple class="absolute inset-0 opacity-0 cursor-pointer" />
-                            <i data-lucide="upload-cloud" class="w-8 h-8 text-slate-400 mx-auto mb-1"></i>
-                            <span class="text-xs text-slate-500 block">クリック、またはファイルをドロップして追加</span>
-                            <span class="text-[10px] text-slate-400 block mt-0.5">取得済み見積りPDF、外観画像など</span>
-                        </div>
-                        <x-input-error class="mt-2" :messages="$errors->get('attachments')" />
-                        <x-input-error class="mt-2" :messages="$errors->get('attachments.0')" />
-                    </div>
+                    <x-attachment-picker />
 
                     <div class="flex justify-end gap-3 pt-4 border-t border-slate-100">
                         <a href="{{ route('cards.index', $workflowType) }}" class="px-4 py-2 text-sm font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors">

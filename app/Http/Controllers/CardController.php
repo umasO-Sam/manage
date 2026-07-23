@@ -131,14 +131,16 @@ class CardController extends Controller
     }
 
     /**
-     * カード内容の修正。変更があったフィールドのみ、変更前後の値を
-     * 人が読める形（注番はコードで、日付は文字列で）に整形してログへ残す。
+     * カード内容の修正。フィールドの変更・添付資料の追加/削除のうち実際に
+     * 発生したものだけを、人が読める形に整形してログへ残す。
      */
     public function update(UpdateCardRequest $request, Card $card): RedirectResponse
     {
         $this->authorize('update', $card);
 
-        $data = $request->safe()->all();
+        $data = $request->safe()->only(['order_number_id', 'item_name', 'manufacturer', 'quantity', 'unit', 'due_date']);
+        $newFiles = $request->file('attachments', []);
+        $removeIds = $request->safe()->input('remove_attachments', []);
 
         $fieldLabels = [
             'order_number_id' => '注番',
@@ -170,21 +172,53 @@ class CardController extends Controller
             }
         }
 
-        if (empty($changes)) {
+        if (empty($newFiles) && empty($removeIds) && empty($changes)) {
             return redirect()->route('cards.show', $card)->with('status', 'card-not-changed');
         }
 
         /** @var Staff $staff */
         $staff = $request->user();
 
-        DB::transaction(function () use ($card, $data, $changes, $staff) {
+        DB::transaction(function () use ($card, $data, &$changes, $newFiles, $removeIds, $staff) {
             $card->update($data);
 
-            CardEditLog::create([
-                'card_id' => $card->id,
-                'editor_id' => $staff->id,
-                'changes' => $changes,
-            ]);
+            $addedNames = [];
+            foreach ($newFiles as $file) {
+                $path = Storage::disk('local')->putFile("attachments/{$card->id}", $file);
+
+                Attachment::create([
+                    'card_id' => $card->id,
+                    'file_name' => $file->getClientOriginalName(),
+                    'path' => $path,
+                    'size_bytes' => $file->getSize(),
+                    'uploaded_by' => $staff->id,
+                ]);
+                $addedNames[] = $file->getClientOriginalName();
+            }
+
+            $removedNames = [];
+            if (! empty($removeIds)) {
+                foreach ($card->attachments()->whereIn('id', $removeIds)->get() as $attachment) {
+                    Storage::disk('local')->delete($attachment->path);
+                    $removedNames[] = $attachment->file_name;
+                    $attachment->delete();
+                }
+            }
+
+            if (! empty($addedNames)) {
+                $changes['添付資料の追加'] = ['old' => '—', 'new' => implode(', ', $addedNames)];
+            }
+            if (! empty($removedNames)) {
+                $changes['添付資料の削除'] = ['old' => implode(', ', $removedNames), 'new' => '—'];
+            }
+
+            if (! empty($changes)) {
+                CardEditLog::create([
+                    'card_id' => $card->id,
+                    'editor_id' => $staff->id,
+                    'changes' => $changes,
+                ]);
+            }
         });
 
         return redirect()->route('cards.show', $card)->with('status', 'card-updated');

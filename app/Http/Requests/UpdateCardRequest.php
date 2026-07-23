@@ -31,6 +31,10 @@ class UpdateCardRequest extends FormRequest
             // 既存カードの希望納期が既に過去日の場合でも他項目を修正できるよう、
             // 作成時と異なり「今日以降」の制約は課さない。
             'due_date' => ['required', 'date'],
+            'attachments' => ['array'],
+            'attachments.*' => ['file', 'max:10240', 'mimes:pdf,jpg,jpeg,png,gif,webp,doc,docx,xls,xlsx'], // 10MB (KB単位)
+            'remove_attachments' => ['array'],
+            'remove_attachments.*' => ['integer'],
         ];
     }
 
@@ -39,6 +43,8 @@ class UpdateCardRequest extends FormRequest
         return [
             'order_number_id.required' => '注番を選択してください。',
             'order_number_id.exists' => '選択された注番が見つかりません。',
+            'attachments.*.max' => '添付ファイルは1ファイルあたり10MBまでです。',
+            'attachments.*.mimes' => '添付ファイルはPDF・画像・Office文書のみアップロードできます。',
         ];
     }
 }

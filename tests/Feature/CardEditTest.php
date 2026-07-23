@@ -2,10 +2,13 @@
 
 namespace Tests\Feature;
 
+use App\Models\Attachment;
 use App\Models\OrderNumber;
 use App\Models\Staff;
 use App\Models\WorkflowType;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class CardEditTest extends TestCase
@@ -175,5 +178,74 @@ class CardEditTest extends TestCase
 
         $response->assertSessionDoesntHaveErrors('due_date');
         $this->assertSame('修正後の部品名', $card->fresh()->item_name);
+    }
+
+    public function test_procurement_manager_can_add_an_attachment_while_editing(): void
+    {
+        Storage::fake('local');
+
+        $workflowType = $this->purchaseWorkflow();
+        $orderNumber = $this->orderNumber();
+        $manager = Staff::factory()->procurementManager()->create();
+
+        $card = $workflowType->cards()->create([
+            'order_number_id' => $orderNumber->id, 'item_name' => 'テスト部品', 'manufacturer' => 'メーカーA',
+            'quantity' => 1, 'unit' => '個', 'due_date' => now()->addWeek(), 'created_by' => $manager->id, 'current_stage' => 0,
+        ]);
+
+        $response = $this->actingAs($manager)->put(route('cards.update', $card), [
+            'order_number_id' => $orderNumber->id,
+            'item_name' => 'テスト部品',
+            'manufacturer' => 'メーカーA',
+            'quantity' => 1,
+            'unit' => '個',
+            'due_date' => $card->due_date->toDateString(),
+            'attachments' => [UploadedFile::fake()->create('quote.pdf', 100, 'application/pdf')],
+        ]);
+
+        $response->assertRedirect(route('cards.show', $card));
+        $this->assertDatabaseHas('attachments', ['card_id' => $card->id, 'file_name' => 'quote.pdf']);
+
+        $log = $card->editLogs()->first();
+        $this->assertNotNull($log);
+        $this->assertSame('quote.pdf', $log->changes['添付資料の追加']['new']);
+    }
+
+    public function test_procurement_manager_can_remove_an_existing_attachment_while_editing(): void
+    {
+        Storage::fake('local');
+
+        $workflowType = $this->purchaseWorkflow();
+        $orderNumber = $this->orderNumber();
+        $manager = Staff::factory()->procurementManager()->create();
+
+        $card = $workflowType->cards()->create([
+            'order_number_id' => $orderNumber->id, 'item_name' => 'テスト部品', 'manufacturer' => 'メーカーA',
+            'quantity' => 1, 'unit' => '個', 'due_date' => now()->addWeek(), 'created_by' => $manager->id, 'current_stage' => 0,
+        ]);
+        $attachment = Attachment::create([
+            'card_id' => $card->id,
+            'file_name' => 'old-quote.pdf',
+            'path' => Storage::disk('local')->putFile('attachments/'.$card->id, UploadedFile::fake()->create('old-quote.pdf', 50)),
+            'size_bytes' => 1000,
+            'uploaded_by' => $manager->id,
+        ]);
+
+        $response = $this->actingAs($manager)->put(route('cards.update', $card), [
+            'order_number_id' => $orderNumber->id,
+            'item_name' => 'テスト部品',
+            'manufacturer' => 'メーカーA',
+            'quantity' => 1,
+            'unit' => '個',
+            'due_date' => $card->due_date->toDateString(),
+            'remove_attachments' => [$attachment->id],
+        ]);
+
+        $response->assertRedirect(route('cards.show', $card));
+        $this->assertDatabaseMissing('attachments', ['id' => $attachment->id]);
+
+        $log = $card->editLogs()->first();
+        $this->assertNotNull($log);
+        $this->assertSame('old-quote.pdf', $log->changes['添付資料の削除']['old']);
     }
 }
