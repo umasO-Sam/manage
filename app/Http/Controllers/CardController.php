@@ -355,6 +355,19 @@ class CardController extends Controller
         return Storage::disk('local')->download($attachment->path, $attachment->file_name);
     }
 
+    /**
+     * サムネイル・拡大表示用に、ダウンロードさせず画像をインライン表示する。
+     * 画像以外の拡張子は不正なリクエストとして弾く。
+     */
+    public function previewAttachment(Attachment $attachment): mixed
+    {
+        $this->authorize('view', $attachment->card);
+
+        abort_unless($attachment->isImage(), 404);
+
+        return Storage::disk('local')->response($attachment->path);
+    }
+
     private function notifyProcurementManagers(Card $card, string $headline): void
     {
         $managers = Staff::where('is_procurement_manager', true)->get();

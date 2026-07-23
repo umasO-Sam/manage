@@ -22,6 +22,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/cards/{card}/archive-now', [CardController::class, 'archiveNow'])->name('cards.archiveNow');
     Route::post('/cards/{card}/comments', [CardCommentController::class, 'store'])->name('cards.comments.store');
     Route::get('/attachments/{attachment}/download', [CardController::class, 'downloadAttachment'])->name('attachments.download');
+    Route::get('/attachments/{attachment}/preview', [CardController::class, 'previewAttachment'])->name('attachments.preview');
 
     Route::get('/archive', [ArchiveController::class, 'index'])->name('archive.index');
 

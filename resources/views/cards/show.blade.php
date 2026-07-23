@@ -107,11 +107,18 @@
                 <div class="space-y-1.5">
                     @forelse ($card->attachments as $attachment)
                         <div class="flex justify-between items-center bg-slate-50 p-2.5 rounded-lg border border-slate-200 text-xs">
-                            <div class="flex items-center gap-2 text-slate-700">
-                                <i data-lucide="file-text" class="w-4 h-4 text-slate-400"></i>
-                                <span class="font-medium">{{ $attachment->file_name }}</span>
+                            <div class="flex items-center gap-2 text-slate-700 min-w-0">
+                                @if ($attachment->isImage())
+                                    <a href="{{ route('attachments.preview', $attachment) }}" target="_blank" rel="noopener" class="shrink-0">
+                                        <img src="{{ route('attachments.preview', $attachment) }}" alt="{{ $attachment->file_name }}"
+                                             class="w-10 h-10 object-cover rounded border border-slate-200 bg-white">
+                                    </a>
+                                @else
+                                    <i data-lucide="file-text" class="w-4 h-4 text-slate-400 shrink-0"></i>
+                                @endif
+                                <span class="font-medium truncate">{{ $attachment->file_name }}</span>
                             </div>
-                            <a href="{{ route('attachments.download', $attachment) }}" class="{{ $accent['link'] }} flex items-center gap-1 font-semibold">
+                            <a href="{{ route('attachments.download', $attachment) }}" class="{{ $accent['link'] }} flex items-center gap-1 font-semibold shrink-0">
                                 <i data-lucide="download" class="w-3.5 h-3.5"></i>
                                 <span>ダウンロード</span>
                             </a>

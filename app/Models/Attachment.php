@@ -21,4 +21,15 @@ class Attachment extends Model
     {
         return $this->belongsTo(Staff::class, 'uploaded_by');
     }
+
+    /**
+     * サムネイル表示可能な画像かどうか。アップロード時に許可している拡張子
+     * （StoreCardRequest/UpdateCardRequestのattachments.*ルール）のうち画像分のみ。
+     */
+    public function isImage(): bool
+    {
+        $extension = strtolower(pathinfo($this->file_name, PATHINFO_EXTENSION));
+
+        return in_array($extension, ['jpg', 'jpeg', 'png', 'gif', 'webp'], true);
+    }
 }
