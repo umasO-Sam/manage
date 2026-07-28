@@ -80,9 +80,12 @@
                                 <th class="p-2.5">注番</th>
                                 <th class="p-2.5">機械装置No</th>
                                 <th class="p-2.5">製品名</th>
+                                <th class="p-2.5">分類</th>
                                 <th class="p-2.5">メーカー</th>
                                 <th class="p-2.5">品名</th>
                                 <th class="p-2.5">形式/寸法</th>
+                                <th class="p-2.5 text-right">必要数</th>
+                                <th class="p-2.5">用途</th>
                                 <th class="p-2.5 text-right">数量</th>
                                 <th class="p-2.5">単位</th>
                                 <th class="p-2.5 text-right">単価</th>
@@ -110,9 +113,16 @@
                                     <td class="p-2.5 font-mono font-bold text-blue-900">{{ $detail->item_code }}</td>
                                     <td class="p-2.5">{{ $detail->machine_no }}</td>
                                     <td class="p-2.5">{{ $detail->product_name }}</td>
+                                    <td class="p-2.5">
+                                        @if ($detail->category)
+                                            {{ $detail->category->major_category }}@if ($detail->category->sub_category)/{{ $detail->category->sub_category }}@endif
+                                        @endif
+                                    </td>
                                     <td class="p-2.5">{{ $detail->manufacturer }}</td>
                                     <td class="p-2.5 font-semibold">{{ $detail->item_name }}</td>
                                     <td class="p-2.5">{{ $detail->dimensions }}</td>
+                                    <td class="p-2.5 text-right">{{ $detail->required_qty }}</td>
+                                    <td class="p-2.5">{{ $detail->usage_purpose }}</td>
                                     <td class="p-2.5 text-right font-semibold">{{ $detail->order_qty }}</td>
                                     <td class="p-2.5">{{ $detail->unit }}</td>
                                     <td class="p-2.5 text-right text-red-700 font-bold">¥{{ number_format((float) $detail->unit_price) }}</td>
@@ -130,7 +140,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="21" class="p-8 text-center text-slate-400">
+                                    <td colspan="24" class="p-8 text-center text-slate-400">
                                         <i data-lucide="search-x" class="w-10 h-10 mx-auto mb-2 text-slate-300"></i>
                                         条件に一致するデータがありません。
                                     </td>

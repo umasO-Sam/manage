@@ -52,6 +52,7 @@ class PurchaseDetailController extends Controller
         $this->applyAlphaFilter($query, $alphas);
 
         $details = $query
+            ->with('category')
             ->orderByRaw("(CASE WHEN (recipient IS NOT NULL AND recipient <> '') OR order_received_date IS NOT NULL OR order_amount > 0 THEN 0 ELSE 1 END)")
             ->orderByDesc('id')
             ->paginate(50)
