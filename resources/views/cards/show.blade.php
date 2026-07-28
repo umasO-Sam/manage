@@ -72,6 +72,16 @@
                                 修正
                             </a>
                         @endif
+                        @if (! $card->trashed() && Auth::user()->can('delete', $card))
+                            <form method="POST" action="{{ route('cards.destroy', $card) }}" onsubmit="return confirm('この依頼カードを削除します。\n削除したカードは今後の集計対象から除外されます（集計機能は現時点では未実装ですが、将来的に資材データベースへ集計する機能を追加予定です）。\nよろしいですか？');">
+                                @csrf
+                                @method('DELETE')
+                                <button type="submit" class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold text-red-600 bg-red-50 hover:bg-red-100 transition-colors">
+                                    <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                                    削除
+                                </button>
+                            </form>
+                        @endif
                     </div>
                 </div>
                 <div class="grid grid-cols-2 gap-y-4 gap-x-6">
@@ -165,12 +175,14 @@
                 <div class="relative border-l border-slate-200 pl-4 ml-2 space-y-4">
                     @foreach ($card->stageLogs as $log)
                         <div class="relative">
-                            <span class="absolute -left-[21px] top-1 bg-white border w-3.5 h-3.5 rounded-full flex items-center justify-center {{ $log->is_reversal ? 'border-amber-300' : 'border-slate-300' }}">
-                                <span class="w-1.5 h-1.5 rounded-full {{ $log->is_reversal ? 'bg-amber-500' : $accent['dot'] }}"></span>
+                            <span class="absolute -left-[21px] top-1 bg-white border w-3.5 h-3.5 rounded-full flex items-center justify-center {{ $log->is_deletion ? 'border-red-300' : ($log->is_reversal ? 'border-amber-300' : 'border-slate-300') }}">
+                                <span class="w-1.5 h-1.5 rounded-full {{ $log->is_deletion ? 'bg-red-500' : ($log->is_reversal ? 'bg-amber-500' : $accent['dot']) }}"></span>
                             </span>
                             <div class="text-xs text-slate-400 font-medium">{{ $log->moved_at->format('Y-m-d H:i') }}</div>
-                            <div class="text-xs mt-0.5 font-bold {{ $log->is_reversal ? 'text-amber-700' : 'text-slate-700' }}">
-                                @if ($log->is_reversal)
+                            <div class="text-xs mt-0.5 font-bold {{ $log->is_deletion ? 'text-red-700' : ($log->is_reversal ? 'text-amber-700' : 'text-slate-700') }}">
+                                @if ($log->is_deletion)
+                                    <i data-lucide="trash-2" class="w-3 h-3 inline-block align-text-bottom"></i>
+                                @elseif ($log->is_reversal)
                                     <i data-lucide="undo-2" class="w-3 h-3 inline-block align-text-bottom"></i>
                                 @endif
                                 {{ $log->stage_label }}: {{ $log->actor->name }}

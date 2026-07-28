@@ -357,6 +357,36 @@ class CardController extends Controller
         return back()->with('status', 'card-archived');
     }
 
+    /**
+     * 依頼カードの取り消し。新規依頼の段階では依頼者自身も取り消せるが、
+     * 手配中・入荷に進んだ後は資材管理担当者のみに限定される（CardPolicy::delete）。
+     * 実体は他の非表示操作と同じ論理削除で、履歴（アーカイブ）から参照できる。
+     */
+    public function destroy(Request $request, Card $card): RedirectResponse
+    {
+        $this->authorize('delete', $card);
+
+        $workflowType = $card->workflowType;
+
+        /** @var Staff $staff */
+        $staff = $request->user();
+
+        DB::transaction(function () use ($card, $staff) {
+            CardStageLog::create([
+                'card_id' => $card->id,
+                'stage_index' => $card->current_stage,
+                'stage_label' => '削除（取り消し）',
+                'is_deletion' => true,
+                'actor_id' => $staff->id,
+                'moved_at' => now(),
+            ]);
+
+            $card->delete();
+        });
+
+        return redirect()->route('cards.index', $workflowType)->with('status', 'card-deleted');
+    }
+
     public function downloadAttachment(Attachment $attachment): mixed
     {
         $this->authorize('view', $attachment->card);

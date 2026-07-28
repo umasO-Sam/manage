@@ -45,6 +45,11 @@
                     <i data-lucide="archive" class="w-4 h-4"></i>カードを非表示にしました。
                 </div>
             @endif
+            @if (session('status') === 'card-deleted')
+                <div class="mb-4 p-3 rounded-xl bg-slate-100 border border-slate-200 text-slate-700 text-sm flex items-center gap-2">
+                    <i data-lucide="trash-2" class="w-4 h-4"></i>依頼カードを削除しました。
+                </div>
+            @endif
             @if ($errors->any())
                 <div class="mb-4 p-3 rounded-xl bg-red-50 border border-red-100 text-red-800 text-sm">
                     @foreach ($errors->all() as $error)
@@ -83,6 +88,11 @@
                             </div>
                             @if ($index === $workflowType->lastStageIndex())
                                 <span class="text-[10px] text-slate-500 bg-white px-2 py-0.5 rounded-full border border-slate-200">{{ $workflowType->retention_days }}日で非表示</span>
+                            @elseif ($index === 0)
+                                <a href="{{ route('cards.create', $workflowType) }}" class="inline-flex items-center gap-1 text-[10px] font-bold {{ $accent['badge_soft_text'] }} {{ $accent['badge_soft_bg'] }} border {{ $accent['badge_soft_border'] }} px-2 py-0.5 rounded-full hover:opacity-80 transition-colors">
+                                    <i data-lucide="plus" class="w-3 h-3"></i>
+                                    新規依頼を作成
+                                </a>
                             @endif
                         </div>
 
@@ -112,7 +122,7 @@
                                             </div>
                                             <i data-lucide="external-link" class="w-4 h-4 text-slate-400"></i>
                                         </div>
-                                        <h3 class="font-bold text-slate-950 text-sm mb-1 {{ $index === $workflowType->lastStageIndex() ? 'line-through text-slate-500' : '' }}">{{ $card->item_name }}</h3>
+                                        <h3 class="font-bold text-slate-950 text-sm mb-1 {{ $index === $workflowType->lastStageIndex() && $workflowType->slug !== 'purchase' ? 'line-through text-slate-500' : '' }}">{{ $card->item_name }}</h3>
                                         <div class="text-xs text-slate-500 mb-2 flex justify-between">
                                             <span>メーカー: {{ $card->manufacturer }}</span>
                                             <span class="font-semibold text-slate-700">数量: {{ $card->quantity }}{{ $card->unit }}</span>

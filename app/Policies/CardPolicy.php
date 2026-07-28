@@ -62,6 +62,20 @@ class CardPolicy
     }
 
     /**
+     * While a card is still in the first stage (新規依頼), its creator may
+     * withdraw it themselves in addition to procurement managers. Once it has
+     * moved on (手配中・入荷など)、取り消しは資材管理担当者のみに限定する。
+     */
+    public function delete(Staff $staff, Card $card): bool
+    {
+        if ($card->current_stage === 0) {
+            return $staff->is_procurement_manager || $card->created_by === $staff->id;
+        }
+
+        return $staff->is_procurement_manager;
+    }
+
+    /**
      * Every staff member may comment — same visibility as viewing the card.
      */
     public function comment(Staff $staff, Card $card): bool

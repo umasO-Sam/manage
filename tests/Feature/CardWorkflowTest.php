@@ -449,4 +449,142 @@ class CardWorkflowTest extends TestCase
         $this->actingAs($manager)->post("/cards/{$card->id}/archive-now")->assertSessionHasErrors('stage');
         $this->assertDatabaseHas('cards', ['id' => $card->id, 'deleted_at' => null]);
     }
+
+    public function test_creator_can_delete_their_own_card_while_in_new_request_stage(): void
+    {
+        $workflowType = $this->purchaseWorkflow();
+        $orderNumber = $this->orderNumber();
+        $requester = Staff::factory()->create();
+
+        $card = $workflowType->cards()->create([
+            'order_number_id' => $orderNumber->id, 'item_name' => 'テスト部品', 'manufacturer' => 'テストメーカー',
+            'quantity' => 1, 'unit' => '個', 'due_date' => now()->addWeek(), 'created_by' => $requester->id, 'current_stage' => 0,
+        ]);
+
+        $response = $this->actingAs($requester)->delete(route('cards.destroy', $card));
+
+        $response->assertRedirect(route('cards.index', $workflowType));
+        $this->assertSoftDeleted('cards', ['id' => $card->id]);
+        $this->assertDatabaseHas('card_stage_logs', [
+            'card_id' => $card->id,
+            'is_deletion' => true,
+            'actor_id' => $requester->id,
+        ]);
+    }
+
+    public function test_deletion_is_shown_in_stage_history_on_card_detail(): void
+    {
+        $workflowType = $this->purchaseWorkflow();
+        $orderNumber = $this->orderNumber();
+        $manager = Staff::factory()->procurementManager()->create();
+
+        $card = $workflowType->cards()->create([
+            'order_number_id' => $orderNumber->id, 'item_name' => 'テスト部品', 'manufacturer' => 'テストメーカー',
+            'quantity' => 1, 'unit' => '個', 'due_date' => now()->addWeek(), 'created_by' => $manager->id, 'current_stage' => 0,
+        ]);
+
+        $this->actingAs($manager)->delete(route('cards.destroy', $card));
+
+        $response = $this->actingAs($manager)->get(route('cards.show', $card));
+
+        $response->assertSee('削除（取り消し）');
+        $response->assertSee($manager->name);
+    }
+
+    public function test_other_staff_member_cannot_delete_someone_elses_card_in_new_request_stage(): void
+    {
+        $workflowType = $this->purchaseWorkflow();
+        $orderNumber = $this->orderNumber();
+        $requester = Staff::factory()->create();
+        $otherStaff = Staff::factory()->create();
+
+        $card = $workflowType->cards()->create([
+            'order_number_id' => $orderNumber->id, 'item_name' => 'テスト部品', 'manufacturer' => 'テストメーカー',
+            'quantity' => 1, 'unit' => '個', 'due_date' => now()->addWeek(), 'created_by' => $requester->id, 'current_stage' => 0,
+        ]);
+
+        $this->actingAs($otherStaff)->delete(route('cards.destroy', $card))->assertForbidden();
+        $this->assertDatabaseHas('cards', ['id' => $card->id, 'deleted_at' => null]);
+    }
+
+    public function test_procurement_manager_can_delete_a_card_in_new_request_stage(): void
+    {
+        $workflowType = $this->purchaseWorkflow();
+        $orderNumber = $this->orderNumber();
+        $requester = Staff::factory()->create();
+        $manager = Staff::factory()->procurementManager()->create();
+
+        $card = $workflowType->cards()->create([
+            'order_number_id' => $orderNumber->id, 'item_name' => 'テスト部品', 'manufacturer' => 'テストメーカー',
+            'quantity' => 1, 'unit' => '個', 'due_date' => now()->addWeek(), 'created_by' => $requester->id, 'current_stage' => 0,
+        ]);
+
+        $this->actingAs($manager)->delete(route('cards.destroy', $card))->assertRedirect(route('cards.index', $workflowType));
+        $this->assertSoftDeleted('cards', ['id' => $card->id]);
+    }
+
+    public function test_creator_cannot_delete_a_card_once_it_has_advanced_past_new_request(): void
+    {
+        $workflowType = $this->purchaseWorkflow();
+        $orderNumber = $this->orderNumber();
+        $requester = Staff::factory()->create();
+
+        $card = $workflowType->cards()->create([
+            'order_number_id' => $orderNumber->id, 'item_name' => 'テスト部品', 'manufacturer' => 'テストメーカー',
+            'quantity' => 1, 'unit' => '個', 'due_date' => now()->addWeek(), 'created_by' => $requester->id, 'current_stage' => 1,
+        ]);
+
+        $this->actingAs($requester)->delete(route('cards.destroy', $card))->assertForbidden();
+        $this->assertDatabaseHas('cards', ['id' => $card->id, 'deleted_at' => null]);
+    }
+
+    public function test_procurement_manager_can_delete_a_card_that_has_advanced(): void
+    {
+        $workflowType = $this->purchaseWorkflow();
+        $orderNumber = $this->orderNumber();
+        $requester = Staff::factory()->create();
+        $manager = Staff::factory()->procurementManager()->create();
+
+        $card = $workflowType->cards()->create([
+            'order_number_id' => $orderNumber->id, 'item_name' => 'テスト部品', 'manufacturer' => 'テストメーカー',
+            'quantity' => 1, 'unit' => '個', 'due_date' => now()->addWeek(), 'created_by' => $requester->id, 'current_stage' => $workflowType->lastStageIndex(),
+        ]);
+
+        $this->actingAs($manager)->delete(route('cards.destroy', $card))->assertRedirect(route('cards.index', $workflowType));
+        $this->assertSoftDeleted('cards', ['id' => $card->id]);
+    }
+
+    public function test_deleted_card_no_longer_appears_on_the_board(): void
+    {
+        $workflowType = $this->purchaseWorkflow();
+        $orderNumber = $this->orderNumber();
+        $requester = Staff::factory()->create();
+
+        $card = $workflowType->cards()->create([
+            'order_number_id' => $orderNumber->id, 'item_name' => '削除対象部品', 'manufacturer' => 'テストメーカー',
+            'quantity' => 1, 'unit' => '個', 'due_date' => now()->addWeek(), 'created_by' => $requester->id, 'current_stage' => 0,
+        ]);
+
+        $this->actingAs($requester)->delete(route('cards.destroy', $card));
+
+        $this->actingAs($requester)->get(route('cards.index', $workflowType))->assertDontSee('削除対象部品');
+    }
+
+    public function test_purchase_board_does_not_strike_through_item_name_at_final_stage(): void
+    {
+        $workflowType = $this->purchaseWorkflow();
+        $orderNumber = $this->orderNumber();
+        $manager = Staff::factory()->procurementManager()->create();
+
+        $workflowType->cards()->create([
+            'order_number_id' => $orderNumber->id, 'item_name' => '入荷済み部品', 'manufacturer' => 'テストメーカー',
+            'quantity' => 1, 'unit' => '個', 'due_date' => now()->addWeek(), 'created_by' => $manager->id,
+            'current_stage' => $workflowType->lastStageIndex(),
+        ]);
+
+        $response = $this->actingAs($manager)->get(route('cards.index', $workflowType));
+
+        $response->assertSee('入荷済み部品');
+        $this->assertStringNotContainsString('line-through', $response->getContent());
+    }
 }

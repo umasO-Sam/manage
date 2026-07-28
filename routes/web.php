@@ -20,6 +20,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/cards/{card}/move', [CardController::class, 'move'])->name('cards.move');
     Route::post('/cards/{card}/revert', [CardController::class, 'revert'])->name('cards.revert');
     Route::post('/cards/{card}/archive-now', [CardController::class, 'archiveNow'])->name('cards.archiveNow');
+    Route::delete('/cards/{card}', [CardController::class, 'destroy'])->name('cards.destroy');
     Route::post('/cards/{card}/comments', [CardCommentController::class, 'store'])->name('cards.comments.store');
     Route::get('/attachments/{attachment}/download', [CardController::class, 'downloadAttachment'])->name('attachments.download');
     Route::get('/attachments/{attachment}/preview', [CardController::class, 'previewAttachment'])->name('attachments.preview');
