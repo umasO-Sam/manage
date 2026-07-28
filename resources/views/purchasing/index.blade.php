@@ -72,7 +72,10 @@
             </form>
 
             <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-                <div class="overflow-x-auto">
+                <div id="purchaseTableTopScroll" class="overflow-x-auto">
+                    <div id="purchaseTableTopScrollInner" style="height: 1px;"></div>
+                </div>
+                <div id="purchaseTableScroll" class="overflow-x-auto">
                     <table class="w-full text-left border-collapse text-xs whitespace-nowrap">
                         <thead>
                             <tr class="bg-slate-50 border-b border-slate-200 font-semibold text-slate-600">
@@ -156,4 +159,36 @@
             @endif
         </div>
     </div>
+
+    <script>
+        (function () {
+            const topScroll = document.getElementById('purchaseTableTopScroll');
+            const topScrollInner = document.getElementById('purchaseTableTopScrollInner');
+            const bottomScroll = document.getElementById('purchaseTableScroll');
+            const table = bottomScroll?.querySelector('table');
+            if (!topScroll || !topScrollInner || !bottomScroll || !table) {
+                return;
+            }
+
+            const syncInnerWidth = () => {
+                topScrollInner.style.width = `${table.scrollWidth}px`;
+            };
+            syncInnerWidth();
+            window.addEventListener('resize', syncInnerWidth);
+
+            let syncing = false;
+            topScroll.addEventListener('scroll', () => {
+                if (syncing) return;
+                syncing = true;
+                bottomScroll.scrollLeft = topScroll.scrollLeft;
+                syncing = false;
+            });
+            bottomScroll.addEventListener('scroll', () => {
+                if (syncing) return;
+                syncing = true;
+                topScroll.scrollLeft = bottomScroll.scrollLeft;
+                syncing = false;
+            });
+        })();
+    </script>
 </x-app-layout>
