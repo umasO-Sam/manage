@@ -60,19 +60,106 @@ class CardWorkflowTest extends TestCase
 
         $response = $this->actingAs($staff)->post(route('cards.store', $workflowType), [
             'order_number_id' => $orderNumber->id,
+            'machine_number' => 'M1234',
             'item_name' => 'テスト部品',
+            'model_number' => 'ABC-123',
             'manufacturer' => 'テストメーカー',
             'quantity' => 2,
             'unit' => '個',
+            'due_date_type' => 'specific',
             'due_date' => now()->addWeek()->toDateString(),
         ]);
 
         $response->assertRedirect();
         $this->assertDatabaseHas('cards', [
             'order_number_id' => $orderNumber->id,
+            'machine_number' => 'M1234',
+            'model_number' => 'ABC-123',
             'created_by' => $staff->id,
             'current_stage' => 0,
         ]);
+    }
+
+    public function test_model_number_is_required_for_a_purchase_request(): void
+    {
+        $workflowType = $this->purchaseWorkflow();
+        $orderNumber = $this->orderNumber();
+        $staff = Staff::factory()->create();
+
+        $response = $this->actingAs($staff)->post(route('cards.store', $workflowType), [
+            'order_number_id' => $orderNumber->id,
+            'item_name' => 'テスト部品',
+            'manufacturer' => 'テストメーカー',
+            'quantity' => 2,
+            'unit' => '個',
+            'due_date_type' => 'asap',
+        ]);
+
+        $response->assertSessionHasErrors('model_number');
+    }
+
+    public function test_machine_number_must_be_half_width_alphanumeric(): void
+    {
+        $workflowType = $this->purchaseWorkflow();
+        $orderNumber = $this->orderNumber();
+        $staff = Staff::factory()->create();
+
+        $response = $this->actingAs($staff)->post(route('cards.store', $workflowType), [
+            'order_number_id' => $orderNumber->id,
+            'machine_number' => '機械１２３',
+            'item_name' => 'テスト部品',
+            'model_number' => 'ABC-123',
+            'manufacturer' => 'テストメーカー',
+            'quantity' => 2,
+            'unit' => '個',
+            'due_date_type' => 'asap',
+        ]);
+
+        $response->assertSessionHasErrors('machine_number');
+    }
+
+    public function test_due_date_type_asap_does_not_require_a_specific_date(): void
+    {
+        $workflowType = $this->purchaseWorkflow();
+        $orderNumber = $this->orderNumber();
+        $staff = Staff::factory()->create();
+
+        $response = $this->actingAs($staff)->post(route('cards.store', $workflowType), [
+            'order_number_id' => $orderNumber->id,
+            'item_name' => 'テスト部品',
+            'model_number' => 'ABC-123',
+            'manufacturer' => 'テストメーカー',
+            'quantity' => 2,
+            'unit' => '個',
+            'due_date_type' => 'asap',
+        ]);
+
+        $response->assertRedirect();
+        $response->assertSessionDoesntHaveErrors();
+        $this->assertDatabaseHas('cards', [
+            'order_number_id' => $orderNumber->id,
+            'due_date_type' => 'asap',
+            'due_date' => null,
+        ]);
+    }
+
+    public function test_due_date_type_specific_requires_a_date(): void
+    {
+        $workflowType = $this->purchaseWorkflow();
+        $orderNumber = $this->orderNumber();
+        $staff = Staff::factory()->create();
+
+        $response = $this->actingAs($staff)->post(route('cards.store', $workflowType), [
+            'order_number_id' => $orderNumber->id,
+            'item_name' => 'テスト部品',
+            'model_number' => 'ABC-123',
+            'manufacturer' => 'テストメーカー',
+            'quantity' => 2,
+            'unit' => '個',
+            'due_date_type' => 'specific',
+        ]);
+
+        $response->assertSessionHasErrors('due_date');
     }
 
     public function test_order_number_must_be_a_registered_one(): void
@@ -83,9 +170,11 @@ class CardWorkflowTest extends TestCase
         $response = $this->actingAs($staff)->post(route('cards.store', $workflowType), [
             'order_number_id' => 99999,
             'item_name' => 'テスト部品',
+            'model_number' => 'ABC-123',
             'manufacturer' => 'テストメーカー',
             'quantity' => 2,
             'unit' => '個',
+            'due_date_type' => 'specific',
             'due_date' => now()->addWeek()->toDateString(),
         ]);
 
@@ -101,9 +190,11 @@ class CardWorkflowTest extends TestCase
         $response = $this->actingAs($staff)->post(route('cards.store', $workflowType), [
             'order_number_id' => $orderNumber->id,
             'item_name' => 'テスト部品',
+            'model_number' => 'ABC-123',
             'manufacturer' => 'テストメーカー',
             'quantity' => 2,
             'unit' => '個',
+            'due_date_type' => 'specific',
             'due_date' => now()->subDay()->toDateString(),
         ]);
 
@@ -119,9 +210,11 @@ class CardWorkflowTest extends TestCase
         $response = $this->actingAs($staff)->post(route('cards.store', $workflowType), [
             'order_number_id' => $orderNumber->id,
             'item_name' => 'テスト部品',
+            'model_number' => 'ABC-123',
             'manufacturer' => 'テストメーカー',
             'quantity' => 2,
             'unit' => '個',
+            'due_date_type' => 'specific',
             'due_date' => now()->toDateString(),
         ]);
 
@@ -219,9 +312,11 @@ class CardWorkflowTest extends TestCase
         $response = $this->actingAs($staff)->post(route('cards.store', $workflowType), [
             'order_number_id' => $orderNumber->id,
             'item_name' => 'テスト部品',
+            'model_number' => 'ABC-123',
             'manufacturer' => 'テストメーカー',
             'quantity' => 1,
             'unit' => '個',
+            'due_date_type' => 'specific',
             'due_date' => now()->addWeek()->toDateString(),
             'attachments' => [
                 \Illuminate\Http\UploadedFile::fake()->create('malicious.php', 10),

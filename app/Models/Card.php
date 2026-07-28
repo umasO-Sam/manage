@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-#[Fillable(['workflow_type_id', 'order_number_id', 'item_name', 'manufacturer', 'quantity', 'unit', 'due_date', 'created_by', 'current_stage'])]
+#[Fillable(['workflow_type_id', 'order_number_id', 'machine_number', 'item_name', 'model_number', 'manufacturer', 'quantity', 'unit', 'due_date', 'due_date_type', 'created_by', 'current_stage'])]
 class Card extends Model
 {
     use SoftDeletes;
@@ -87,6 +87,20 @@ class Card extends Model
     public function currentStageLabel(): string
     {
         return $this->workflowType->stageLabel($this->current_stage);
+    }
+
+    /**
+     * 希望納期の表示文字列。「最短」「通常」の場合は日付を持たないため
+     * ラベルを返し、「日付指定」または旧来のワークフロー（due_date_type未使用）
+     * の場合は日付を返す。
+     */
+    public function dueDateDisplay(): string
+    {
+        return match ($this->due_date_type) {
+            'asap' => '最短',
+            'normal' => '通常',
+            default => $this->due_date?->format('Y-m-d') ?? '',
+        };
     }
 
     public function isAtFinalStage(): bool

@@ -37,11 +37,28 @@
                         <x-input-error class="mt-2" :messages="$errors->get('order_number_id')" />
                     </div>
 
+                    @if ($card->workflowType->slug === 'purchase')
+                        <div>
+                            <x-input-label for="machine_number" value="機械装置番号（任意）" />
+                            <x-text-input id="machine_number" name="machine_number" type="text" pattern="[A-Za-z0-9]*" class="mt-1 block w-full" :value="old('machine_number', $card->machine_number)" placeholder="例: M1234" />
+                            <p class="mt-1 text-[11px] text-slate-400">半角英数で入力してください。</p>
+                            <x-input-error class="mt-2" :messages="$errors->get('machine_number')" />
+                        </div>
+                    @endif
+
                     <div>
                         <x-input-label for="item_name" value="品名" />
                         <x-text-input id="item_name" name="item_name" type="text" class="mt-1 block w-full" :value="old('item_name', $card->item_name)" required />
                         <x-input-error class="mt-2" :messages="$errors->get('item_name')" />
                     </div>
+
+                    @if ($card->workflowType->slug === 'purchase')
+                        <div>
+                            <x-input-label for="model_number" value="型式" />
+                            <x-text-input id="model_number" name="model_number" type="text" class="mt-1 block w-full" :value="old('model_number', $card->model_number)" required />
+                            <x-input-error class="mt-2" :messages="$errors->get('model_number')" />
+                        </div>
+                    @endif
 
                     <div>
                         <x-input-label for="manufacturer" value="メーカー" />
@@ -62,11 +79,37 @@
                         </div>
                     </div>
 
-                    <div>
-                        <x-input-label for="due_date" :value="$card->workflowType->due_date_label" />
-                        <x-text-input id="due_date" name="due_date" type="date" class="mt-1 block w-full" :value="old('due_date', $card->due_date->format('Y-m-d'))" required />
-                        <x-input-error class="mt-2" :messages="$errors->get('due_date')" />
-                    </div>
+                    @if ($card->workflowType->slug === 'purchase')
+                        <div x-data="{ dueDateType: '{{ old('due_date_type', $card->due_date_type ?? 'asap') }}' }">
+                            <x-input-label value="{{ $card->workflowType->due_date_label }}" />
+                            <div class="mt-1 flex items-center gap-5">
+                                <label class="flex items-center gap-1.5 text-sm text-slate-700 cursor-pointer">
+                                    <input type="radio" name="due_date_type" value="asap" x-model="dueDateType" class="border-slate-300 text-blue-600 focus:ring-blue-500">
+                                    最短
+                                </label>
+                                <label class="flex items-center gap-1.5 text-sm text-slate-700 cursor-pointer">
+                                    <input type="radio" name="due_date_type" value="normal" x-model="dueDateType" class="border-slate-300 text-blue-600 focus:ring-blue-500">
+                                    通常
+                                </label>
+                                <label class="flex items-center gap-1.5 text-sm text-slate-700 cursor-pointer">
+                                    <input type="radio" name="due_date_type" value="specific" x-model="dueDateType" class="border-slate-300 text-blue-600 focus:ring-blue-500">
+                                    日付指定
+                                </label>
+                            </div>
+                            <x-input-error class="mt-2" :messages="$errors->get('due_date_type')" />
+
+                            <div class="mt-2" x-show="dueDateType === 'specific'" x-cloak>
+                                <x-text-input id="due_date" name="due_date" type="date" class="block w-full" :value="old('due_date', $card->due_date?->format('Y-m-d'))" />
+                                <x-input-error class="mt-2" :messages="$errors->get('due_date')" />
+                            </div>
+                        </div>
+                    @else
+                        <div>
+                            <x-input-label for="due_date" :value="$card->workflowType->due_date_label" />
+                            <x-text-input id="due_date" name="due_date" type="date" class="mt-1 block w-full" :value="old('due_date', $card->due_date->format('Y-m-d'))" required />
+                            <x-input-error class="mt-2" :messages="$errors->get('due_date')" />
+                        </div>
+                    @endif
 
                     <div>
                         <x-input-label value="現在の添付資料" />

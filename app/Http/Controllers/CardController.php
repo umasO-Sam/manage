@@ -138,18 +138,23 @@ class CardController extends Controller
     {
         $this->authorize('update', $card);
 
-        $data = $request->safe()->only(['order_number_id', 'item_name', 'manufacturer', 'quantity', 'unit', 'due_date']);
+        $data = $request->safe()->only(['order_number_id', 'machine_number', 'item_name', 'model_number', 'manufacturer', 'quantity', 'unit', 'due_date_type', 'due_date']);
         $newFiles = $request->file('attachments', []);
         $removeIds = $request->safe()->input('remove_attachments', []);
 
         $fieldLabels = [
             'order_number_id' => '注番',
+            'machine_number' => '機械装置番号',
             'item_name' => '品名',
+            'model_number' => '型式',
             'manufacturer' => 'メーカー',
             'quantity' => '数量',
             'unit' => '単位',
+            'due_date_type' => '希望納期の種別',
             'due_date' => $card->workflowType->due_date_label,
         ];
+
+        $dueDateTypeLabels = ['asap' => '最短', 'normal' => '通常', 'specific' => '日付指定'];
 
         $changes = [];
         foreach ($data as $field => $newValue) {
@@ -158,9 +163,13 @@ class CardController extends Controller
                 $newDisplay = OrderNumber::find($newValue)?->code;
                 $changed = (int) $card->order_number_id !== (int) $newValue;
             } elseif ($field === 'due_date') {
-                $oldDisplay = $card->due_date->format('Y-m-d');
-                $newDisplay = $newValue;
+                $oldDisplay = $card->due_date?->format('Y-m-d') ?? '—';
+                $newDisplay = $newValue ?: '—';
                 $changed = $oldDisplay !== $newDisplay;
+            } elseif ($field === 'due_date_type') {
+                $oldDisplay = $dueDateTypeLabels[$card->due_date_type] ?? '—';
+                $newDisplay = $dueDateTypeLabels[$newValue] ?? '—';
+                $changed = $card->due_date_type !== $newValue;
             } else {
                 $oldDisplay = (string) $card->{$field};
                 $newDisplay = (string) $newValue;

@@ -46,16 +46,18 @@ class CardEditTest extends TestCase
         $manager = Staff::factory()->procurementManager()->create();
 
         $card = $workflowType->cards()->create([
-            'order_number_id' => $orderNumber->id, 'item_name' => 'テスト部品', 'manufacturer' => 'メーカーA',
-            'quantity' => 1, 'unit' => '個', 'due_date' => now()->addWeek(), 'created_by' => $requester->id, 'current_stage' => 0,
+            'order_number_id' => $orderNumber->id, 'item_name' => 'テスト部品', 'model_number' => 'ABC-123', 'manufacturer' => 'メーカーA',
+            'quantity' => 1, 'unit' => '個', 'due_date_type' => 'specific', 'due_date' => now()->addWeek(), 'created_by' => $requester->id, 'current_stage' => 0,
         ]);
 
         $response = $this->actingAs($manager)->put(route('cards.update', $card), [
             'order_number_id' => $newOrderNumber->id,
             'item_name' => '修正後の部品名',
+            'model_number' => 'ABC-123',
             'manufacturer' => 'メーカーA',
             'quantity' => 3,
             'unit' => '個',
+            'due_date_type' => 'specific',
             'due_date' => $card->due_date->toDateString(),
         ]);
 
@@ -85,8 +87,8 @@ class CardEditTest extends TestCase
         $requester = Staff::factory()->create();
 
         $card = $workflowType->cards()->create([
-            'order_number_id' => $orderNumber->id, 'item_name' => 'テスト部品', 'manufacturer' => 'メーカーA',
-            'quantity' => 1, 'unit' => '個', 'due_date' => now()->addWeek(), 'created_by' => $requester->id, 'current_stage' => 0,
+            'order_number_id' => $orderNumber->id, 'item_name' => 'テスト部品', 'model_number' => 'ABC-123', 'manufacturer' => 'メーカーA',
+            'quantity' => 1, 'unit' => '個', 'due_date_type' => 'specific', 'due_date' => now()->addWeek(), 'created_by' => $requester->id, 'current_stage' => 0,
         ]);
 
         $this->actingAs($requester)->get(route('cards.edit', $card))->assertForbidden();
@@ -94,9 +96,11 @@ class CardEditTest extends TestCase
         $response = $this->actingAs($requester)->put(route('cards.update', $card), [
             'order_number_id' => $orderNumber->id,
             'item_name' => '不正な修正',
+            'model_number' => 'ABC-123',
             'manufacturer' => 'メーカーA',
             'quantity' => 1,
             'unit' => '個',
+            'due_date_type' => 'specific',
             'due_date' => $card->due_date->toDateString(),
         ]);
 
@@ -112,16 +116,18 @@ class CardEditTest extends TestCase
         $manager = Staff::factory()->procurementManager()->create();
 
         $card = $workflowType->cards()->create([
-            'order_number_id' => $orderNumber->id, 'item_name' => 'テスト部品', 'manufacturer' => 'メーカーA',
-            'quantity' => 1, 'unit' => '個', 'due_date' => now()->addWeek(), 'created_by' => $manager->id, 'current_stage' => 0,
+            'order_number_id' => $orderNumber->id, 'item_name' => 'テスト部品', 'model_number' => 'ABC-123', 'manufacturer' => 'メーカーA',
+            'quantity' => 1, 'unit' => '個', 'due_date_type' => 'specific', 'due_date' => now()->addWeek(), 'created_by' => $manager->id, 'current_stage' => 0,
         ]);
 
         $response = $this->actingAs($manager)->put(route('cards.update', $card), [
             'order_number_id' => $orderNumber->id,
             'item_name' => 'テスト部品',
+            'model_number' => 'ABC-123',
             'manufacturer' => 'メーカーA',
             'quantity' => 1,
             'unit' => '個',
+            'due_date_type' => 'specific',
             'due_date' => $card->due_date->toDateString(),
         ]);
 
@@ -163,16 +169,18 @@ class CardEditTest extends TestCase
         $manager = Staff::factory()->procurementManager()->create();
 
         $card = $workflowType->cards()->create([
-            'order_number_id' => $orderNumber->id, 'item_name' => 'テスト部品', 'manufacturer' => 'メーカーA',
-            'quantity' => 1, 'unit' => '個', 'due_date' => now()->subWeek(), 'created_by' => $manager->id, 'current_stage' => 1,
+            'order_number_id' => $orderNumber->id, 'item_name' => 'テスト部品', 'model_number' => 'ABC-123', 'manufacturer' => 'メーカーA',
+            'quantity' => 1, 'unit' => '個', 'due_date_type' => 'specific', 'due_date' => now()->subWeek(), 'created_by' => $manager->id, 'current_stage' => 1,
         ]);
 
         $response = $this->actingAs($manager)->put(route('cards.update', $card), [
             'order_number_id' => $orderNumber->id,
             'item_name' => '修正後の部品名',
+            'model_number' => 'ABC-123',
             'manufacturer' => 'メーカーA',
             'quantity' => 1,
             'unit' => '個',
+            'due_date_type' => 'specific',
             'due_date' => $card->due_date->toDateString(),
         ]);
 
@@ -189,16 +197,18 @@ class CardEditTest extends TestCase
         $manager = Staff::factory()->procurementManager()->create();
 
         $card = $workflowType->cards()->create([
-            'order_number_id' => $orderNumber->id, 'item_name' => 'テスト部品', 'manufacturer' => 'メーカーA',
-            'quantity' => 1, 'unit' => '個', 'due_date' => now()->addWeek(), 'created_by' => $manager->id, 'current_stage' => 0,
+            'order_number_id' => $orderNumber->id, 'item_name' => 'テスト部品', 'model_number' => 'ABC-123', 'manufacturer' => 'メーカーA',
+            'quantity' => 1, 'unit' => '個', 'due_date_type' => 'specific', 'due_date' => now()->addWeek(), 'created_by' => $manager->id, 'current_stage' => 0,
         ]);
 
         $response = $this->actingAs($manager)->put(route('cards.update', $card), [
             'order_number_id' => $orderNumber->id,
             'item_name' => 'テスト部品',
+            'model_number' => 'ABC-123',
             'manufacturer' => 'メーカーA',
             'quantity' => 1,
             'unit' => '個',
+            'due_date_type' => 'specific',
             'due_date' => $card->due_date->toDateString(),
             'attachments' => [UploadedFile::fake()->create('quote.pdf', 100, 'application/pdf')],
         ]);
@@ -220,8 +230,8 @@ class CardEditTest extends TestCase
         $manager = Staff::factory()->procurementManager()->create();
 
         $card = $workflowType->cards()->create([
-            'order_number_id' => $orderNumber->id, 'item_name' => 'テスト部品', 'manufacturer' => 'メーカーA',
-            'quantity' => 1, 'unit' => '個', 'due_date' => now()->addWeek(), 'created_by' => $manager->id, 'current_stage' => 0,
+            'order_number_id' => $orderNumber->id, 'item_name' => 'テスト部品', 'model_number' => 'ABC-123', 'manufacturer' => 'メーカーA',
+            'quantity' => 1, 'unit' => '個', 'due_date_type' => 'specific', 'due_date' => now()->addWeek(), 'created_by' => $manager->id, 'current_stage' => 0,
         ]);
         $attachment = Attachment::create([
             'card_id' => $card->id,
@@ -234,9 +244,11 @@ class CardEditTest extends TestCase
         $response = $this->actingAs($manager)->put(route('cards.update', $card), [
             'order_number_id' => $orderNumber->id,
             'item_name' => 'テスト部品',
+            'model_number' => 'ABC-123',
             'manufacturer' => 'メーカーA',
             'quantity' => 1,
             'unit' => '個',
+            'due_date_type' => 'specific',
             'due_date' => $card->due_date->toDateString(),
             'remove_attachments' => [$attachment->id],
         ]);

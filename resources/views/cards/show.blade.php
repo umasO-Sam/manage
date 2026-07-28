@@ -79,10 +79,22 @@
                         <span class="text-xs font-semibold text-slate-400 block">注番</span>
                         <span class="text-sm font-bold text-slate-900 font-mono">{{ $card->orderNumber->code }}</span>
                     </div>
+                    @if ($card->workflowType->slug === 'purchase')
+                        <div>
+                            <span class="text-xs font-semibold text-slate-400 block">機械装置番号</span>
+                            <span class="text-sm font-bold text-slate-900">{{ $card->machine_number ?: '—' }}</span>
+                        </div>
+                    @endif
                     <div>
                         <span class="text-xs font-semibold text-slate-400 block">品名</span>
                         <span class="text-sm font-bold text-slate-900">{{ $card->item_name }}</span>
                     </div>
+                    @if ($card->workflowType->slug === 'purchase')
+                        <div>
+                            <span class="text-xs font-semibold text-slate-400 block">型式</span>
+                            <span class="text-sm font-bold text-slate-900">{{ $card->model_number }}</span>
+                        </div>
+                    @endif
                     <div>
                         <span class="text-xs font-semibold text-slate-400 block">メーカー</span>
                         <span class="text-sm font-bold text-slate-900">{{ $card->manufacturer }}</span>
@@ -93,7 +105,7 @@
                     </div>
                     <div>
                         <span class="text-xs font-semibold text-slate-400 block">{{ $card->workflowType->due_date_label }}</span>
-                        <span class="text-sm font-bold text-slate-900">{{ $card->due_date->format('Y-m-d') }}</span>
+                        <span class="text-sm font-bold text-slate-900">{{ $card->dueDateDisplay() }}</span>
                     </div>
                     <div class="col-span-2">
                         <span class="text-xs font-semibold text-slate-400 block">依頼者</span>

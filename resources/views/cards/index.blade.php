@@ -146,7 +146,7 @@
                                         <div class="border-t border-slate-100 pt-2 flex justify-between items-center text-[11px] text-slate-400 mt-3">
                                             <div class="flex items-center gap-1">
                                                 <i data-lucide="calendar" class="w-3.5 h-3.5"></i>
-                                                <span>{{ $card->due_date->format('Y-m-d') }}</span>
+                                                <span>{{ $card->dueDateDisplay() }}</span>
                                             </div>
                                             @if ($index === 0)
                                                 <div class="flex items-center gap-1 {{ $accent['badge_soft_bg'] }} {{ $accent['badge_soft_text'] }} px-1.5 py-0.5 rounded font-medium">
