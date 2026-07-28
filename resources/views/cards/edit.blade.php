@@ -40,8 +40,8 @@
                     @if ($card->workflowType->slug === 'purchase')
                         <div>
                             <x-input-label for="machine_number" value="機械装置番号（任意）" />
-                            <x-text-input id="machine_number" name="machine_number" type="text" pattern="[A-Za-z0-9]*" class="mt-1 block w-full" :value="old('machine_number', $card->machine_number)" placeholder="例: M1234" />
-                            <p class="mt-1 text-[11px] text-slate-400">半角英数で入力してください。</p>
+                            <x-text-input id="machine_number" name="machine_number" type="text" pattern="[A-Za-z0-9\-]*" class="mt-1 block w-full" :value="old('machine_number', $card->machine_number)" placeholder="例: TEST-100" />
+                            <p class="mt-1 text-[11px] text-slate-400">半角英数字とハイフン(-)で入力してください。</p>
                             <x-input-error class="mt-2" :messages="$errors->get('machine_number')" />
                         </div>
                     @endif

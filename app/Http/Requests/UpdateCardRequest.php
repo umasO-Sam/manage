@@ -26,7 +26,7 @@ class UpdateCardRequest extends FormRequest
 
         return [
             'order_number_id' => ['required', 'integer', 'exists:order_numbers,id'],
-            'machine_number' => ['nullable', 'string', 'max:50', 'regex:/^[A-Za-z0-9]+$/'],
+            'machine_number' => ['nullable', 'string', 'max:50', 'regex:/^[A-Za-z0-9-]+$/'],
             'item_name' => ['required', 'string', 'max:255'],
             'model_number' => [$isPurchase ? 'required' : 'nullable', 'string', 'max:255'],
             'manufacturer' => ['required', 'string', 'max:255'],
@@ -50,7 +50,7 @@ class UpdateCardRequest extends FormRequest
         return [
             'order_number_id.required' => '注番を選択してください。',
             'order_number_id.exists' => '選択された注番が見つかりません。',
-            'machine_number.regex' => '機械装置番号は半角英数字で入力してください。',
+            'machine_number.regex' => '機械装置番号は半角英数字とハイフン(-)で入力してください。',
             'model_number.required' => '型式を入力してください。',
             'due_date_type.required' => '希望納期を選択してください。',
             'due_date.required_if' => '日付指定の場合は希望納期の日付を入力してください。',

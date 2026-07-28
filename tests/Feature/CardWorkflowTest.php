@@ -80,6 +80,30 @@ class CardWorkflowTest extends TestCase
         ]);
     }
 
+    public function test_machine_number_allows_a_hyphen(): void
+    {
+        $workflowType = $this->purchaseWorkflow();
+        $orderNumber = $this->orderNumber();
+        $staff = Staff::factory()->create();
+
+        $response = $this->actingAs($staff)->post(route('cards.store', $workflowType), [
+            'order_number_id' => $orderNumber->id,
+            'machine_number' => 'TEST-100',
+            'item_name' => 'テスト部品',
+            'model_number' => 'ABC-123',
+            'manufacturer' => 'テストメーカー',
+            'quantity' => 2,
+            'unit' => '個',
+            'due_date_type' => 'asap',
+        ]);
+
+        $response->assertSessionDoesntHaveErrors('machine_number');
+        $this->assertDatabaseHas('cards', [
+            'order_number_id' => $orderNumber->id,
+            'machine_number' => 'TEST-100',
+        ]);
+    }
+
     public function test_model_number_is_required_for_a_purchase_request(): void
     {
         $workflowType = $this->purchaseWorkflow();
