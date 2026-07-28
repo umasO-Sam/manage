@@ -115,7 +115,7 @@
                                     <td class="p-2.5">{{ $detail->product_name }}</td>
                                     <td class="p-2.5">
                                         @if ($detail->category)
-                                            {{ $detail->category->major_category }}@if ($detail->category->sub_category)/{{ $detail->category->sub_category }}@endif
+                                            {{ $detail->category->code }}:{{ $detail->category->major_category }}@if ($detail->category->sub_category)／{{ $detail->category->sub_category }}@endif
                                         @endif
                                     </td>
                                     <td class="p-2.5">{{ $detail->manufacturer }}</td>
