@@ -46,7 +46,7 @@ class LoginRequest extends FormRequest
             RateLimiter::hit($this->throttleKey());
 
             throw ValidationException::withMessages([
-                'login_id' => trans('auth.failed'),
+                'login_id' => 'ログインIDもしくはパスワードが間違っています。',
             ]);
         }
 
@@ -69,10 +69,7 @@ class LoginRequest extends FormRequest
         $seconds = RateLimiter::availableIn($this->throttleKey());
 
         throw ValidationException::withMessages([
-            'login_id' => trans('auth.throttle', [
-                'seconds' => $seconds,
-                'minutes' => ceil($seconds / 60),
-            ]),
+            'login_id' => "ログイン試行回数が上限に達しました。{$seconds}秒後に再度お試しください。",
         ]);
     }
 

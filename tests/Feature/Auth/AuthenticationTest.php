@@ -34,12 +34,24 @@ class AuthenticationTest extends TestCase
     {
         $staff = Staff::factory()->create();
 
-        $this->post('/login', [
+        $response = $this->post('/login', [
             'login_id' => $staff->login_id,
             'password' => 'wrong-password',
         ]);
 
         $this->assertGuest();
+        $response->assertSessionHasErrors(['login_id' => 'ログインIDもしくはパスワードが間違っています。']);
+    }
+
+    public function test_staff_can_not_authenticate_with_an_unknown_login_id(): void
+    {
+        $response = $this->post('/login', [
+            'login_id' => 'no-such-login-id',
+            'password' => 'password',
+        ]);
+
+        $this->assertGuest();
+        $response->assertSessionHasErrors(['login_id' => 'ログインIDもしくはパスワードが間違っています。']);
     }
 
     public function test_staff_can_logout(): void
