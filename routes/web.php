@@ -3,8 +3,14 @@
 use App\Http\Controllers\ArchiveController;
 use App\Http\Controllers\CardCommentController;
 use App\Http\Controllers\CardController;
+use App\Http\Controllers\CostAnalysisController;
+use App\Http\Controllers\LaborCostController;
 use App\Http\Controllers\OrderNumberController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\PurchaseDetailController;
+use App\Http\Controllers\PurchaseInputController;
+use App\Http\Controllers\PurchaseInvoiceController;
+use App\Http\Controllers\PurchaseOrderController;
 use App\Http\Controllers\StaffController;
 use Illuminate\Support\Facades\Route;
 
@@ -27,6 +33,8 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/archive', [ArchiveController::class, 'index'])->name('archive.index');
 
+    Route::get('/purchasing', [PurchaseDetailController::class, 'index'])->name('purchasing.index');
+
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
 
@@ -44,6 +52,19 @@ Route::middleware('auth')->group(function () {
 
         Route::get('/cards/{card}/edit', [CardController::class, 'edit'])->name('cards.edit');
         Route::put('/cards/{card}', [CardController::class, 'update'])->name('cards.update');
+
+        Route::get('/purchasing/input', [PurchaseInputController::class, 'create'])->name('purchasing.input');
+        Route::post('/purchasing/input', [PurchaseInputController::class, 'store'])->name('purchasing.input.store');
+
+        Route::get('/purchasing/orders', [PurchaseOrderController::class, 'index'])->name('purchasing.orders.index');
+        Route::post('/purchasing/orders/print', [PurchaseOrderController::class, 'print'])->name('purchasing.orders.print');
+
+        Route::get('/purchasing/invoices', [PurchaseInvoiceController::class, 'index'])->name('purchasing.invoices.index');
+        Route::post('/purchasing/invoices/print', [PurchaseInvoiceController::class, 'print'])->name('purchasing.invoices.print');
+
+        Route::get('/purchasing/labor', [LaborCostController::class, 'index'])->name('purchasing.labor.index');
+
+        Route::get('/purchasing/cost', [CostAnalysisController::class, 'index'])->name('purchasing.cost.index');
     });
 });
 
