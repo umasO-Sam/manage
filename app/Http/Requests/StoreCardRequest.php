@@ -28,7 +28,7 @@ class StoreCardRequest extends FormRequest
             'order_number_id' => ['required', 'integer', 'exists:order_numbers,id'],
             'machine_number' => ['nullable', 'string', 'max:50', 'regex:/^[A-Za-z0-9-]+$/'],
             'item_name' => ['required', 'string', 'max:255'],
-            'model_number' => [$isPurchase ? 'required' : 'nullable', 'string', 'max:255'],
+            'model_number' => ['required', 'string', 'max:255'],
             'manufacturer' => ['required', 'string', 'max:255'],
             'quantity' => ['required', 'integer', 'min:1'],
             'unit' => ['required', 'string', 'max:20'],

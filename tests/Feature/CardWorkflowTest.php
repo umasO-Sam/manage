@@ -80,6 +80,49 @@ class CardWorkflowTest extends TestCase
         ]);
     }
 
+    public function test_estimate_request_accepts_machine_number_and_requires_model_number(): void
+    {
+        $workflowType = $this->estimateWorkflow();
+        $orderNumber = $this->orderNumber();
+        $staff = Staff::factory()->create();
+
+        $response = $this->actingAs($staff)->post(route('cards.store', $workflowType), [
+            'order_number_id' => $orderNumber->id,
+            'machine_number' => 'TEST-100',
+            'item_name' => 'テスト部品',
+            'model_number' => 'ABC-123',
+            'manufacturer' => 'テストメーカー',
+            'quantity' => 2,
+            'unit' => '個',
+            'due_date' => now()->addWeek()->toDateString(),
+        ]);
+
+        $response->assertRedirect();
+        $this->assertDatabaseHas('cards', [
+            'order_number_id' => $orderNumber->id,
+            'machine_number' => 'TEST-100',
+            'model_number' => 'ABC-123',
+        ]);
+    }
+
+    public function test_estimate_request_without_model_number_is_rejected(): void
+    {
+        $workflowType = $this->estimateWorkflow();
+        $orderNumber = $this->orderNumber();
+        $staff = Staff::factory()->create();
+
+        $response = $this->actingAs($staff)->post(route('cards.store', $workflowType), [
+            'order_number_id' => $orderNumber->id,
+            'item_name' => 'テスト部品',
+            'manufacturer' => 'テストメーカー',
+            'quantity' => 2,
+            'unit' => '個',
+            'due_date' => now()->addWeek()->toDateString(),
+        ]);
+
+        $response->assertSessionHasErrors('model_number');
+    }
+
     public function test_machine_number_allows_a_hyphen(): void
     {
         $workflowType = $this->purchaseWorkflow();
