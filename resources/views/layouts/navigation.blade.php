@@ -63,6 +63,9 @@
                                 <x-dropdown-link :href="route('purchasing.cost.index')">
                                     <i data-lucide="bar-chart-3" class="w-3.5 h-3.5 inline-block align-text-bottom mr-1"></i> 原価計算
                                 </x-dropdown-link>
+                                <x-dropdown-link :href="route('purchasing.cost-report.index')">
+                                    <i data-lucide="table" class="w-3.5 h-3.5 inline-block align-text-bottom mr-1"></i> 受注別原価一覧
+                                </x-dropdown-link>
                             </x-slot>
                         </x-dropdown>
                     @endif
@@ -163,6 +166,9 @@
                 </a>
                 <a href="{{ route('purchasing.cost.index') }}" class="block px-3 py-2 rounded-lg text-sm font-medium {{ request()->routeIs('purchasing.cost.*') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
                     原価計算
+                </a>
+                <a href="{{ route('purchasing.cost-report.index') }}" class="block px-3 py-2 rounded-lg text-sm font-medium {{ request()->routeIs('purchasing.cost-report.*') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
+                    受注別原価一覧
                 </a>
             @endif
             @if (Auth::user()->is_procurement_manager)
