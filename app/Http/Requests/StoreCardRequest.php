@@ -37,7 +37,8 @@ class StoreCardRequest extends FormRequest
                 ? ['nullable', 'required_if:due_date_type,specific', 'date', 'after_or_equal:today']
                 : ['required', 'date', 'after_or_equal:today'],
             'attachments' => ['array'],
-            'attachments.*' => ['file', 'max:10240', 'mimes:pdf,jpg,jpeg,png,gif,webp,doc,docx,xls,xlsx'], // 10MB (KB単位)
+            // FDC(CAD等の独自拡張子)はMIMEタイプの自動判定に乗らないため、拡張子ベースのextensionsルールを使う
+            'attachments.*' => ['file', 'max:10240', 'extensions:pdf,jpg,jpeg,png,gif,webp,doc,docx,xls,xlsx,fdc'], // 10MB (KB単位)
         ];
     }
 
@@ -52,7 +53,7 @@ class StoreCardRequest extends FormRequest
             'due_date.required_if' => '日付指定の場合は希望納期の日付を入力してください。',
             'due_date.after_or_equal' => '希望納期・希望回答期限は今日以降の日付を指定してください。',
             'attachments.*.max' => '添付ファイルは1ファイルあたり10MBまでです。',
-            'attachments.*.mimes' => '添付ファイルはPDF・画像・Office文書のみアップロードできます。',
+            'attachments.*.extensions' => '添付ファイルはPDF・画像・Office文書・FDCのみアップロードできます。',
         ];
     }
 }
