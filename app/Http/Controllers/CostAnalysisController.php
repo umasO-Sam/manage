@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\LaborCost;
 use App\Models\PurchaseDetail;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -11,8 +10,24 @@ use Illuminate\View\View;
 class CostAnalysisController extends Controller
 {
     /**
-     * 注番別の原価分析（仕入・外注費 + 人工費 vs 受注金額）。
-     * 大量データでもDB側で集計するため、旧dbtestシステムのSQLをそのまま踏襲する。
+     * 大分類ごとに直接集計する費目。キー => [表示名, 大分類名の配列]。
+     * 社内人工/雑人工のみコード62(打合せ見積)を除外する特別ルールがある(costItemAmount参照)。
+     *
+     * @var array<string, array{label: string, majors: array<int, string>}>
+     */
+    private const COST_ITEMS = [
+        'material' => ['label' => '材料費', 'majors' => ['材料']],
+        'outsourcing' => ['label' => '外注費', 'majors' => ['外注']],
+        'parts' => ['label' => '部品費', 'majors' => ['部品']],
+        'electrical' => ['label' => '電装費', 'majors' => ['電機']],
+        'shipping' => ['label' => '運送費', 'majors' => ['運賃']],
+        'lease' => ['label' => 'リース費', 'majors' => ['リース']],
+        'internal' => ['label' => '社内費', 'majors' => ['社内人工', '雑人工']],
+    ];
+
+    /**
+     * 注番別の原価分析。ユーザーが実運用で使っている「仕入リスト - 原価計算表」Excelの
+     * 集計ロジック(大分類ごとの直接集計 + 5%比率雑費 + 簡易収支)をそのまま踏襲する。
      */
     public function index(Request $request): View
     {
@@ -22,43 +37,39 @@ class CostAnalysisController extends Controller
             return view('purchasing.cost.index', ['orderNo' => '', 'result' => null]);
         }
 
-        $parts = DB::table('purchase_details as p')
+        $rows = DB::table('purchase_details as p')
             ->leftJoin('category_codes as c', 'p.category_id', '=', 'c.id')
             ->where('p.item_code', $orderNo)
             ->where('p.is_provisional', false)
-            ->selectRaw('
-                MAX(p.order_amount) as total_order_amount,
-                SUM(p.order_qty * p.unit_price) as total_material_cost,
-                SUM(CASE WHEN c.is_parts = 1 THEN (p.order_qty * p.unit_price) ELSE 0 END) as r_parts,
-                SUM(CASE WHEN c.is_outsourcing = 1 AND (p.item_name LIKE ? OR c.major_category LIKE ?) THEN (p.order_qty * p.unit_price) ELSE 0 END) as r_sub_elec_work,
-                SUM(CASE WHEN c.is_outsourcing = 1 AND (p.item_name LIKE ? OR c.major_category LIKE ?) THEN (p.order_qty * p.unit_price) ELSE 0 END) as r_sub_elec_ctrl,
-                SUM(CASE WHEN c.is_outsourcing = 1 AND p.item_name NOT LIKE ? AND p.item_name NOT LIKE ? AND c.major_category NOT LIKE ? AND c.major_category NOT LIKE ? THEN (p.order_qty * p.unit_price) ELSE 0 END) as r_sub_proc,
-                SUM(CASE WHEN c.major_category LIKE ? THEN (p.order_qty * p.unit_price) ELSE 0 END) as r_seikan
-            ', [
-                '%電気工事%', '%電気工事%',
-                '%制御%', '%制御%',
-                '%電気工事%', '%制御%', '%電気工事%', '%制御%',
-                '%製缶%',
-            ])
-            ->first();
+            ->selectRaw('c.code as category_code, c.major_category, c.sub_category, (p.order_qty * p.unit_price) as amount')
+            ->get();
 
-        $labor = DB::table('labor_costs as l')
-            ->leftJoin('category_codes as c', 'l.category_id', '=', 'c.id')
-            ->where('l.order_no', $orderNo)
-            ->where('l.is_provisional', false)
-            ->selectRaw('
-                SUM(((l.work_hours * 60 + l.work_minutes) / 480.0) * (CASE WHEN l.is_overtime = 1 THEN 50000 ELSE 40000 END) * (CASE WHEN l.position_weight_cache IS NULL OR l.position_weight_cache = 0 THEN 1.0 ELSE l.position_weight_cache END)) as total_labor_cost,
-                SUM(CASE WHEN c.item_name LIKE ? OR c.major_category LIKE ? THEN (((l.work_hours * 60 + l.work_minutes) / 480.0) * (CASE WHEN l.is_overtime = 1 THEN 50000 ELSE 40000 END) * (CASE WHEN l.position_weight_cache IS NULL OR l.position_weight_cache = 0 THEN 1.0 ELSE l.position_weight_cache END)) ELSE 0 END) as r_mech_design,
-                SUM(CASE WHEN (c.item_name LIKE ? AND c.item_name LIKE ?) OR (c.major_category LIKE ? AND c.major_category LIKE ?) THEN (((l.work_hours * 60 + l.work_minutes) / 480.0) * (CASE WHEN l.is_overtime = 1 THEN 50000 ELSE 40000 END) * (CASE WHEN l.position_weight_cache IS NULL OR l.position_weight_cache = 0 THEN 1.0 ELSE l.position_weight_cache END)) ELSE 0 END) as r_elec_design,
-                SUM(CASE WHEN c.item_name LIKE ? OR c.major_category LIKE ? THEN (((l.work_hours * 60 + l.work_minutes) / 480.0) * (CASE WHEN l.is_overtime = 1 THEN 50000 ELSE 40000 END) * (CASE WHEN l.position_weight_cache IS NULL OR l.position_weight_cache = 0 THEN 1.0 ELSE l.position_weight_cache END)) ELSE 0 END) as r_assembly,
-                SUM(CASE WHEN c.item_name LIKE ? OR c.item_name LIKE ? OR c.major_category LIKE ? OR c.major_category LIKE ? THEN (((l.work_hours * 60 + l.work_minutes) / 480.0) * (CASE WHEN l.is_overtime = 1 THEN 50000 ELSE 40000 END) * (CASE WHEN l.position_weight_cache IS NULL OR l.position_weight_cache = 0 THEN 1.0 ELSE l.position_weight_cache END)) ELSE 0 END) as r_adjustment
-            ', [
-                '%機械設計%', '%機械設計%',
-                '%電気%', '%設計%', '%電気%', '%設計%',
-                '%組付%', '%組付%',
-                '%試運転%', '%調整%', '%試運転%', '%調整%',
-            ])
-            ->first();
+        $orderAmount = (float) (DB::table('purchase_details')
+            ->where('item_code', $orderNo)
+            ->where('is_provisional', false)
+            ->max('order_amount') ?? 0);
+
+        $items = [];
+        $subtotal = 0.0;
+        foreach (self::COST_ITEMS as $key => $def) {
+            $amount = $this->costItemAmount($rows, $def['majors']);
+            $items[$key] = ['label' => $def['label'], 'amount' => $amount];
+            $subtotal += $amount;
+        }
+
+        // 旅費(コード61)は社内費の内訳として別枠表示するため、人工等は差分で求める(Excel側の内訳リストは
+        // コード69・70が漏れているため、合計と内訳が一致するよう差分計算にしている)。
+        $travelCost = $rows->filter(fn ($r) => (int) $r->category_code === 61)->sum('amount');
+        $laborCost = $items['internal']['amount'] - $travelCost;
+
+        $miscRatio = (int) floor(($subtotal * 0.05) / 100) * 100;
+        $totalCost = $subtotal + $miscRatio;
+        $profit = $orderAmount - $totalCost;
+
+        // 「他/他」バケット(コード44,55,66,77,88,99): 注番に紐づけない雑多な費目として原価から除外し、警告表示する。
+        $miscCategoryAmount = $rows->filter(fn ($r) => $r->major_category === '他')->sum('amount');
+        // 分類コード自体が付いていない仕入行: 集計から漏れているため警告表示する。
+        $unclassifiedAmount = $rows->filter(fn ($r) => $r->category_code === null)->sum('amount');
 
         $topParts = PurchaseDetail::query()
             ->where('item_code', $orderNo)
@@ -73,48 +84,45 @@ class CostAnalysisController extends Controller
             ])
             ->values();
 
-        $laborTasks = LaborCost::query()
-            ->with('category')
-            ->where('order_no', $orderNo)
-            ->where('is_provisional', false)
-            ->get()
-            ->groupBy(fn (LaborCost $l) => $l->category?->item_name ?? '未分類')
-            ->map(function ($rows, $name) {
-                $mins = $rows->sum(fn (LaborCost $l) => $l->totalMinutes());
-
-                return ['name' => $name, 'hours' => intdiv($mins, 60), 'mins' => $mins % 60, 'raw_mins' => $mins];
-            })
-            ->sortByDesc('raw_mins')
-            ->values();
-
-        $orderAmount = (float) ($parts?->total_order_amount ?? 0);
-        $materialCost = (float) ($parts?->total_material_cost ?? 0);
-        $laborCost = (float) ($labor?->total_labor_cost ?? 0);
-        $totalCost = $materialCost + $laborCost;
-        $profit = $orderAmount - $totalCost;
-
         $result = [
             'summary' => [
                 'order_amount' => (int) $orderAmount,
                 'total_cost' => (int) $totalCost,
                 'gross_profit' => (int) $profit,
-                'profit_margin' => $orderAmount > 0 ? round(($profit / $orderAmount) * 100, 2) : 0,
+                'profit_margin' => $orderAmount > 0 ? round(($profit / $orderAmount) * 100, 1) : null,
             ],
-            'ratios' => [
-                'mech_design' => (float) ($labor?->r_mech_design ?? 0),
-                'elec_design' => (float) ($labor?->r_elec_design ?? 0),
-                'parts' => (float) ($parts?->r_parts ?? 0),
-                'seikan' => (float) ($parts?->r_seikan ?? 0),
-                'assembly' => (float) ($labor?->r_assembly ?? 0),
-                'adjustment' => (float) ($labor?->r_adjustment ?? 0),
-                'sub_elec_work' => (float) ($parts?->r_sub_elec_work ?? 0),
-                'sub_elec_ctrl' => (float) ($parts?->r_sub_elec_ctrl ?? 0),
-                'sub_proc' => (float) ($parts?->r_sub_proc ?? 0),
-            ],
+            'items' => $items,
+            'labor_cost' => (int) $laborCost,
+            'travel_cost' => (int) $travelCost,
+            'misc_ratio' => $miscRatio,
+            'subtotal' => (int) $subtotal,
+            'misc_category_amount' => (int) $miscCategoryAmount,
+            'unclassified_amount' => (int) $unclassifiedAmount,
             'top_parts' => $topParts,
-            'labor_tasks' => $laborTasks,
         ];
 
         return view('purchasing.cost.index', compact('orderNo', 'result'));
+    }
+
+    /**
+     * @param  \Illuminate\Support\Collection<int, object>  $rows
+     * @param  array<int, string>  $majors
+     */
+    private function costItemAmount($rows, array $majors): float
+    {
+        return (float) $rows
+            ->filter(function ($r) use ($majors) {
+                if (! in_array($r->major_category, $majors, true)) {
+                    return false;
+                }
+
+                // 社内人工のコード62(打合せ見積)は原価計算表Excelの集計ルールに合わせて除外する。
+                if (in_array($r->major_category, ['社内人工', '雑人工'], true) && (int) $r->category_code === 62) {
+                    return false;
+                }
+
+                return true;
+            })
+            ->sum('amount');
     }
 }
