@@ -61,17 +61,31 @@
                     </div>
 
                     <div class="border-t border-slate-100 pt-3 grid grid-cols-2 md:grid-cols-5 gap-3">
-                        <div>
+                        <div class="relative" x-data="{ open: false }" @click.outside="open = false">
                             <label class="block text-xs font-semibold text-slate-600 mb-1">分類</label>
-                            <select name="category_id" class="w-full text-sm bg-slate-50 border border-slate-200 rounded-lg py-1.5 px-3 focus:outline-none focus:ring-2 focus:ring-slate-400">
-                                <option value="" @selected($detailFilters['category_id'] === '')>すべて</option>
+                            <button type="button" @click="open = !open"
+                                    class="w-full text-sm bg-slate-50 border border-slate-200 rounded-lg py-1.5 px-3 flex items-center justify-between gap-2 focus:outline-none focus:ring-2 focus:ring-slate-400">
+                                <span data-category-summary class="truncate text-left">すべて</span>
+                                <span class="text-slate-400 text-[10px] shrink-0" x-text="open ? '∧' : '∨'"></span>
+                            </button>
+                            <div x-show="open" x-cloak
+                                 class="absolute z-20 mt-1 w-80 max-h-72 overflow-y-auto bg-white border border-slate-200 rounded-lg shadow-lg p-2 space-y-0.5">
+                                <label class="flex items-center gap-2 text-xs px-2 py-1 rounded hover:bg-slate-50 cursor-pointer font-semibold">
+                                    <input type="checkbox" data-category-all @checked(empty($detailFilters['category_id'])) class="rounded border-slate-300">
+                                    すべて
+                                </label>
+                                <div class="border-t border-slate-100 my-1"></div>
                                 @foreach ($categories as $category)
-                                    <option value="{{ $category->id }}" @selected((string) $category->id === $detailFilters['category_id'])>
-                                        {{ $category->code }}:{{ $category->major_category }}@if ($category->sub_category)／{{ $category->sub_category }}@endif
-                                    </option>
+                                    @php($label = $category->code.':'.$category->major_category.($category->sub_category ? '／'.$category->sub_category : ''))
+                                    <label class="flex items-center gap-2 text-xs px-2 py-1 rounded hover:bg-slate-50 cursor-pointer">
+                                        <input type="checkbox" name="category_id[]" value="{{ $category->id }}"
+                                               data-category-item data-category-label="{{ $label }}"
+                                               @checked(in_array((string) $category->id, $detailFilters['category_id'], true)) class="rounded border-slate-300">
+                                        {{ $label }}
+                                    </label>
                                 @endforeach
-                            </select>
-                            <p class="mt-1 text-[10px] text-slate-400">仕入・人工の両方に適用</p>
+                            </div>
+                            <p class="mt-1 text-[10px] text-slate-400">仕入・人工の両方に適用（複数選択可）</p>
                         </div>
                         @foreach ([['manufacturer', 'メーカー'], ['item_name', '品名'], ['dimensions', '型式'], ['supplier_name', '商社']] as [$key, $label])
                             <div>
@@ -265,4 +279,41 @@
             </form>
         </div>
     </div>
+
+    <script>
+        (function () {
+            const allCheckbox = document.querySelector('[data-category-all]');
+            const itemCheckboxes = Array.from(document.querySelectorAll('[data-category-item]'));
+            const summary = document.querySelector('[data-category-summary]');
+            if (!allCheckbox || !summary) return;
+
+            const updateSummary = () => {
+                const checked = itemCheckboxes.filter((c) => c.checked);
+                if (checked.length === 0) {
+                    summary.textContent = 'すべて';
+                } else if (checked.length <= 2) {
+                    summary.textContent = checked.map((c) => c.dataset.categoryLabel).join('、');
+                } else {
+                    summary.textContent = `${checked.length}件選択中`;
+                }
+            };
+
+            allCheckbox.addEventListener('change', () => {
+                if (allCheckbox.checked) {
+                    itemCheckboxes.forEach((c) => { c.checked = false; });
+                }
+                updateSummary();
+            });
+
+            itemCheckboxes.forEach((checkbox) => {
+                checkbox.addEventListener('change', () => {
+                    const anyChecked = itemCheckboxes.some((c) => c.checked);
+                    allCheckbox.checked = !anyChecked;
+                    updateSummary();
+                });
+            });
+
+            updateSummary();
+        })();
+    </script>
 </x-app-layout>

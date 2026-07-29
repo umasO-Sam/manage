@@ -75,6 +75,34 @@ class EstimateAssistTest extends TestCase
         $response->assertSee('対象品A')->assertDontSee('除外対象品B');
     }
 
+    public function test_category_filter_accepts_multiple_selections(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        $partsCategory = CategoryCode::create(['code' => 3, 'major_category' => '部品']);
+        $materialCategory = CategoryCode::create(['code' => 4, 'major_category' => '材料']);
+        $outsourcingCategory = CategoryCode::create(['code' => 5, 'major_category' => '外注']);
+
+        PurchaseDetail::create([
+            'item_code' => 'D3', 'item_name' => '部品行', 'category_id' => $partsCategory->id,
+            'unit_price' => 1000, 'required_qty' => 1, 'is_provisional' => false,
+        ]);
+        PurchaseDetail::create([
+            'item_code' => 'D3', 'item_name' => '材料行', 'category_id' => $materialCategory->id,
+            'unit_price' => 1000, 'required_qty' => 1, 'is_provisional' => false,
+        ]);
+        PurchaseDetail::create([
+            'item_code' => 'D3', 'item_name' => '外注行', 'category_id' => $outsourcingCategory->id,
+            'unit_price' => 1000, 'required_qty' => 1, 'is_provisional' => false,
+        ]);
+
+        $response = $this->actingAs($manager)->get(route('purchasing.estimate.index', [
+            'order_no' => 'D3', 'order_no_match' => 'perfect',
+            'category_id' => [$partsCategory->id, $materialCategory->id],
+        ]));
+
+        $response->assertSee('部品行')->assertSee('材料行')->assertDontSee('外注行');
+    }
+
     public function test_aggregation_can_be_narrowed_by_category_manufacturer_item_name_dimensions_and_supplier(): void
     {
         $manager = Staff::factory()->procurementManager()->create();

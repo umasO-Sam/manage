@@ -62,7 +62,7 @@ class EstimateAssistController extends Controller
     }
 
     /**
-     * @return array{orderNo: string, orderNoMatch: string, matchedOrderNos: Collection<int, string>, excludedOrderNos: array<int, string>, includedOrderNos: Collection<int, string>, detailFilters: array<string, string>, purchaseRows: Collection<int, PurchaseDetail>, laborRows: Collection<int, LaborCost>}
+     * @return array{orderNo: string, orderNoMatch: string, matchedOrderNos: Collection<int, string>, excludedOrderNos: array<int, string>, includedOrderNos: Collection<int, string>, detailFilters: array{category_id: array<int, string>, manufacturer: string, item_name: string, dimensions: string, supplier_name: string}, purchaseRows: Collection<int, PurchaseDetail>, laborRows: Collection<int, LaborCost>}
      */
     private function aggregateByOrderNo(Request $request): array
     {
@@ -71,7 +71,7 @@ class EstimateAssistController extends Controller
         $excludedOrderNos = array_values(array_filter((array) $request->query('excluded_order_nos', [])));
 
         $detailFilters = [
-            'category_id' => trim((string) $request->query('category_id', '')),
+            'category_id' => array_values(array_filter((array) $request->query('category_id', []))),
             'manufacturer' => trim((string) $request->query('manufacturer', '')),
             'item_name' => trim((string) $request->query('item_name', '')),
             'dimensions' => trim((string) $request->query('dimensions', '')),
@@ -113,8 +113,8 @@ class EstimateAssistController extends Controller
                 ->whereIn('item_code', $includedOrderNos)
                 ->where('is_provisional', false);
 
-            if ($detailFilters['category_id'] !== '') {
-                $purchaseQuery->where('category_id', $detailFilters['category_id']);
+            if (! empty($detailFilters['category_id'])) {
+                $purchaseQuery->whereIn('category_id', $detailFilters['category_id']);
             }
             foreach (['manufacturer', 'item_name', 'dimensions', 'supplier_name'] as $column) {
                 if ($detailFilters[$column] === '') {
@@ -133,8 +133,8 @@ class EstimateAssistController extends Controller
                 ->whereIn('order_no', $includedOrderNos)
                 ->where('is_provisional', false);
 
-            if ($detailFilters['category_id'] !== '') {
-                $laborQuery->where('category_id', $detailFilters['category_id']);
+            if (! empty($detailFilters['category_id'])) {
+                $laborQuery->whereIn('category_id', $detailFilters['category_id']);
             }
 
             $laborRows = $laborQuery->with(['staff', 'category'])->orderByDesc('work_date')->get();
