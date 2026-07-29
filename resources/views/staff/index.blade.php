@@ -24,6 +24,16 @@
             @if (session('status') === 'staff-updated')
                 <div class="mb-4 p-3 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-800 text-sm">担当者情報を更新しました。</div>
             @endif
+            @if (session('status') === 'staff-deleted')
+                <div class="mb-4 p-3 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-800 text-sm">担当者を削除しました。</div>
+            @endif
+            @if ($errors->any())
+                <div class="mb-4 p-3 rounded-xl bg-red-50 border border-red-100 text-red-800 text-sm">
+                    @foreach ($errors->all() as $error)
+                        <p>{{ $error }}</p>
+                    @endforeach
+                </div>
+            @endif
 
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                 @foreach ($staffList as $staff)
@@ -58,9 +68,21 @@
                         </div>
                         <div class="mt-4 pt-3 border-t border-slate-100 flex justify-between items-center">
                             <span class="text-slate-400 text-[11px]">ID: #{{ $staff->id }}</span>
-                            <a href="{{ route('staff.edit', $staff) }}" class="text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold py-1 px-3 rounded-lg border border-blue-200 transition-colors">
-                                編集
-                            </a>
+                            <div class="flex gap-2">
+                                @if ($staff->id !== Auth::id())
+                                    <form method="POST" action="{{ route('staff.destroy', $staff) }}"
+                                          onsubmit="return confirm('「{{ $staff->name }}」を削除します。この操作は取り消せません。よろしいですか？');">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" class="text-xs bg-red-50 hover:bg-red-100 text-red-700 font-semibold py-1 px-3 rounded-lg border border-red-200 transition-colors">
+                                            削除
+                                        </button>
+                                    </form>
+                                @endif
+                                <a href="{{ route('staff.edit', $staff) }}" class="text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold py-1 px-3 rounded-lg border border-blue-200 transition-colors">
+                                    編集
+                                </a>
+                            </div>
                         </div>
                     </div>
                 @endforeach

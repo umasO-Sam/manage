@@ -49,6 +49,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/staff', [StaffController::class, 'store'])->name('staff.store');
         Route::get('/staff/{staff}/edit', [StaffController::class, 'edit'])->name('staff.edit');
         Route::put('/staff/{staff}', [StaffController::class, 'update'])->name('staff.update');
+        Route::delete('/staff/{staff}', [StaffController::class, 'destroy'])->name('staff.destroy');
 
         Route::get('/order-numbers', [OrderNumberController::class, 'index'])->name('order-numbers.index');
         Route::get('/order-numbers/create', [OrderNumberController::class, 'create'])->name('order-numbers.create');

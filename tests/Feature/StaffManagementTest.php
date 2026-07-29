@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\OrderNumber;
 use App\Models\Staff;
 use App\Models\WorkflowType;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -81,5 +82,44 @@ class StaffManagementTest extends TestCase
         $this->actingAs($general)->get(route('purchasing.cost.index'))->assertForbidden();
         $this->actingAs($general)->get(route('cards.index', $workflowType))->assertOk();
         $this->actingAs($general)->get(route('archive.index'))->assertOk();
+    }
+
+    public function test_manager_can_delete_a_staff_with_no_history(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        $target = Staff::factory()->create();
+
+        $response = $this->actingAs($manager)->delete(route('staff.destroy', $target));
+
+        $response->assertRedirect(route('staff.index'));
+        $this->assertModelMissing($target);
+    }
+
+    public function test_staff_cannot_delete_themselves(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+
+        $response = $this->actingAs($manager)->delete(route('staff.destroy', $manager));
+
+        $response->assertSessionHasErrors('delete');
+        $this->assertModelExists($manager);
+    }
+
+    public function test_staff_with_card_history_cannot_be_deleted(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        $requester = Staff::factory()->create();
+        $workflowType = $this->purchaseWorkflow();
+        $orderNumber = OrderNumber::create(['code' => 'ZZ999-N99T99', 'is_protected' => false]);
+
+        $workflowType->cards()->create([
+            'order_number_id' => $orderNumber->id, 'item_name' => 'テスト部品', 'model_number' => 'ABC-123', 'manufacturer' => 'メーカーA',
+            'quantity' => 1, 'unit' => '個', 'due_date_type' => 'specific', 'due_date' => now()->addWeek(), 'created_by' => $requester->id, 'current_stage' => 0,
+        ]);
+
+        $response = $this->actingAs($manager)->delete(route('staff.destroy', $requester));
+
+        $response->assertSessionHasErrors('delete');
+        $this->assertModelExists($requester);
     }
 }

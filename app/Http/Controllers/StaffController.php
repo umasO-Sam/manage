@@ -4,9 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Models\Staff;
 use App\Rules\NotSimilarToLoginId;
+use Illuminate\Database\QueryException;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
@@ -105,5 +107,25 @@ class StaffController extends Controller
         }
 
         return redirect()->route('staff.index')->with('status', 'staff-updated');
+    }
+
+    public function destroy(Staff $staff): RedirectResponse
+    {
+        // 削除操作自体がprocurement.managerミドルウェアで資材管理担当者に限定されているため、
+        // 「自分自身」以外を削除する時点で実行者は必ずもう1人の資材管理担当者として存在する。
+        // よって「資材管理担当者が0人になる」ケースは自分自身の削除禁止だけで防げる。
+        if ($staff->id === Auth::id()) {
+            return back()->withErrors(['delete' => '自分自身のアカウントは削除できません。']);
+        }
+
+        try {
+            $staff->delete();
+        } catch (QueryException) {
+            // カードの作成・移動・コメント・添付ファイルアップロード等の履歴がある担当者は
+            // 外部キー制約(restrictOnDelete)により削除できない。履歴を残すため意図的な仕様。
+            return back()->withErrors(['delete' => 'この担当者はカードの作成・操作履歴があるため削除できません（履歴を残すための仕様です）。']);
+        }
+
+        return redirect()->route('staff.index')->with('status', 'staff-deleted');
     }
 }
