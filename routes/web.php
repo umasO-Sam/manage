@@ -45,6 +45,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/purchasing/labor', [LaborCostController::class, 'index'])->name('purchasing.labor.index');
         Route::get('/purchasing/estimate', [EstimateAssistController::class, 'index'])->name('purchasing.estimate.index');
         Route::get('/purchasing/cost-report', [CostReportController::class, 'index'])->name('purchasing.cost-report.index');
+        Route::get('/purchasing/cost-report/results', [CostReportController::class, 'results'])->name('purchasing.cost-report.results');
         Route::get('/purchasing/cost-report/export', [CostReportController::class, 'export'])->name('purchasing.cost-report.export');
     });
 

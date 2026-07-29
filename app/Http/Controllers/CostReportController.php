@@ -2,9 +2,9 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\CategoryCode;
 use App\Models\LaborCost;
 use App\Models\PurchaseDetail;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -12,12 +12,19 @@ use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
- * 受注日・受注金額が登録された注番(=確定した受注)を、売上日(受注日)の範囲指定で
- * 一覧集計する原価レポート。単一注番の詳細を見るCostAnalysisControllerに対し、
- * こちらは期間内の受注を横断して一括確認・CSV出力するためのもの。
+ * 受注日・受注金額が登録された注番(=確定した受注)を一覧集計する原価レポート。
+ * 単一注番の詳細を見るCostAnalysisControllerに対し、こちらは複数の受注を
+ * 横断して一括確認・CSV出力するためのもの。
+ *
+ * 「売上日」項目を追加したばかりでまだ入力が揃っていないため、いきなり
+ * 期間集計するのではなく、まず受注日を手がかりにした候補一覧から対象を
+ * 選ばせる(select)→選んだ注番で実際に集計する(results)の2段階にしている。
  */
 class CostReportController extends Controller
 {
+    /** 候補選定: 終了日からさかのぼって候補として表示する期間(年)。 */
+    private const CANDIDATE_WINDOW_YEARS = 2;
+
     /** 部品材料費の内訳: 材料費計(major_category='材料')・部品費計(major_category='部品')・スイッチセンサ計(コード31,32)。 */
     private const SWITCH_SENSOR_CODES = [31, 32];
 
@@ -37,22 +44,39 @@ class CostReportController extends Controller
     private const SHIPPING_CODES = [54];
     private const LEASE_CODES = [56];
 
+    /**
+     * 対象選択画面。終了日からさかのぼった候補(受注日・受注金額が登録済みの注番)を
+     * チェックボックスで、さらに候補期間より前の注番は手入力欄で選ばせる。
+     */
     public function index(Request $request): View
     {
         $dateFrom = trim((string) $request->query('date_from', ''));
         $dateTo = trim((string) $request->query('date_to', ''));
 
-        $rows = collect();
-        $miscLaborRow = null;
-
-        if ($dateFrom !== '' || $dateTo !== '') {
-            $rows = $this->buildReportRows($dateFrom, $dateTo);
-            $miscLaborRow = $this->buildMiscLaborRow($dateFrom, $dateTo);
-        }
+        $candidates = $dateTo !== '' ? $this->findCandidates($dateTo) : collect();
 
         return view('purchasing.cost-report.index', [
             'dateFrom' => $dateFrom,
             'dateTo' => $dateTo,
+            'candidates' => $candidates,
+            'windowYears' => self::CANDIDATE_WINDOW_YEARS,
+        ]);
+    }
+
+    /**
+     * 対象選択画面で選んだ注番の集計結果一覧。
+     */
+    public function results(Request $request): View
+    {
+        [$dateFrom, $dateTo, $itemCodes] = $this->parseSelection($request);
+
+        $rows = $itemCodes->isNotEmpty() ? $this->buildReportRows($itemCodes) : collect();
+        $miscLaborRow = ($dateFrom !== '' || $dateTo !== '') ? $this->buildMiscLaborRow($dateFrom, $dateTo) : null;
+
+        return view('purchasing.cost-report.results', [
+            'dateFrom' => $dateFrom,
+            'dateTo' => $dateTo,
+            'itemCodes' => $itemCodes,
             'rows' => $rows,
             'miscLaborRow' => $miscLaborRow,
         ]);
@@ -60,10 +84,9 @@ class CostReportController extends Controller
 
     public function export(Request $request): StreamedResponse
     {
-        $dateFrom = trim((string) $request->query('date_from', ''));
-        $dateTo = trim((string) $request->query('date_to', ''));
+        [$dateFrom, $dateTo, $itemCodes] = $this->parseSelection($request);
 
-        $rows = ($dateFrom !== '' || $dateTo !== '') ? $this->buildReportRows($dateFrom, $dateTo) : collect();
+        $rows = $itemCodes->isNotEmpty() ? $this->buildReportRows($itemCodes) : collect();
         $miscLaborRow = ($dateFrom !== '' || $dateTo !== '') ? $this->buildMiscLaborRow($dateFrom, $dateTo) : null;
 
         $headers = [
@@ -98,36 +121,59 @@ class CostReportController extends Controller
     }
 
     /**
-     * 期間内に受注日・受注金額(>0)が登録された注番ごとに、仕入・人工を横断集計した
-     * レポート行を返す。
-     *
-     * @return Collection<int, array<string, mixed>>
+     * @return array{0: string, 1: string, 2: Collection<int, string>}
      */
-    private function buildReportRows(string $dateFrom, string $dateTo): Collection
+    private function parseSelection(Request $request): array
     {
-        $summaryQuery = PurchaseDetail::query()
+        $dateFrom = trim((string) $request->query('date_from', ''));
+        $dateTo = trim((string) $request->query('date_to', ''));
+        $itemCodes = collect((array) $request->query('item_codes', []))
+            ->map(fn ($v) => trim((string) $v))
+            ->filter(fn ($v) => $v !== '')
+            ->unique()
+            ->values();
+
+        return [$dateFrom, $dateTo, $itemCodes];
+    }
+
+    /**
+     * 終了日から過去2年以内で、受注日・受注金額(>0)が登録済みの注番を候補として返す。
+     *
+     * @return Collection<int, object>
+     */
+    private function findCandidates(string $dateTo): Collection
+    {
+        $windowStart = Carbon::parse($dateTo)->subYears(self::CANDIDATE_WINDOW_YEARS)->toDateString();
+
+        return PurchaseDetail::query()
             ->where('is_provisional', false)
             ->select('item_code')
             ->selectRaw('MAX(order_received_date) as order_received_date')
             ->selectRaw('MAX(order_amount) as order_amount')
             ->groupBy('item_code')
             ->havingNotNull('order_received_date')
-            ->having('order_amount', '>', 0);
+            ->having('order_amount', '>', 0)
+            ->having('order_received_date', '<=', $dateTo)
+            ->having('order_received_date', '>=', $windowStart)
+            ->orderByDesc('order_received_date')
+            ->get();
+    }
 
-        if ($dateFrom !== '') {
-            $summaryQuery->having('order_received_date', '>=', $dateFrom);
-        }
-        if ($dateTo !== '') {
-            $summaryQuery->having('order_received_date', '<=', $dateTo);
-        }
-
-        $summaries = $summaryQuery->get()->keyBy('item_code');
-
-        if ($summaries->isEmpty()) {
-            return collect();
-        }
-
-        $itemCodes = $summaries->keys();
+    /**
+     * 選択された注番ごとに、仕入・人工を横断集計したレポート行を返す。
+     *
+     * @param  Collection<int, string>  $itemCodes
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function buildReportRows(Collection $itemCodes): Collection
+    {
+        $orderAmounts = PurchaseDetail::query()
+            ->whereIn('item_code', $itemCodes)
+            ->where('is_provisional', false)
+            ->select('item_code')
+            ->selectRaw('MAX(order_amount) as order_amount')
+            ->groupBy('item_code')
+            ->pluck('order_amount', 'item_code');
 
         $salesRowsByItemCode = PurchaseDetail::query()
             ->whereIn('item_code', $itemCodes)
@@ -165,7 +211,7 @@ class CostReportController extends Controller
             })
             ->groupBy('item_code');
 
-        return $itemCodes->map(function (string $itemCode) use ($summaries, $salesRowsByItemCode, $purchaseRows, $laborRows) {
+        return $itemCodes->map(function (string $itemCode) use ($orderAmounts, $salesRowsByItemCode, $purchaseRows, $laborRows) {
             $rows = collect($purchaseRows->get($itemCode, collect()))->concat($laborRows->get($itemCode, collect()));
             $salesRow = $salesRowsByItemCode->get($itemCode, collect())->first();
 
@@ -173,7 +219,7 @@ class CostReportController extends Controller
                 itemCode: $itemCode,
                 deliveryDest: $salesRow?->delivery_dest ?? '',
                 productName: $salesRow?->product_name ?? '',
-                orderAmount: (float) $summaries[$itemCode]->order_amount,
+                orderAmount: (float) ($orderAmounts[$itemCode] ?? 0),
                 rows: $rows,
             );
         })->values();

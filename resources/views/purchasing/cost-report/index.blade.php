@@ -2,123 +2,80 @@
     <x-slot name="header">
         <h2 class="font-bold text-2xl text-slate-900 flex items-center gap-2">
             <i data-lucide="table" class="text-slate-600 w-6 h-6"></i>
-            <span>受注別 原価一覧</span>
+            <span>受注別 原価一覧（対象選択）</span>
         </h2>
         <p class="text-xs text-slate-500 mt-1">
-            売上日(受注日)の範囲内で、受注日・受注金額が登録された注番ごとに原価・損益を一覧表示します。
+            まだ「売上日」の入力が揃っていないレコードがあるため、受注日を手がかりにした候補から集計対象の注番を選んでください。
         </p>
     </x-slot>
 
     <div class="py-8">
-        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-6">
+        <div class="max-w-5xl mx-auto sm:px-6 lg:px-8 space-y-6">
 
-            <form method="GET" action="{{ route('purchasing.cost-report.index') }}" class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-wrap items-end gap-4">
-                <div>
-                    <label class="block text-xs font-bold text-slate-700 mb-1">売上日（開始）</label>
-                    <input type="date" name="date_from" value="{{ $dateFrom }}" class="border rounded-lg p-2 bg-slate-50 border-slate-300">
+            <form method="GET" action="{{ route('purchasing.cost-report.index') }}" x-data="{ manualRows: [Date.now()] }" class="space-y-6">
+                <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-3">
+                    <div class="flex flex-wrap items-end gap-4">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 mb-1">対象期間（開始日）</label>
+                            <input type="date" name="date_from" value="{{ $dateFrom }}" class="border rounded-lg p-2 bg-slate-50 border-slate-300">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 mb-1">対象期間（終了日）</label>
+                            <input type="date" name="date_to" value="{{ $dateTo }}" class="border rounded-lg p-2 bg-slate-50 border-slate-300">
+                        </div>
+                        <button type="submit" formaction="{{ route('purchasing.cost-report.index') }}" formmethod="GET"
+                                class="bg-slate-800 hover:bg-slate-900 text-white px-6 py-2.5 rounded-lg font-bold shadow transition">候補を表示</button>
+                    </div>
+                    <p class="text-[11px] text-slate-400">
+                        終了日から過去{{ $windowYears }}年以内で、受注日・受注金額が登録済みの注番を候補として下に表示します（開始日は期間中の雑人工集計にも使います）。
+                    </p>
                 </div>
-                <div>
-                    <label class="block text-xs font-bold text-slate-700 mb-1">売上日（終了）</label>
-                    <input type="date" name="date_to" value="{{ $dateTo }}" class="border rounded-lg p-2 bg-slate-50 border-slate-300">
-                </div>
-                <button type="submit" class="bg-indigo-600 text-white px-8 py-2.5 rounded-lg font-bold shadow hover:bg-indigo-700 transition">集計実行</button>
-                @if ($dateFrom !== '' || $dateTo !== '')
-                    <a href="{{ route('purchasing.cost-report.export', ['date_from' => $dateFrom, 'date_to' => $dateTo]) }}"
-                       class="inline-flex items-center gap-1.5 text-xs font-semibold px-4 py-2.5 rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors">
-                        <i data-lucide="download" class="w-3.5 h-3.5"></i>
-                        <span>CSV出力</span>
-                    </a>
-                @endif
-            </form>
 
-            @if ($dateFrom === '' && $dateTo === '')
-                <p class="text-xs text-slate-400">売上日の範囲を指定して集計を実行してください。</p>
-            @else
-                <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-x-auto">
-                    <table class="w-full text-left border-collapse text-xs whitespace-nowrap">
-                        <thead>
-                            <tr class="bg-slate-50 border-b border-slate-200 font-semibold text-slate-600">
-                                <th class="p-2" rowspan="2">注番</th>
-                                <th class="p-2" rowspan="2">納入先</th>
-                                <th class="p-2" rowspan="2">製品名</th>
-                                <th class="p-2 text-right" rowspan="2">受注額</th>
-                                <th class="p-2 text-right" rowspan="2">原価</th>
-                                <th class="p-2 text-right" rowspan="2">損益</th>
-                                <th class="p-2 text-right" rowspan="2">利益率</th>
-                                <th class="p-2 text-right bg-amber-50" colspan="4">部品材料費</th>
-                                <th class="p-2 text-right" rowspan="2">機械等外注費</th>
-                                <th class="p-2 text-right" rowspan="2">電気関係外注費</th>
-                                <th class="p-2 text-right bg-blue-50" colspan="5">機械人工</th>
-                                <th class="p-2 text-right" rowspan="2">電機人工</th>
-                                <th class="p-2 text-right bg-slate-100" colspan="4">その他</th>
-                            </tr>
-                            <tr class="bg-slate-50 border-b border-slate-200 font-semibold text-slate-500 text-[10px]">
-                                <th class="p-1.5 text-right bg-amber-50">計</th>
-                                <th class="p-1.5 text-right bg-amber-50">材料費計</th>
-                                <th class="p-1.5 text-right bg-amber-50">部品費計</th>
-                                <th class="p-1.5 text-right bg-amber-50">SW/センサ計</th>
-                                <th class="p-1.5 text-right bg-blue-50">計</th>
-                                <th class="p-1.5 text-right bg-blue-50">機械製造</th>
-                                <th class="p-1.5 text-right bg-blue-50">機械設計</th>
-                                <th class="p-1.5 text-right bg-blue-50">現地工事</th>
-                                <th class="p-1.5 text-right bg-blue-50">社内費その他計</th>
-                                <th class="p-1.5 text-right bg-slate-100">計</th>
-                                <th class="p-1.5 text-right bg-slate-100">運送費</th>
-                                <th class="p-1.5 text-right bg-slate-100">レンタルリース費</th>
-                                <th class="p-1.5 text-right bg-slate-100">比率雑費計</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-slate-100">
-                            @forelse ($rows as $row)
-                                <tr class="hover:bg-slate-50">
-                                    <td class="p-2 font-mono font-bold text-blue-900">{{ $row['item_code'] }}</td>
-                                    <td class="p-2">{{ $row['delivery_dest'] }}</td>
-                                    <td class="p-2 font-semibold">{{ $row['product_name'] }}</td>
-                                    <td class="p-2 text-right text-blue-800 font-bold">¥{{ number_format($row['order_amount']) }}</td>
-                                    <td class="p-2 text-right text-red-700 font-bold">¥{{ number_format($row['total_cost']) }}</td>
-                                    <td class="p-2 text-right font-bold {{ $row['profit'] >= 0 ? 'text-emerald-700' : 'text-red-700' }}">¥{{ number_format($row['profit']) }}</td>
-                                    <td class="p-2 text-right">{{ $row['profit_margin'] === null ? '-' : $row['profit_margin'].'%' }}</td>
-                                    <td class="p-2 text-right bg-amber-50/50 font-bold">¥{{ number_format($row['parts_material_total']) }}</td>
-                                    <td class="p-2 text-right bg-amber-50/50">¥{{ number_format($row['material_cost']) }}</td>
-                                    <td class="p-2 text-right bg-amber-50/50">¥{{ number_format($row['parts_cost']) }}</td>
-                                    <td class="p-2 text-right bg-amber-50/50">¥{{ number_format($row['switch_sensor_cost']) }}</td>
-                                    <td class="p-2 text-right">¥{{ number_format($row['machine_outsourcing_cost']) }}</td>
-                                    <td class="p-2 text-right">¥{{ number_format($row['electrical_outsourcing_cost']) }}</td>
-                                    <td class="p-2 text-right bg-blue-50/50 font-bold">¥{{ number_format($row['machine_labor_total']) }}</td>
-                                    <td class="p-2 text-right bg-blue-50/50">¥{{ number_format($row['machine_manufacturing_labor']) }}</td>
-                                    <td class="p-2 text-right bg-blue-50/50">¥{{ number_format($row['machine_design_labor']) }}</td>
-                                    <td class="p-2 text-right bg-blue-50/50">¥{{ number_format($row['machine_onsite_labor']) }}</td>
-                                    <td class="p-2 text-right bg-blue-50/50">¥{{ number_format($row['machine_other_labor']) }}</td>
-                                    <td class="p-2 text-right">¥{{ number_format($row['electrical_labor_cost']) }}</td>
-                                    <td class="p-2 text-right bg-slate-100/70 font-bold">¥{{ number_format($row['other_total']) }}</td>
-                                    <td class="p-2 text-right bg-slate-100/70">¥{{ number_format($row['shipping_cost']) }}</td>
-                                    <td class="p-2 text-right bg-slate-100/70">¥{{ number_format($row['lease_cost']) }}</td>
-                                    <td class="p-2 text-right bg-slate-100/70">¥{{ number_format($row['misc_ratio_cost']) }}</td>
-                                </tr>
-                            @empty
-                                <tr><td colspan="21" class="p-8 text-center text-slate-400">該当する受注データがありません。</td></tr>
-                            @endforelse
-
-                            @if ($miscLaborRow)
-                                <tr class="bg-amber-50/60 font-bold">
-                                    <td class="p-2 font-mono text-amber-800">{{ $miscLaborRow['item_code'] }}</td>
-                                    <td class="p-2"></td>
-                                    <td class="p-2 text-amber-800">{{ $miscLaborRow['product_name'] }}</td>
-                                    <td class="p-2 text-right">-</td>
-                                    <td class="p-2 text-right text-red-700">¥{{ number_format($miscLaborRow['total_cost']) }}</td>
-                                    <td class="p-2 text-right">-</td>
-                                    <td class="p-2 text-right">-</td>
-                                    <td class="p-2 text-right" colspan="4"></td>
-                                    <td class="p-2 text-right" colspan="2"></td>
-                                    <td class="p-2 text-right" colspan="5"></td>
-                                    <td class="p-2 text-right"></td>
-                                    <td class="p-2 text-right" colspan="4"></td>
-                                </tr>
+                @if ($dateTo !== '')
+                    <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+                        <div class="flex justify-between items-center mb-3">
+                            <h3 class="text-sm font-bold text-slate-700">候補（{{ $candidates->count() }}件）</h3>
+                            @if ($candidates->isNotEmpty())
+                                <div class="flex gap-3 text-xs font-semibold">
+                                    <button type="button" onclick="document.querySelectorAll('.candidate-checkbox').forEach(c => c.checked = true)" class="text-indigo-600 hover:text-indigo-800">すべて選択</button>
+                                    <button type="button" onclick="document.querySelectorAll('.candidate-checkbox').forEach(c => c.checked = false)" class="text-slate-400 hover:text-slate-600">すべて解除</button>
+                                </div>
                             @endif
-                        </tbody>
-                    </table>
+                        </div>
+                        <div class="max-h-96 overflow-y-auto border border-slate-100 rounded-lg divide-y divide-slate-100">
+                            @forelse ($candidates as $candidate)
+                                <label class="flex items-center gap-4 px-3 py-2 text-xs hover:bg-slate-50 cursor-pointer">
+                                    <input type="checkbox" name="item_codes[]" value="{{ $candidate->item_code }}" class="candidate-checkbox rounded border-slate-300">
+                                    <span class="font-mono font-bold text-blue-900 w-32 shrink-0">{{ $candidate->item_code }}</span>
+                                    <span class="text-slate-500 w-24 shrink-0">{{ \Illuminate\Support\Carbon::parse($candidate->order_received_date)->format('Y/m/d') }}</span>
+                                    <span class="text-slate-700 font-semibold">¥{{ number_format((float) $candidate->order_amount) }}</span>
+                                </label>
+                            @empty
+                                <p class="p-4 text-center text-slate-400 text-xs">候補となる注番が見つかりませんでした。</p>
+                            @endforelse
+                        </div>
+                    </div>
+                @endif
+
+                <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+                    <h3 class="text-sm font-bold text-slate-700 mb-1">それより前の注番を手入力で追加</h3>
+                    <p class="text-[11px] text-slate-400 mb-3">候補期間より古い注番を対象にする場合は、ここに直接入力してください。</p>
+                    <template x-for="row in manualRows" :key="row">
+                        <div class="flex gap-2 mb-2">
+                            <input type="text" name="item_codes[]" placeholder="例: DH013-N01" class="flex-grow font-mono text-sm border rounded-lg p-2 bg-slate-50 border-slate-300">
+                            <button type="button" @click="manualRows = manualRows.filter(r => r !== row)"
+                                    class="text-xs font-semibold px-3 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50">×</button>
+                        </div>
+                    </template>
+                    <button type="button" @click="manualRows.push(Date.now())"
+                            class="text-xs font-semibold px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700">＋ 注番を追加</button>
                 </div>
-            @endif
+
+                <div class="flex justify-end">
+                    <button type="submit" formaction="{{ route('purchasing.cost-report.results') }}" formmethod="GET"
+                            class="bg-indigo-600 text-white px-8 py-2.5 rounded-lg font-bold shadow hover:bg-indigo-700 transition">選択した内容で集計実行</button>
+                </div>
+            </form>
         </div>
     </div>
 </x-app-layout>
