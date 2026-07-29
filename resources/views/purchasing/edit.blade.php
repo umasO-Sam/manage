@@ -21,6 +21,7 @@
             <form method="POST" action="{{ route('purchasing.update', $detail) }}" class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-5">
                 @csrf
                 @method('PUT')
+                <input type="hidden" name="return_query" value="{{ $returnQuery }}">
 
                 <div class="flex items-center justify-end gap-2 border-b border-slate-100 pb-3">
                     <input type="checkbox" id="is_provisional_check" name="is_provisional" value="1" x-model="isProvisional" class="w-4 h-4 text-yellow-600 rounded focus:ring-yellow-500">
@@ -139,7 +140,7 @@
                 </div>
 
                 <div class="flex justify-between items-center pt-4 border-t border-slate-100">
-                    <a href="{{ route('purchasing.index') }}" class="text-xs text-slate-400 hover:text-slate-600">検索画面に戻る</a>
+                    <a href="{{ route('purchasing.index').($returnQuery !== '' ? '?'.$returnQuery : '') }}" class="text-xs text-slate-400 hover:text-slate-600">検索画面に戻る</a>
                     <button type="submit" class="inline-flex items-center px-6 py-2 bg-slate-800 hover:bg-slate-900 border border-transparent rounded-xl font-semibold text-sm text-white shadow-sm transition-all">
                         更新する
                     </button>

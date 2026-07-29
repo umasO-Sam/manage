@@ -123,12 +123,15 @@ class PurchaseDetailController extends Controller
 
     /**
      * 仕入管理データの編集(資材管理担当者のみ、procurement.managerミドルウェアで制御)。
+     * 検索画面の絞り込み条件付きURLから遷移してきた場合、更新後にその条件へ戻れるよう
+     * クエリ文字列をそのままフォームに持ち回す。
      */
-    public function edit(PurchaseDetail $purchaseDetail): View
+    public function edit(Request $request, PurchaseDetail $purchaseDetail): View
     {
         return view('purchasing.edit', [
             'detail' => $purchaseDetail,
             'categories' => CategoryCode::orderBy('code')->get(),
+            'returnQuery' => (string) $request->query('return_query', ''),
         ]);
     }
 
@@ -166,7 +169,10 @@ class PurchaseDetailController extends Controller
 
         $purchaseDetail->update($data);
 
-        return redirect()->route('purchasing.index')->with('status', 'update-success');
+        $returnQuery = (string) $request->input('return_query', '');
+        $redirectUrl = route('purchasing.index').($returnQuery !== '' ? "?{$returnQuery}" : '');
+
+        return redirect()->to($redirectUrl)->with('status', 'update-success');
     }
 
     /**

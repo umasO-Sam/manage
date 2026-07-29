@@ -118,4 +118,49 @@ class PurchaseDetailSearchTest extends TestCase
         // 注文価格 = 単価1,000 × (必要数量5 - 在庫2) = 3,000
         $response->assertSee('5,000')->assertSee('3,000');
     }
+
+    public function test_edit_link_from_a_filtered_search_carries_the_filters(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        $detail = PurchaseDetail::create(['item_code' => 'AAA111-X01', 'item_name' => '対象品']);
+
+        $response = $this->actingAs($manager)->get(route('purchasing.index', ['item_code' => 'AAA111']));
+
+        $response->assertSee('return_query=item_code%3DAAA111', false);
+    }
+
+    public function test_updating_a_record_redirects_back_to_the_search_with_filters_preserved(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        $category = \App\Models\CategoryCode::create(['code' => 1, 'major_category' => '部品']);
+        $detail = PurchaseDetail::create([
+            'item_code' => 'AAA111-X01', 'item_name' => '対象品', 'manufacturer' => 'メーカーA',
+            'category_id' => $category->id, 'order_qty' => 1, 'unit_price' => 100, 'supplier_name' => '商社A',
+        ]);
+
+        $response = $this->actingAs($manager)->put(route('purchasing.update', $detail), [
+            'item_code' => 'AAA111-X01', 'item_name' => '更新後品名', 'manufacturer' => 'メーカーA',
+            'category_id' => $category->id, 'order_qty' => 1, 'unit_price' => 100, 'supplier_name' => '商社A',
+            'return_query' => 'item_code=AAA111&item_code_match=partial',
+        ]);
+
+        $response->assertRedirect(route('purchasing.index').'?item_code=AAA111&item_code_match=partial');
+    }
+
+    public function test_updating_a_record_without_return_query_redirects_to_the_plain_search_page(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        $category = \App\Models\CategoryCode::create(['code' => 1, 'major_category' => '部品']);
+        $detail = PurchaseDetail::create([
+            'item_code' => 'AAA111-X01', 'item_name' => '対象品', 'manufacturer' => 'メーカーA',
+            'category_id' => $category->id, 'order_qty' => 1, 'unit_price' => 100, 'supplier_name' => '商社A',
+        ]);
+
+        $response = $this->actingAs($manager)->put(route('purchasing.update', $detail), [
+            'item_code' => 'AAA111-X01', 'item_name' => '更新後品名', 'manufacturer' => 'メーカーA',
+            'category_id' => $category->id, 'order_qty' => 1, 'unit_price' => 100, 'supplier_name' => '商社A',
+        ]);
+
+        $response->assertRedirect(route('purchasing.index'));
+    }
 }

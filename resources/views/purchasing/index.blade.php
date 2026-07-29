@@ -227,7 +227,7 @@
                                 <tr class="hover:bg-slate-50 {{ $detail->hasSalesOrder() ? 'bg-blue-50/50' : '' }}">
                                     @if (Auth::user()->is_procurement_manager)
                                         <td class="p-2.5">
-                                            <a href="{{ route('purchasing.edit', $detail) }}" class="text-blue-700 hover:text-blue-900 font-semibold">編集</a>
+                                            <a href="{{ route('purchasing.edit', [$detail, 'return_query' => request()->getQueryString()]) }}" class="text-blue-700 hover:text-blue-900 font-semibold">編集</a>
                                         </td>
                                     @endif
                                     <td class="p-2.5">
