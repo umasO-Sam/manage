@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\CategoryCode;
 use App\Models\PurchaseDetail;
 use Illuminate\Contracts\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -14,10 +15,22 @@ class PurchaseDetailController extends Controller
      */
     private const SEARCH_FIELDS = [
         'item_code' => 'item_code',
+        'machine_no' => 'machine_no',
+        'product_name' => 'product_name',
         'dimensions' => 'dimensions',
         'item_name' => 'item_name',
         'manufacturer' => 'manufacturer',
         'supplier_name' => 'supplier_name',
+    ];
+
+    /**
+     * @var array<string, string> クエリ文字列のキー => purchase_details の日付カラム名
+     */
+    private const DATE_FIELDS = [
+        'order_date' => '注文日',
+        'arrival_date' => '受入日',
+        'invoice_date' => '納品書日',
+        'order_received_date' => '受注日',
     ];
 
     /**
@@ -33,6 +46,14 @@ class PurchaseDetailController extends Controller
         }
         $alphas = array_values(array_filter((array) $request->query('alpha', [])));
         $filters['alpha'] = $alphas;
+        $filters['category_id'] = trim((string) $request->query('category_id', ''));
+
+        foreach (self::DATE_FIELDS as $key => $label) {
+            $mode = $request->query("{$key}_mode", '');
+            $filters["{$key}_mode"] = in_array($mode, ['exact', 'before', 'after', 'range'], true) ? $mode : '';
+            $filters["{$key}_from"] = trim((string) $request->query("{$key}_from", ''));
+            $filters["{$key}_to"] = trim((string) $request->query("{$key}_to", ''));
+        }
 
         $query = PurchaseDetail::query();
 
@@ -49,6 +70,31 @@ class PurchaseDetailController extends Controller
             }
         }
 
+        if ($filters['category_id'] !== '') {
+            $query->where('category_id', $filters['category_id']);
+        }
+
+        foreach (self::DATE_FIELDS as $key => $label) {
+            $mode = $filters["{$key}_mode"];
+            $from = $filters["{$key}_from"];
+            $to = $filters["{$key}_to"];
+
+            if ($mode === 'exact' && $from !== '') {
+                $query->whereDate($key, $from);
+            } elseif ($mode === 'before' && $from !== '') {
+                $query->whereDate($key, '<=', $from);
+            } elseif ($mode === 'after' && $from !== '') {
+                $query->whereDate($key, '>=', $from);
+            } elseif ($mode === 'range' && ($from !== '' || $to !== '')) {
+                if ($from !== '') {
+                    $query->whereDate($key, '>=', $from);
+                }
+                if ($to !== '') {
+                    $query->whereDate($key, '<=', $to);
+                }
+            }
+        }
+
         $this->applyAlphaFilter($query, $alphas);
 
         $details = $query
@@ -58,9 +104,12 @@ class PurchaseDetailController extends Controller
             ->paginate(50)
             ->withQueryString();
 
+        $categories = CategoryCode::orderBy('code')->get();
+
         return view('purchasing.index', [
             'details' => $details,
             'filters' => $filters,
+            'categories' => $categories,
         ]);
     }
 

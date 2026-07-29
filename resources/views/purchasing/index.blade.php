@@ -12,10 +12,18 @@
     @php
         $fields = [
             ['item_code', '注番'],
+            ['machine_no', '機械装置No'],
+            ['product_name', '製品名'],
             ['dimensions', '形式/寸法'],
             ['item_name', '品名'],
             ['manufacturer', 'メーカー'],
             ['supplier_name', '商社'],
+        ];
+        $dateFields = [
+            ['order_date', '注文日'],
+            ['arrival_date', '受入日'],
+            ['invoice_date', '納品書日'],
+            ['order_received_date', '受注日'],
         ];
         $alphaLetters = range('A', 'Z');
     @endphp
@@ -42,6 +50,48 @@
                             </div>
                         </div>
                     @endforeach
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">分類</label>
+                        <select name="category_id" class="w-full text-sm bg-slate-50 border border-slate-200 rounded-lg py-1.5 px-3 focus:outline-none focus:ring-2 focus:ring-slate-400">
+                            <option value="">すべて</option>
+                            @foreach ($categories as $category)
+                                <option value="{{ $category->id }}" @selected($filters['category_id'] === (string) $category->id)>
+                                    {{ $category->code }}:{{ $category->major_category }}@if ($category->sub_category)／{{ $category->sub_category }}@endif
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+                </div>
+
+                <div class="border-t border-slate-100 pt-3">
+                    <span class="text-xs font-semibold text-slate-500 mr-2 block mb-2">日付で絞り込み:</span>
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        @foreach ($dateFields as [$key, $label])
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 mb-1">{{ $label }}</label>
+                                <select name="{{ $key }}_mode" data-date-mode="{{ $key }}"
+                                        class="w-full text-xs bg-slate-50 border border-slate-200 rounded-lg py-1 px-2 mb-1 focus:outline-none focus:ring-2 focus:ring-slate-400">
+                                    <option value="" @selected($filters["{$key}_mode"] === '')>指定なし</option>
+                                    <option value="exact" @selected($filters["{$key}_mode"] === 'exact')>その日付</option>
+                                    <option value="before" @selected($filters["{$key}_mode"] === 'before')>以前</option>
+                                    <option value="after" @selected($filters["{$key}_mode"] === 'after')>以降</option>
+                                    <option value="range" @selected($filters["{$key}_mode"] === 'range')>範囲</option>
+                                </select>
+                                <div class="flex items-center gap-1">
+                                    <input type="date" name="{{ $key }}_from" value="{{ $filters["{$key}_from"] }}"
+                                           data-date-from="{{ $key }}"
+                                           class="w-full text-xs bg-slate-50 border border-slate-200 rounded-lg py-1 px-2 focus:outline-none focus:ring-2 focus:ring-slate-400">
+                                    <span data-date-to-wrap="{{ $key }}" class="flex items-center gap-1 {{ $filters["{$key}_mode"] !== 'range' ? 'hidden' : '' }}">
+                                        <span class="text-slate-400">〜</span>
+                                        <input type="date" name="{{ $key }}_to" value="{{ $filters["{$key}_to"] }}"
+                                               data-date-to="{{ $key }}"
+                                               class="w-full text-xs bg-slate-50 border border-slate-200 rounded-lg py-1 px-2 focus:outline-none focus:ring-2 focus:ring-slate-400">
+                                    </span>
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
                 </div>
 
                 <div class="border-t border-slate-100 pt-3">
@@ -161,6 +211,17 @@
     </div>
 
     <script>
+        (function () {
+            document.querySelectorAll('[data-date-mode]').forEach((select) => {
+                const key = select.dataset.dateMode;
+                const toWrap = document.querySelector(`[data-date-to-wrap="${key}"]`);
+                if (!toWrap) return;
+                select.addEventListener('change', () => {
+                    toWrap.classList.toggle('hidden', select.value !== 'range');
+                });
+            });
+        })();
+
         (function () {
             const topScroll = document.getElementById('purchaseTableTopScroll');
             const topScrollInner = document.getElementById('purchaseTableTopScrollInner');
