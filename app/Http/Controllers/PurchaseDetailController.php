@@ -46,7 +46,7 @@ class PurchaseDetailController extends Controller
         }
         $alphas = array_values(array_filter((array) $request->query('alpha', [])));
         $filters['alpha'] = $alphas;
-        $filters['category_id'] = trim((string) $request->query('category_id', ''));
+        $filters['category_id'] = array_values(array_filter((array) $request->query('category_id', [])));
 
         foreach (self::DATE_FIELDS as $key => $label) {
             $mode = $request->query("{$key}_mode", '');
@@ -70,8 +70,8 @@ class PurchaseDetailController extends Controller
             }
         }
 
-        if ($filters['category_id'] !== '') {
-            $query->where('category_id', $filters['category_id']);
+        if (! empty($filters['category_id'])) {
+            $query->whereIn('category_id', $filters['category_id']);
         }
 
         foreach (self::DATE_FIELDS as $key => $label) {

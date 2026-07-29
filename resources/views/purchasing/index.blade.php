@@ -56,11 +56,13 @@
                     @endforeach
 
                     <div>
-                        <label class="block text-xs font-semibold text-slate-600 mb-1">分類</label>
-                        <select name="category_id" class="w-full text-sm bg-slate-50 border border-slate-200 rounded-lg py-1.5 px-3 focus:outline-none focus:ring-2 focus:ring-slate-400">
-                            <option value="">すべて</option>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">
+                            分類 <span class="font-normal text-slate-400">(Ctrl/Cmdで複数選択)</span>
+                        </label>
+                        <select name="category_id[]" multiple size="4"
+                                class="w-full text-sm bg-slate-50 border border-slate-200 rounded-lg py-1.5 px-3 focus:outline-none focus:ring-2 focus:ring-slate-400">
                             @foreach ($categories as $category)
-                                <option value="{{ $category->id }}" @selected($filters['category_id'] === (string) $category->id)>
+                                <option value="{{ $category->id }}" @selected(in_array((string) $category->id, $filters['category_id'], true))>
                                     {{ $category->code }}:{{ $category->major_category }}@if ($category->sub_category)／{{ $category->sub_category }}@endif
                                 </option>
                             @endforeach
