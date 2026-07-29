@@ -20,7 +20,8 @@
                     <h3 class="font-bold text-slate-900 text-base">{{ $workflowType->name }}の新規依頼</h3>
                 </div>
 
-                <form method="POST" action="{{ route('cards.store', $workflowType) }}" enctype="multipart/form-data" class="p-6 space-y-5">
+                <form method="POST" action="{{ route('cards.store', $workflowType) }}" enctype="multipart/form-data" class="p-6 space-y-5"
+                      onsubmit="return confirm('この内容で依頼を作成しますか？');">
                     @csrf
 
                     <div>
@@ -73,7 +74,8 @@
                         </div>
                         <div>
                             <x-input-label for="unit" value="単位" />
-                            <x-text-input id="unit" name="unit" type="text" class="mt-1 block w-full" :value="old('unit')" required placeholder="例: 個, 本, kg" />
+                            <x-text-input id="unit" name="unit" type="text" class="mt-1 block w-full" :value="old('unit')" required placeholder="例: 個, 本, kg"
+                                          onkeydown="if (event.key === 'Enter') { event.preventDefault(); }" />
                             <x-input-error class="mt-2" :messages="$errors->get('unit')" />
                         </div>
                     </div>
