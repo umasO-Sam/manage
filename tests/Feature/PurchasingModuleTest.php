@@ -225,6 +225,21 @@ class PurchasingModuleTest extends TestCase
         $response->assertSee('10,000')->assertSee('2,100')->assertSee('7,900')->assertSee('79');
     }
 
+    public function test_cost_analysis_links_to_search_filtered_to_the_same_order_number(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        $category = CategoryCode::create(['code' => 3, 'major_category' => '部品', 'is_parts' => true]);
+        PurchaseDetail::create([
+            'item_code' => 'A1', 'category_id' => $category->id, 'item_name' => '部品X',
+            'supplier_name' => '大津屋', 'order_qty' => 2, 'unit_price' => 1000, 'order_amount' => 10000,
+            'is_provisional' => false,
+        ]);
+
+        $response = $this->actingAs($manager)->get(route('purchasing.cost.index', ['order_no' => 'A1']));
+
+        $response->assertSee('item_code=A1', false)->assertSee('item_code_match=perfect', false);
+    }
+
     public function test_cost_analysis_breaks_down_labor_cost_by_sub_category(): void
     {
         $manager = Staff::factory()->procurementManager()->create();

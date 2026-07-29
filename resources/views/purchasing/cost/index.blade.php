@@ -22,6 +22,14 @@
             </form>
 
             @if ($result)
+                <div class="flex justify-end">
+                    <a href="{{ route('purchasing.index', ['item_code' => $orderNo, 'item_code_match' => 'perfect']) }}"
+                       class="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition-colors">
+                        <i data-lucide="search" class="w-3.5 h-3.5"></i>
+                        <span>この注番の仕入レコードを検索画面で見る</span>
+                    </a>
+                </div>
+
                 <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <div class="bg-white p-4 rounded-xl shadow-sm border-l-4 border-blue-500">
                         <div class="text-xs font-bold text-slate-500">受注金額</div>
