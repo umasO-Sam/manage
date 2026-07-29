@@ -10,12 +10,14 @@
     </x-slot>
 
     @php
-        $fields = [
+        $primaryFields = [
             ['item_code', '注番'],
+            ['item_name', '品名'],
+            ['dimensions', '形式/寸法'],
+        ];
+        $secondaryFields = [
             ['machine_no', '機械装置No'],
             ['product_name', '製品名'],
-            ['dimensions', '形式/寸法'],
-            ['item_name', '品名'],
             ['manufacturer', 'メーカー'],
             ['supplier_name', '商社'],
         ];
@@ -26,6 +28,8 @@
             ['order_received_date', '受注日'],
         ];
         $alphaLetters = range('A', 'Z');
+        $secondaryHasValue = collect($secondaryFields)->contains(fn ($f) => $filters[$f[0]] !== '');
+        $dateHasValue = collect($dateFields)->contains(fn ($f) => $filters["{$f[0]}_mode"] !== '');
     @endphp
 
     <div class="py-8">
@@ -33,7 +37,7 @@
 
             <form method="GET" action="{{ route('purchasing.index') }}" class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4">
                 <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
-                    @foreach ($fields as [$key, $label])
+                    @foreach ($primaryFields as [$key, $label])
                         <div>
                             <label class="block text-xs font-semibold text-slate-600 mb-1">{{ $label }}</label>
                             <input type="text" name="{{ $key }}" value="{{ $filters[$key] }}"
@@ -64,9 +68,38 @@
                     </div>
                 </div>
 
-                <div class="border-t border-slate-100 pt-3">
-                    <span class="text-xs font-semibold text-slate-500 mr-2 block mb-2">日付で絞り込み:</span>
-                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div class="border-t border-slate-100 pt-3" x-data="{ open: {{ $secondaryHasValue ? 'true' : 'false' }} }">
+                    <button type="button" @click="open = !open" class="flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-700">
+                        <span>その他の項目で絞り込み</span>
+                        <span x-text="open ? '∧' : '∨'"></span>
+                    </button>
+                    <div x-show="open" x-cloak class="grid grid-cols-1 md:grid-cols-5 gap-4 mt-3">
+                        @foreach ($secondaryFields as [$key, $label])
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 mb-1">{{ $label }}</label>
+                                <input type="text" name="{{ $key }}" value="{{ $filters[$key] }}"
+                                       class="w-full text-sm bg-slate-50 border border-slate-200 rounded-lg py-1.5 px-3 focus:outline-none focus:ring-2 focus:ring-slate-400">
+                                <div class="mt-1 flex gap-3 text-[11px] text-slate-500">
+                                    <label class="flex items-center gap-1">
+                                        <input type="radio" name="{{ $key }}_match" value="perfect" @checked($filters["{$key}_match"] === 'perfect') class="border-slate-300">
+                                        完全
+                                    </label>
+                                    <label class="flex items-center gap-1">
+                                        <input type="radio" name="{{ $key }}_match" value="partial" @checked($filters["{$key}_match"] === 'partial') class="border-slate-300">
+                                        部分
+                                    </label>
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+
+                <div class="border-t border-slate-100 pt-3" x-data="{ open: {{ $dateHasValue ? 'true' : 'false' }} }">
+                    <button type="button" @click="open = !open" class="flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-700">
+                        <span>日付で絞り込み</span>
+                        <span x-text="open ? '∧' : '∨'"></span>
+                    </button>
+                    <div x-show="open" x-cloak class="grid grid-cols-1 md:grid-cols-4 gap-4 mt-3">
                         @foreach ($dateFields as [$key, $label])
                             <div>
                                 <label class="block text-xs font-semibold text-slate-600 mb-1">{{ $label }}</label>
