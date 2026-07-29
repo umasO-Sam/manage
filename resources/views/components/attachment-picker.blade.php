@@ -6,6 +6,10 @@
         dragging: false,
         addFiles(fileList) {
             Array.from(fileList).forEach((file) => {
+                if (/\.fdc$/i.test(file.name)) {
+                    const proceed = confirm('部品リストを通知する場合、ここに添付するのではなくBOX上の保存場所を通知してください。\nFDCファイルを添付しますか。');
+                    if (! proceed) return;
+                }
                 const exists = this.files.some((f) => f.name === file.name && f.size === file.size && f.lastModified === file.lastModified);
                 if (! exists) this.files.push(file);
             });
