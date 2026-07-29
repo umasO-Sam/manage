@@ -140,11 +140,22 @@ class ImportLegacyPurchasingData extends Command
         $this->info('category_codes: '.count($rows).'件');
     }
 
+    /**
+     * Access側の氏名には姓名の間に全角スペースが入っている(例:「鵜飼　克彦」)ことがあり、
+     * 既存スタッフの氏名(スペースなし「鵜飼克彦」)と完全一致しないため、スペースを除去して比較する。
+     */
+    private function normalizeStaffName(string $name): string
+    {
+        return str_replace(['　', ' '], '', $name);
+    }
+
     private function importStaff(string $path): void
     {
         $this->staffIdMap = [];
         $created = 0;
         $updated = 0;
+
+        $existingByNormalizedName = Staff::all()->keyBy(fn (Staff $s) => $this->normalizeStaffName($s->name));
 
         foreach ($this->readCsv($path) as $row) {
             $accessId = (int) $row['ID'];
@@ -156,7 +167,7 @@ class ImportLegacyPurchasingData extends Command
             $isLaborTarget = $this->toBool($row['人工対象']);
             $positionWeight = $this->toNullableInt($row['役職重さ']);
 
-            $staff = Staff::where('name', $name)->first();
+            $staff = $existingByNormalizedName->get($this->normalizeStaffName($name));
 
             if ($staff) {
                 $staff->update([
@@ -176,6 +187,7 @@ class ImportLegacyPurchasingData extends Command
                     'password' => Hash::make(Str::random(40)),
                 ]);
                 $created++;
+                $existingByNormalizedName->put($this->normalizeStaffName($name), $staff);
             }
 
             $this->staffIdMap[$accessId] = $staff->id;
