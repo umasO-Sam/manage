@@ -690,4 +690,25 @@ class CardWorkflowTest extends TestCase
         $mineOnly = $this->actingAs($requester)->get(route('cards.index', [$workflowType, 'only_mine' => 1]));
         $mineOnly->assertSee('自分の依頼部品')->assertDontSee('他人の依頼部品');
     }
+
+    public function test_order_number_filter_narrows_cards_by_partial_match(): void
+    {
+        $workflowType = $this->purchaseWorkflow();
+        $requester = Staff::factory()->create();
+        $orderA = $this->orderNumber('AB123-N01');
+        $orderB = $this->orderNumber('ZZ999-N99T99');
+
+        $workflowType->cards()->create([
+            'order_number_id' => $orderA->id, 'item_name' => 'AB123の部品', 'manufacturer' => 'テストメーカー',
+            'quantity' => 1, 'unit' => '個', 'due_date' => now()->addWeek(), 'created_by' => $requester->id, 'current_stage' => 0,
+        ]);
+        $workflowType->cards()->create([
+            'order_number_id' => $orderB->id, 'item_name' => 'ZZ999の部品', 'manufacturer' => 'テストメーカー',
+            'quantity' => 1, 'unit' => '個', 'due_date' => now()->addWeek(), 'created_by' => $requester->id, 'current_stage' => 0,
+        ]);
+
+        $filtered = $this->actingAs($requester)->get(route('cards.index', [$workflowType, 'order_no' => 'AB123']));
+
+        $filtered->assertSee('AB123の部品')->assertDontSee('ZZ999の部品');
+    }
 }

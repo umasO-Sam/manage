@@ -37,6 +37,7 @@ class CardController extends Controller
         /** @var Staff $staff */
         $staff = $request->user();
         $onlyMine = $request->boolean('only_mine');
+        $orderNo = trim((string) $request->query('order_no', ''));
 
         $cardsQuery = $workflow->cards()
             ->with([
@@ -49,12 +50,17 @@ class CardController extends Controller
             $cardsQuery->where('created_by', $staff->id);
         }
 
+        if ($orderNo !== '') {
+            $cardsQuery->whereHas('orderNumber', fn ($q) => $q->where('code', 'like', "%{$orderNo}%"));
+        }
+
         $cards = $cardsQuery->orderBy('due_date')->get()->groupBy('current_stage');
 
         return view('cards.index', [
             'workflowType' => $workflow,
             'cardsByStage' => $cards,
             'onlyMine' => $onlyMine,
+            'orderNo' => $orderNo,
         ]);
     }
 

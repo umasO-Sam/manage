@@ -58,13 +58,26 @@
                 </div>
             @endif
 
-            <div class="flex justify-end mb-4">
-                <a href="{{ route('cards.index', [$workflowType, 'only_mine' => $onlyMine ? null : 1]) }}"
-                   class="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full border transition-colors {{ $onlyMine ? $accent['button'].' text-white border-transparent' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50' }}">
+            <form method="GET" action="{{ route('cards.index', $workflowType) }}" class="flex flex-wrap justify-end items-center gap-2 mb-4">
+                <input type="text" name="order_no" value="{{ $orderNo }}" placeholder="注番で絞り込み"
+                       class="text-xs font-mono rounded-full px-3 py-1.5 border border-slate-200 focus:ring-1 focus:ring-slate-300">
+
+                <label class="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full border cursor-pointer transition-colors {{ $onlyMine ? $accent['button'].' text-white border-transparent' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50' }}">
+                    <input type="checkbox" name="only_mine" value="1" class="hidden" @checked($onlyMine)>
                     <i data-lucide="user" class="w-3.5 h-3.5"></i>
                     <span>自分の依頼のみ表示</span>
-                </a>
-            </div>
+                </label>
+
+                <button type="submit" class="text-xs font-semibold px-3 py-1.5 rounded-full border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 transition-colors">
+                    絞り込む
+                </button>
+
+                @if ($onlyMine || $orderNo !== '')
+                    <a href="{{ route('cards.index', $workflowType) }}" class="text-xs font-semibold px-3 py-1.5 text-slate-400 hover:text-slate-600 transition-colors">
+                        条件をクリア
+                    </a>
+                @endif
+            </form>
 
             <div
                 class="grid grid-cols-1 md:grid-cols-3 gap-6"
