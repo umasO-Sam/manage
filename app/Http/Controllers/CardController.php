@@ -36,20 +36,25 @@ class CardController extends Controller
 
         /** @var Staff $staff */
         $staff = $request->user();
+        $onlyMine = $request->boolean('only_mine');
 
-        $cards = $workflow->cards()
+        $cardsQuery = $workflow->cards()
             ->with([
                 'orderNumber', 'creator', 'stageLogs.actor', 'attachments',
                 'comments:id,card_id,created_at',
                 'views' => fn ($query) => $query->where('staff_id', $staff->id),
-            ])
-            ->orderBy('due_date')
-            ->get()
-            ->groupBy('current_stage');
+            ]);
+
+        if ($onlyMine) {
+            $cardsQuery->where('created_by', $staff->id);
+        }
+
+        $cards = $cardsQuery->orderBy('due_date')->get()->groupBy('current_stage');
 
         return view('cards.index', [
             'workflowType' => $workflow,
             'cardsByStage' => $cards,
+            'onlyMine' => $onlyMine,
         ]);
     }
 

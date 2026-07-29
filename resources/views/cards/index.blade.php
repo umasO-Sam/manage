@@ -58,6 +58,14 @@
                 </div>
             @endif
 
+            <div class="flex justify-end mb-4">
+                <a href="{{ route('cards.index', [$workflowType, 'only_mine' => $onlyMine ? null : 1]) }}"
+                   class="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full border transition-colors {{ $onlyMine ? $accent['button'].' text-white border-transparent' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50' }}">
+                    <i data-lucide="user" class="w-3.5 h-3.5"></i>
+                    <span>自分の依頼のみ表示</span>
+                </a>
+            </div>
+
             <div
                 class="grid grid-cols-1 md:grid-cols-3 gap-6"
                 x-data="{ draggedCardId: null, draggedFromStage: null, dragOverStage: null }"
@@ -150,6 +158,15 @@
                                                         </span>
                                                     </div>
                                                 @endif
+                                                <div class="flex justify-between text-slate-500">
+                                                    <span>状態変更日時:</span>
+                                                    <span class="font-medium text-slate-700">{{ $card->stageEnteredAt($index)?->format('Y/m/d H:i') }}</span>
+                                                </div>
+                                            </div>
+                                        @else
+                                            <div class="mt-3 p-2 rounded-lg border text-xs bg-slate-50 border-slate-100 flex justify-between text-slate-500">
+                                                <span>作成日時:</span>
+                                                <span class="font-medium text-slate-700">{{ $card->stageEnteredAt($index)?->format('Y/m/d H:i') }}</span>
                                             </div>
                                         @endif
 

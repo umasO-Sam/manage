@@ -630,4 +630,64 @@ class CardWorkflowTest extends TestCase
         $response->assertSee('入荷済み部品');
         $this->assertStringNotContainsString('line-through', $response->getContent());
     }
+
+    public function test_new_request_card_shows_its_creation_datetime(): void
+    {
+        $workflowType = $this->purchaseWorkflow();
+        $orderNumber = $this->orderNumber();
+        $requester = Staff::factory()->create();
+
+        $card = $workflowType->cards()->create([
+            'order_number_id' => $orderNumber->id, 'item_name' => 'テスト部品', 'manufacturer' => 'テストメーカー',
+            'quantity' => 1, 'unit' => '個', 'due_date' => now()->addWeek(), 'created_by' => $requester->id, 'current_stage' => 0,
+        ]);
+
+        $response = $this->actingAs($requester)->get(route('cards.index', $workflowType));
+
+        $response->assertSee('作成日時')->assertSee($card->created_at->format('Y/m/d H:i'));
+    }
+
+    public function test_in_progress_card_shows_the_datetime_it_entered_that_stage(): void
+    {
+        $workflowType = $this->purchaseWorkflow();
+        $orderNumber = $this->orderNumber();
+        $requester = Staff::factory()->create();
+        $manager = Staff::factory()->procurementManager()->create();
+
+        $card = $workflowType->cards()->create([
+            'order_number_id' => $orderNumber->id, 'item_name' => 'テスト部品', 'manufacturer' => 'テストメーカー',
+            'quantity' => 1, 'unit' => '個', 'due_date' => now()->addWeek(), 'created_by' => $requester->id, 'current_stage' => 0,
+        ]);
+
+        $this->travel(3)->days();
+        $this->actingAs($manager)->post("/cards/{$card->id}/move");
+        $movedAt = $card->fresh()->stageLogs()->where('stage_index', 1)->first()->moved_at;
+
+        $response = $this->actingAs($manager)->get(route('cards.index', $workflowType));
+
+        $response->assertSee('状態変更日時')->assertSee($movedAt->format('Y/m/d H:i'));
+    }
+
+    public function test_only_mine_filter_shows_only_the_current_users_cards(): void
+    {
+        $workflowType = $this->purchaseWorkflow();
+        $orderNumber = $this->orderNumber();
+        $requester = Staff::factory()->create();
+        $otherStaff = Staff::factory()->create();
+
+        $workflowType->cards()->create([
+            'order_number_id' => $orderNumber->id, 'item_name' => '自分の依頼部品', 'manufacturer' => 'テストメーカー',
+            'quantity' => 1, 'unit' => '個', 'due_date' => now()->addWeek(), 'created_by' => $requester->id, 'current_stage' => 0,
+        ]);
+        $workflowType->cards()->create([
+            'order_number_id' => $orderNumber->id, 'item_name' => '他人の依頼部品', 'manufacturer' => 'テストメーカー',
+            'quantity' => 1, 'unit' => '個', 'due_date' => now()->addWeek(), 'created_by' => $otherStaff->id, 'current_stage' => 0,
+        ]);
+
+        $all = $this->actingAs($requester)->get(route('cards.index', $workflowType));
+        $all->assertSee('自分の依頼部品')->assertSee('他人の依頼部品');
+
+        $mineOnly = $this->actingAs($requester)->get(route('cards.index', [$workflowType, 'only_mine' => 1]));
+        $mineOnly->assertSee('自分の依頼部品')->assertDontSee('他人の依頼部品');
+    }
 }

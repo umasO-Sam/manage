@@ -125,4 +125,22 @@ class Card extends Model
             ->last()
             ?->actor;
     }
+
+    /**
+     * ある段階に「現在」到達した日時を返す。段階0はカード自体の作成日時、
+     * それ以外は差し戻しを除く直近の移動ログのmoved_atを返す
+     * （latestActorForStageと同じ考え方）。
+     */
+    public function stageEnteredAt(int $stageIndex): ?\Illuminate\Support\Carbon
+    {
+        if ($stageIndex === 0) {
+            return $this->created_at;
+        }
+
+        return $this->stageLogs
+            ->where('stage_index', $stageIndex)
+            ->where('is_reversal', false)
+            ->last()
+            ?->moved_at;
+    }
 }
