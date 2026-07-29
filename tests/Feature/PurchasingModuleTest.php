@@ -198,7 +198,8 @@ class PurchasingModuleTest extends TestCase
 
         $response = $this->actingAs($manager)->get(route('purchasing.cost.index', ['order_no' => 'A1']));
 
-        // 受注金額10,000 - 原価2,000(部品) = 粗利8,000、利益率80%
-        $response->assertSee('10,000')->assertSee('8,000')->assertSee('80');
+        // 受注金額10,000、部品費2,000 + 比率雑費100(小計の5%を100円未満切り捨て) = 総原価2,100
+        // 簡易収支 = 10,000 - 2,100 = 7,900、収支率79%
+        $response->assertSee('10,000')->assertSee('2,100')->assertSee('7,900')->assertSee('79');
     }
 }

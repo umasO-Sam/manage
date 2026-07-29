@@ -3,11 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Models\Staff;
+use App\Rules\NotSimilarToLoginId;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\Password;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
@@ -36,7 +38,7 @@ class StaffController extends Controller
             'login_id' => ['required', 'string', 'max:255', 'unique:staff,login_id'],
             'email' => ['required', 'string', 'email', 'max:255', 'unique:staff,email'],
             'is_procurement_manager' => ['boolean'],
-            'password' => ['required', 'string', 'min:8'],
+            'password' => ['required', Password::defaults(), new NotSimilarToLoginId($request->input('login_id'))],
         ]);
 
         // アプリ側のunique検証後に別リクエストが割り込む競合状態に備え、
@@ -67,7 +69,7 @@ class StaffController extends Controller
             'login_id' => ['required', 'string', 'max:255', Rule::unique('staff', 'login_id')->ignore($staff->id)],
             'email' => ['required', 'string', 'email', 'max:255', Rule::unique('staff', 'email')->ignore($staff->id)],
             'is_procurement_manager' => ['boolean'],
-            'password' => ['nullable', 'string', 'min:8'],
+            'password' => ['nullable', Password::defaults(), new NotSimilarToLoginId($request->input('login_id'))],
         ]);
 
         $willRemainManager = $request->boolean('is_procurement_manager');
@@ -95,6 +97,8 @@ class StaffController extends Controller
 
         if (! empty($data['password'])) {
             $staff->password = Hash::make($data['password']);
+            // 資材管理担当者が代わりにパスワードを設定した場合、本人に次回ログイン時の変更を求める。
+            $staff->must_change_password = true;
         }
 
         try {
