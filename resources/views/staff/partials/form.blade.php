@@ -27,7 +27,7 @@
 <div>
     <x-input-label for="password" :value="$isEdit ? 'パスワード（変更する場合のみ入力）' : '初期パスワード'" />
     <x-text-input id="password" name="password" type="password" class="mt-1 block w-full" :required="! $isEdit" autocomplete="new-password"
-                   passwordrules="minlength: 20; required: lower; required: upper; required: digit; required: special;" />
+                   passwordrules="minlength: 20; required: lower; required: upper; required: digit;" />
     <x-input-error class="mt-2" :messages="$errors->get('password')" />
 </div>
 
