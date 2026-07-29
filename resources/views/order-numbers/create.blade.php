@@ -21,7 +21,7 @@
                             :value="old('code')" required autofocus
                             x-bind:class="bypass ? '' : 'font-mono'"
                             x-bind:placeholder="bypass ? '例: 〇〇工事現場支給品' : '例: ZZ999-N99T99'" />
-                        <p class="mt-1 text-[11px] text-slate-400" x-show="! bypass">英数5〜7文字 - 英数3〜10文字</p>
+                        <p class="mt-1 text-[11px] text-slate-400" x-show="! bypass">英数1〜8文字 - 英数2〜12文字</p>
                         <p class="mt-1 text-[11px] text-amber-600" x-show="bypass" x-cloak>形式チェックを解除しています。日本語を含む自由な文字列で登録できます。</p>
                         <x-input-error class="mt-2" :messages="$errors->get('code')" />
                     </div>

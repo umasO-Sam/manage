@@ -56,6 +56,30 @@ class OrderNumberTest extends TestCase
         $this->assertDatabaseHas('order_numbers', ['code' => '〇〇工事現場支給品', 'is_protected' => false]);
     }
 
+    public function test_order_number_format_allows_short_codes(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+
+        // 「英数1〜8文字-英数2〜12文字」の緩和後の下限(1文字-2文字)を確認する。
+        $response = $this->actingAs($manager)->post(route('order-numbers.store'), [
+            'code' => 'A-11',
+        ]);
+
+        $response->assertRedirect(route('order-numbers.index'));
+        $this->assertDatabaseHas('order_numbers', ['code' => 'A-11', 'is_protected' => false]);
+    }
+
+    public function test_order_number_format_rejects_prefix_over_eight_chars(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+
+        $response = $this->actingAs($manager)->post(route('order-numbers.store'), [
+            'code' => 'ABCDEFGHI-N99T99',
+        ]);
+
+        $response->assertSessionHasErrors('code');
+    }
+
     public function test_without_bypass_japanese_text_is_still_rejected(): void
     {
         $manager = Staff::factory()->procurementManager()->create();

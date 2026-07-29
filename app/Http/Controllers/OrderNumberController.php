@@ -36,13 +36,13 @@ class OrderNumberController extends Controller
 
         $codeRules = ['required', 'string', 'max:50', 'unique:order_numbers,code'];
         if (! $bypassFormatCheck) {
-            $codeRules[] = 'regex:/^[A-Za-z0-9]{5,7}-[A-Za-z0-9]{3,10}$/';
+            $codeRules[] = 'regex:'.OrderNumber::FORMAT_REGEX;
         }
 
         $data = $request->validate([
             'code' => $codeRules,
         ], [
-            'code.regex' => '注番は「英数5〜7文字-英数3〜10文字」の形式で入力してください（例: ZZ999-N99T99）。形式に合わない注番を登録する場合は「形式チェックを解除する」にチェックしてください。',
+            'code.regex' => '注番は「英数1〜8文字-英数2〜12文字」の形式で入力してください（例: ZZ999-N99T99）。形式に合わない注番を登録する場合は「形式チェックを解除する」にチェックしてください。',
             'code.unique' => 'この注番はすでに登録されています。',
         ]);
 
