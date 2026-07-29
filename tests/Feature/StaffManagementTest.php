@@ -69,6 +69,7 @@ class StaffManagementTest extends TestCase
 
         $this->actingAs($sales)->get(route('purchasing.index'))->assertOk();
         $this->actingAs($sales)->get(route('purchasing.cost.index'))->assertOk();
+        $this->actingAs($sales)->get(route('purchasing.labor.index'))->assertOk();
         $this->actingAs($sales)->get(route('purchasing.input'))->assertForbidden();
         $this->actingAs($sales)->get(route('staff.index'))->assertForbidden();
     }

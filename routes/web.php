@@ -36,13 +36,14 @@ Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
 
-    // 仕入管理の検索・原価計算は資材管理担当者・営業担当が閲覧できる。
+    // 仕入管理の検索・原価計算・人工計算は資材管理担当者・営業担当が閲覧できる。
     Route::middleware('purchasing.viewer')->group(function () {
         Route::get('/purchasing', [PurchaseDetailController::class, 'index'])->name('purchasing.index');
         Route::get('/purchasing/cost', [CostAnalysisController::class, 'index'])->name('purchasing.cost.index');
+        Route::get('/purchasing/labor', [LaborCostController::class, 'index'])->name('purchasing.labor.index');
     });
 
-    // データ入力・注文書・明細書・人工計算・レコード編集・担当者管理は資材管理担当者限定。
+    // データ入力・注文書・明細書・レコード編集・担当者管理は資材管理担当者限定。
     Route::middleware('procurement.manager')->group(function () {
         Route::get('/staff', [StaffController::class, 'index'])->name('staff.index');
         Route::get('/staff/create', [StaffController::class, 'create'])->name('staff.create');
@@ -70,8 +71,6 @@ Route::middleware('auth')->group(function () {
 
         Route::get('/purchasing/invoices', [PurchaseInvoiceController::class, 'index'])->name('purchasing.invoices.index');
         Route::post('/purchasing/invoices/print', [PurchaseInvoiceController::class, 'print'])->name('purchasing.invoices.print');
-
-        Route::get('/purchasing/labor', [LaborCostController::class, 'index'])->name('purchasing.labor.index');
     });
 });
 

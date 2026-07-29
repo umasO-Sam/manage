@@ -238,6 +238,7 @@ class PurchasingModuleTest extends TestCase
         $response = $this->actingAs($manager)->get(route('purchasing.cost.index', ['order_no' => 'A1']));
 
         $response->assertSee('item_code=A1', false)->assertSee('item_code_match=perfect', false);
+        $response->assertSee(route('purchasing.labor.index', ['order_no' => 'A1']), false);
     }
 
     public function test_cost_analysis_breaks_down_labor_cost_by_sub_category(): void

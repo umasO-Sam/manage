@@ -22,11 +22,16 @@
             </form>
 
             @if ($result)
-                <div class="flex justify-end">
+                <div class="flex justify-end gap-2">
                     <a href="{{ route('purchasing.index', ['item_code' => $orderNo, 'item_code_match' => 'perfect']) }}"
                        class="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition-colors">
                         <i data-lucide="search" class="w-3.5 h-3.5"></i>
                         <span>この注番の仕入レコードを検索画面で見る</span>
+                    </a>
+                    <a href="{{ route('purchasing.labor.index', ['order_no' => $orderNo]) }}"
+                       class="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full border border-green-200 bg-green-50 text-green-700 hover:bg-green-100 transition-colors">
+                        <i data-lucide="clock" class="w-3.5 h-3.5"></i>
+                        <span>この注番の人工データを見る</span>
                     </a>
                 </div>
 
