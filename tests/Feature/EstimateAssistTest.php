@@ -1,0 +1,118 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\LaborCost;
+use App\Models\PurchaseDetail;
+use App\Models\Staff;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
+
+class EstimateAssistTest extends TestCase
+{
+    use RefreshDatabase;
+
+    public function test_procurement_manager_and_sales_can_view_the_page(): void
+    {
+        $this->actingAs(Staff::factory()->procurementManager()->create())->get(route('purchasing.estimate.index'))->assertOk();
+        $this->actingAs(Staff::factory()->sales()->create())->get(route('purchasing.estimate.index'))->assertOk();
+    }
+
+    public function test_general_staff_cannot_view_the_page(): void
+    {
+        $staff = Staff::factory()->create();
+
+        $this->actingAs($staff)->get(route('purchasing.estimate.index'))->assertForbidden();
+    }
+
+    public function test_order_no_aggregation_combines_purchase_and_labor_totals(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        $worker = Staff::factory()->create(['is_labor_target' => true, 'position_weight' => 1]);
+
+        PurchaseDetail::create([
+            'item_code' => 'A1', 'item_name' => '部品X', 'unit_price' => 1000,
+            'required_qty' => 5, 'stock_qty' => 2, 'order_qty' => 3, 'order_amount' => 4000,
+            'is_provisional' => false,
+        ]);
+        LaborCost::create([
+            'work_date' => now(), 'staff_id' => $worker->id, 'order_no' => 'A1',
+            'work_hours' => 8, 'work_minutes' => 0, 'is_overtime' => false, 'position_weight_cache' => 1,
+            'is_provisional' => false,
+        ]);
+
+        $response = $this->actingAs($manager)->get(route('purchasing.estimate.index', ['order_no' => 'A1', 'order_no_match' => 'perfect']));
+
+        // 価格=1000*5=5,000 注文価格=1000*(5-2)=3,000 受注金額=4,000 労務費=40,000
+        $response->assertOk()
+            ->assertSee('5,000')
+            ->assertSee('3,000')
+            ->assertSee('4,000')
+            ->assertSee('40,000')
+            ->assertSee('部品X')
+            ->assertSee($worker->name);
+    }
+
+    public function test_excluded_order_no_is_removed_from_aggregation(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+
+        PurchaseDetail::create([
+            'item_code' => 'AA100-X01', 'item_name' => '対象品A', 'unit_price' => 1000,
+            'required_qty' => 1, 'order_amount' => 1000, 'is_provisional' => false,
+        ]);
+        PurchaseDetail::create([
+            'item_code' => 'AA200-X01', 'item_name' => '除外対象品B', 'unit_price' => 2000,
+            'required_qty' => 1, 'order_amount' => 2000, 'is_provisional' => false,
+        ]);
+
+        $response = $this->actingAs($manager)->get(route('purchasing.estimate.index', [
+            'order_no' => 'AA', 'order_no_match' => 'partial',
+            'excluded_order_nos' => ['AA200-X01'],
+        ]));
+
+        $response->assertSee('対象品A')->assertDontSee('除外対象品B');
+    }
+
+    public function test_reference_price_search_scores_and_sorts_by_relevance(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+
+        PurchaseDetail::create([
+            'item_code' => 'B1', 'item_name' => '近接センサ', 'manufacturer' => 'オムロン', 'dimensions' => 'E2E-X1R5E1',
+            'unit_price' => 500, 'order_date' => now()->subYear(), 'is_provisional' => false,
+        ]);
+        PurchaseDetail::create([
+            'item_code' => 'B2', 'item_name' => '近接センサ', 'manufacturer' => '別メーカー', 'dimensions' => '別型式',
+            'unit_price' => 800, 'order_date' => now(), 'is_provisional' => false,
+        ]);
+
+        $response = $this->actingAs($manager)->get(route('purchasing.estimate.index', [
+            'ref_item_name' => '近接センサ',
+            'ref_manufacturer' => 'オムロン',
+            'ref_sort' => 'relevance',
+        ]));
+
+        // 一致度2件のB1(品名+メーカー一致)が、一致度1件のB2(品名のみ一致)より先に表示される
+        $content = $response->getContent();
+        $this->assertLessThan(strpos($content, 'B2'), strpos($content, 'B1'));
+    }
+
+    public function test_reference_price_search_matches_across_katakana_width(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+
+        // 旧Accessデータはメーカー名が半角カタカナで登録されていることが多いため、
+        // 全角で入力しても半角データがヒットする必要がある。
+        PurchaseDetail::create([
+            'item_code' => 'C1', 'item_name' => 'リミットスイッチ', 'manufacturer' => 'ｵﾑﾛﾝ',
+            'unit_price' => 500, 'is_provisional' => false,
+        ]);
+
+        $response = $this->actingAs($manager)->get(route('purchasing.estimate.index', [
+            'ref_manufacturer' => 'オムロン',
+        ]));
+
+        $response->assertSee('C1');
+    }
+}

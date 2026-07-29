@@ -43,6 +43,9 @@
                                 <x-dropdown-link :href="route('purchasing.index')">
                                     <i data-lucide="search" class="w-3.5 h-3.5 inline-block align-text-bottom mr-1"></i> 検索
                                 </x-dropdown-link>
+                                <x-dropdown-link :href="route('purchasing.estimate.index')">
+                                    <i data-lucide="calculator" class="w-3.5 h-3.5 inline-block align-text-bottom mr-1"></i> 見積補助
+                                </x-dropdown-link>
                                 @if (Auth::user()->is_procurement_manager)
                                     <x-dropdown-link :href="route('purchasing.input')">
                                         <i data-lucide="pencil-line" class="w-3.5 h-3.5 inline-block align-text-bottom mr-1"></i> データ入力
@@ -140,6 +143,9 @@
                 <div class="px-3 py-2 text-xs font-bold text-slate-400 uppercase tracking-wider">仕入管理</div>
                 <a href="{{ route('purchasing.index') }}" class="block px-3 py-2 rounded-lg text-sm font-medium {{ request()->routeIs('purchasing.index') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
                     検索
+                </a>
+                <a href="{{ route('purchasing.estimate.index') }}" class="block px-3 py-2 rounded-lg text-sm font-medium {{ request()->routeIs('purchasing.estimate.*') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
+                    見積補助
                 </a>
                 @if (Auth::user()->is_procurement_manager)
                     <a href="{{ route('purchasing.input') }}" class="block px-3 py-2 rounded-lg text-sm font-medium {{ request()->routeIs('purchasing.input') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">

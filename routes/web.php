@@ -4,6 +4,7 @@ use App\Http\Controllers\ArchiveController;
 use App\Http\Controllers\CardCommentController;
 use App\Http\Controllers\CardController;
 use App\Http\Controllers\CostAnalysisController;
+use App\Http\Controllers\EstimateAssistController;
 use App\Http\Controllers\LaborCostController;
 use App\Http\Controllers\OrderNumberController;
 use App\Http\Controllers\ProfileController;
@@ -41,6 +42,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/purchasing', [PurchaseDetailController::class, 'index'])->name('purchasing.index');
         Route::get('/purchasing/cost', [CostAnalysisController::class, 'index'])->name('purchasing.cost.index');
         Route::get('/purchasing/labor', [LaborCostController::class, 'index'])->name('purchasing.labor.index');
+        Route::get('/purchasing/estimate', [EstimateAssistController::class, 'index'])->name('purchasing.estimate.index');
     });
 
     // データ入力・注文書・明細書・レコード編集・担当者管理は資材管理担当者限定。
