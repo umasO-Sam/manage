@@ -57,6 +57,7 @@ class PurchaseInputController extends Controller
             'order_received_date' => ['nullable', 'date'],
             'delivery_dest' => ['nullable', 'string', 'max:255'],
             'order_amount' => ['nullable', 'numeric'],
+            'sales_date' => ['nullable', 'date'],
             'supplier_invoice_no' => ['nullable', 'string', 'max:255'],
         ]);
         $data['is_provisional'] = $isProvisional;

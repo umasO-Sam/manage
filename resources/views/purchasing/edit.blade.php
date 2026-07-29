@@ -127,6 +127,11 @@
                         <x-input-label for="order_amount" value="受注金額" />
                         <x-text-input id="order_amount" name="order_amount" type="number" step="0.01" class="mt-1 block w-full" :value="old('order_amount', $detail->order_amount)" />
                     </div>
+                    <div>
+                        <x-input-label for="sales_date" value="売上日" />
+                        <x-text-input id="sales_date" name="sales_date" type="date" class="mt-1 block w-full" :value="old('sales_date', $detail->sales_date?->format('Y-m-d'))" />
+                        <p class="mt-1 text-[11px] text-slate-400">実際に売り上がったタイミングで登録してください。</p>
+                    </div>
                     <div class="md:col-span-2">
                         <x-input-label for="remarks" value="備考" />
                         <textarea id="remarks" name="remarks" rows="3" class="mt-1 block w-full text-sm border-slate-300 focus:border-blue-500 focus:ring-blue-500 rounded-lg shadow-sm">{{ old('remarks', $detail->remarks) }}</textarea>

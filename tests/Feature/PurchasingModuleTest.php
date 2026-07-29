@@ -60,6 +60,29 @@ class PurchasingModuleTest extends TestCase
         ]);
     }
 
+    public function test_procurement_manager_can_register_a_sales_date(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        $category = CategoryCode::create(['code' => 1, 'major_category' => '部品', 'is_parts' => true]);
+
+        $this->actingAs($manager)->post(route('purchasing.input.store'), [
+            'form_type' => 'purchase',
+            'is_provisional' => '0',
+            'item_code' => 'AB123-C45',
+            'category_id' => $category->id,
+            'manufacturer' => 'オムロン',
+            'item_name' => '近接センサ',
+            'order_qty' => 5,
+            'unit' => '個',
+            'unit_price' => 1000,
+            'supplier_name' => '大津屋',
+            'order_amount' => 6000,
+            'sales_date' => '2026-07-29',
+        ]);
+
+        $this->assertSame('2026-07-29', PurchaseDetail::where('item_code', 'AB123-C45')->first()->sales_date->format('Y-m-d'));
+    }
+
     public function test_provisional_purchase_detail_skips_required_fields(): void
     {
         $manager = Staff::factory()->procurementManager()->create();

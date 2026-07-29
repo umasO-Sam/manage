@@ -26,6 +26,7 @@
             ['arrival_date', '受入日'],
             ['invoice_date', '納品書日'],
             ['order_received_date', '受注日'],
+            ['sales_date', '売上日'],
         ];
         $alphaLetters = range('A', 'Z');
         $secondaryHasValue = collect($secondaryFields)->contains(fn ($f) => $filters[$f[0]] !== '') || $filters['provisional'] !== '';
@@ -216,6 +217,7 @@
                                 <th class="p-2.5">受注日</th>
                                 <th class="p-2.5">納入先</th>
                                 <th class="p-2.5 text-right">受注金額</th>
+                                <th class="p-2.5">売上日</th>
                                 <th class="p-2.5">商社納品書No</th>
                                 <th class="p-2.5">備考</th>
                             </tr>
@@ -260,12 +262,13 @@
                                     <td class="p-2.5 text-slate-500">{{ $detail->order_received_date?->format('Y/m/d') ?? '-' }}</td>
                                     <td class="p-2.5">{{ $detail->delivery_dest }}</td>
                                     <td class="p-2.5 text-right text-indigo-700 font-bold">¥{{ number_format((float) $detail->order_amount) }}</td>
+                                    <td class="p-2.5 text-slate-500">{{ $detail->sales_date?->format('Y/m/d') ?? '-' }}</td>
                                     <td class="p-2.5">{{ $detail->supplier_invoice_no }}</td>
                                     <td class="p-2.5 text-slate-500 max-w-[220px] truncate" title="{{ $detail->remarks }}">{{ $detail->remarks }}</td>
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="{{ Auth::user()->is_procurement_manager ? 27 : 26 }}" class="p-8 text-center text-slate-400">
+                                    <td colspan="{{ Auth::user()->is_procurement_manager ? 28 : 27 }}" class="p-8 text-center text-slate-400">
                                         <i data-lucide="search-x" class="w-10 h-10 mx-auto mb-2 text-slate-300"></i>
                                         条件に一致するデータがありません。
                                     </td>

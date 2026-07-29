@@ -40,6 +40,19 @@ class PurchaseDetailSearchTest extends TestCase
         $response->assertSee('ABC123-D01')->assertDontSee('ZZZ999-D01');
     }
 
+    public function test_sales_date_is_shown_and_filterable(): void
+    {
+        $staff = Staff::factory()->sales()->create();
+        PurchaseDetail::create(['item_code' => 'AAA111-X01', 'item_name' => '売上済み', 'order_amount' => 1000, 'sales_date' => '2026-07-29']);
+        PurchaseDetail::create(['item_code' => 'AAA111-X02', 'item_name' => '未計上', 'order_amount' => 1000]);
+
+        $response = $this->actingAs($staff)->get(route('purchasing.index', [
+            'sales_date_mode' => 'exact', 'sales_date_from' => '2026-07-29',
+        ]));
+
+        $response->assertSee('売上済み')->assertDontSee('未計上')->assertSee('2026/07/29');
+    }
+
     public function test_search_by_item_code_perfect_match(): void
     {
         $staff = Staff::factory()->sales()->create();

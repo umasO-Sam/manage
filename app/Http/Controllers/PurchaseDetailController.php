@@ -32,6 +32,7 @@ class PurchaseDetailController extends Controller
         'arrival_date' => '受入日',
         'invoice_date' => '納品書日',
         'order_received_date' => '受注日',
+        'sales_date' => '売上日',
     ];
 
     /**
@@ -158,6 +159,7 @@ class PurchaseDetailController extends Controller
             'order_received_date' => ['nullable', 'date'],
             'delivery_dest' => ['nullable', 'string', 'max:255'],
             'order_amount' => ['nullable', 'numeric'],
+            'sales_date' => ['nullable', 'date'],
             'supplier_invoice_no' => ['nullable', 'string', 'max:255'],
         ]);
         $data['is_provisional'] = $isProvisional;

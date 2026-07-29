@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'item_code', 'machine_no', 'product_name', 'category_id', 'manufacturer', 'item_name',
     'dimensions', 'remarks', 'required_qty', 'usage_purpose', 'order_qty', 'unit', 'unit_price',
     'stock_qty', 'supplier_name', 'order_date', 'arrival_date', 'invoice_date', 'recipient',
-    'order_received_date', 'delivery_dest', 'order_amount', 'supplier_invoice_no', 'is_provisional',
+    'order_received_date', 'delivery_dest', 'order_amount', 'sales_date', 'supplier_invoice_no', 'is_provisional',
 ])]
 class PurchaseDetail extends Model
 {
@@ -21,6 +21,7 @@ class PurchaseDetail extends Model
             'arrival_date' => 'date',
             'invoice_date' => 'date',
             'order_received_date' => 'date',
+            'sales_date' => 'date',
             'required_qty' => 'decimal:2',
             'order_qty' => 'decimal:2',
             'stock_qty' => 'decimal:2',
