@@ -35,6 +35,10 @@
     <div class="py-8">
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-6">
 
+            @if (session('status') === 'update-success')
+                <div class="p-3 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-800 text-sm">更新しました。</div>
+            @endif
+
             <form method="GET" action="{{ route('purchasing.index') }}" class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4">
                 <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
                     @foreach ($primaryFields as [$key, $label])
@@ -200,6 +204,9 @@
                                 <th class="p-2.5 text-right">受注金額</th>
                                 <th class="p-2.5">商社納品書No</th>
                                 <th class="p-2.5">備考</th>
+                                @if (Auth::user()->is_procurement_manager)
+                                    <th class="p-2.5"></th>
+                                @endif
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100">
@@ -237,10 +244,15 @@
                                     <td class="p-2.5 text-right text-indigo-700 font-bold">¥{{ number_format((float) $detail->order_amount) }}</td>
                                     <td class="p-2.5">{{ $detail->supplier_invoice_no }}</td>
                                     <td class="p-2.5 text-slate-500 max-w-[220px] truncate" title="{{ $detail->remarks }}">{{ $detail->remarks }}</td>
+                                    @if (Auth::user()->is_procurement_manager)
+                                        <td class="p-2.5">
+                                            <a href="{{ route('purchasing.edit', $detail) }}" class="text-blue-700 hover:text-blue-900 font-semibold">編集</a>
+                                        </td>
+                                    @endif
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="24" class="p-8 text-center text-slate-400">
+                                    <td colspan="{{ Auth::user()->is_procurement_manager ? 25 : 24 }}" class="p-8 text-center text-slate-400">
                                         <i data-lucide="search-x" class="w-10 h-10 mx-auto mb-2 text-slate-300"></i>
                                         条件に一致するデータがありません。
                                     </td>

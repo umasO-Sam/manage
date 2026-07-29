@@ -56,6 +56,9 @@ Route::middleware('auth')->group(function () {
         Route::get('/purchasing/input', [PurchaseInputController::class, 'create'])->name('purchasing.input');
         Route::post('/purchasing/input', [PurchaseInputController::class, 'store'])->name('purchasing.input.store');
 
+        Route::get('/purchasing/{purchaseDetail}/edit', [PurchaseDetailController::class, 'edit'])->name('purchasing.edit');
+        Route::put('/purchasing/{purchaseDetail}', [PurchaseDetailController::class, 'update'])->name('purchasing.update');
+
         Route::get('/purchasing/orders', [PurchaseOrderController::class, 'index'])->name('purchasing.orders.index');
         Route::post('/purchasing/orders/print', [PurchaseOrderController::class, 'print'])->name('purchasing.orders.print');
 

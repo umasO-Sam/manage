@@ -1,0 +1,145 @@
+<x-app-layout>
+    <x-slot name="header">
+        <h2 class="font-bold text-2xl text-slate-900 flex items-center gap-2">
+            <i data-lucide="pencil-line" class="text-slate-600 w-6 h-6"></i>
+            <span>仕入管理データ編集</span>
+        </h2>
+        <p class="text-xs text-slate-500 mt-1">注番: <span class="font-mono font-bold">{{ $detail->item_code }}</span>(ID: {{ $detail->id }})</p>
+    </x-slot>
+
+    <div class="py-8" x-data="{ isProvisional: {{ $detail->is_provisional ? 'true' : 'false' }} }">
+        <div class="max-w-4xl mx-auto sm:px-6 lg:px-8 space-y-6">
+
+            @if ($errors->any())
+                <div class="p-3 rounded-xl bg-red-50 border border-red-100 text-red-800 text-sm">
+                    @foreach ($errors->all() as $error)
+                        <p>{{ $error }}</p>
+                    @endforeach
+                </div>
+            @endif
+
+            <form method="POST" action="{{ route('purchasing.update', $detail) }}" class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-5">
+                @csrf
+                @method('PUT')
+
+                <div class="flex items-center justify-end gap-2 border-b border-slate-100 pb-3">
+                    <input type="checkbox" id="is_provisional_check" name="is_provisional" value="1" x-model="isProvisional" class="w-4 h-4 text-yellow-600 rounded focus:ring-yellow-500">
+                    <label for="is_provisional_check" class="font-bold text-yellow-800 text-xs cursor-pointer">仮登録として保存(必須入力をスキップ)</label>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <x-input-label for="item_code" value="注番 *" />
+                        <x-text-input id="item_code" name="item_code" type="text" class="mt-1 block w-full" :value="old('item_code', $detail->item_code)" />
+                    </div>
+                    <div>
+                        <x-input-label for="machine_no" value="機械装置No" />
+                        <x-text-input id="machine_no" name="machine_no" type="text" class="mt-1 block w-full" :value="old('machine_no', $detail->machine_no)" />
+                    </div>
+                    <div>
+                        <x-input-label for="product_name" value="製品名" />
+                        <x-text-input id="product_name" name="product_name" type="text" class="mt-1 block w-full" :value="old('product_name', $detail->product_name)" />
+                    </div>
+                    <div>
+                        <x-input-label for="category_id" value="分類 *" />
+                        <select id="category_id" name="category_id" class="mt-1 block w-full text-sm border-slate-300 focus:border-blue-500 focus:ring-blue-500 rounded-lg shadow-sm">
+                            <option value="">選択してください</option>
+                            @foreach ($categories as $category)
+                                <option value="{{ $category->id }}" @selected((string) old('category_id', $detail->category_id) === (string) $category->id)>
+                                    {{ $category->code }} - {{ $category->major_category }}/{{ $category->sub_category }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div>
+                        <x-input-label for="manufacturer" value="メーカー *" />
+                        <x-text-input id="manufacturer" name="manufacturer" type="text" class="mt-1 block w-full" :value="old('manufacturer', $detail->manufacturer)" />
+                    </div>
+                    <div>
+                        <x-input-label for="item_name" value="品名 *" />
+                        <x-text-input id="item_name" name="item_name" type="text" class="mt-1 block w-full" :value="old('item_name', $detail->item_name)" />
+                    </div>
+                    <div>
+                        <x-input-label for="dimensions" value="形式/寸法" />
+                        <x-text-input id="dimensions" name="dimensions" type="text" class="mt-1 block w-full" :value="old('dimensions', $detail->dimensions)" />
+                    </div>
+                    <div>
+                        <x-input-label for="usage_purpose" value="使用用途" />
+                        <x-text-input id="usage_purpose" name="usage_purpose" type="text" class="mt-1 block w-full" :value="old('usage_purpose', $detail->usage_purpose)" />
+                    </div>
+                    <div>
+                        <x-input-label for="order_qty" value="注文数量 *" />
+                        <x-text-input id="order_qty" name="order_qty" type="number" step="0.01" class="mt-1 block w-full" :value="old('order_qty', $detail->order_qty)" />
+                    </div>
+                    <div>
+                        <x-input-label for="unit" value="単位" />
+                        <x-text-input id="unit" name="unit" type="text" class="mt-1 block w-full" :value="old('unit', $detail->unit)" />
+                    </div>
+                    <div>
+                        <x-input-label for="unit_price" value="単価 *" />
+                        <x-text-input id="unit_price" name="unit_price" type="number" step="0.01" class="mt-1 block w-full" :value="old('unit_price', $detail->unit_price)" />
+                    </div>
+                    <div>
+                        <x-input-label for="stock_qty" value="在庫" />
+                        <x-text-input id="stock_qty" name="stock_qty" type="number" step="0.01" class="mt-1 block w-full" :value="old('stock_qty', $detail->stock_qty)" />
+                    </div>
+                    <div>
+                        <x-input-label for="required_qty" value="必要数量" />
+                        <x-text-input id="required_qty" name="required_qty" type="number" step="0.01" class="mt-1 block w-full" :value="old('required_qty', $detail->required_qty)" />
+                    </div>
+                    <div>
+                        <x-input-label for="supplier_name" value="商社名 *" />
+                        <x-text-input id="supplier_name" name="supplier_name" type="text" class="mt-1 block w-full" :value="old('supplier_name', $detail->supplier_name)" />
+                    </div>
+                    <div>
+                        <x-input-label for="order_date" value="注文日付" />
+                        <x-text-input id="order_date" name="order_date" type="date" class="mt-1 block w-full" :value="old('order_date', $detail->order_date?->format('Y-m-d'))" />
+                    </div>
+                    <div>
+                        <x-input-label for="arrival_date" value="受入日付" />
+                        <x-text-input id="arrival_date" name="arrival_date" type="date" class="mt-1 block w-full" :value="old('arrival_date', $detail->arrival_date?->format('Y-m-d'))" />
+                    </div>
+                    <div>
+                        <x-input-label for="invoice_date" value="納品書日付" />
+                        <x-text-input id="invoice_date" name="invoice_date" type="date" class="mt-1 block w-full" :value="old('invoice_date', $detail->invoice_date?->format('Y-m-d'))" />
+                    </div>
+                    <div>
+                        <x-input-label for="supplier_invoice_no" value="商社納品書番号" />
+                        <x-text-input id="supplier_invoice_no" name="supplier_invoice_no" type="text" class="mt-1 block w-full" :value="old('supplier_invoice_no', $detail->supplier_invoice_no)" />
+                    </div>
+
+                    <div class="md:col-span-2 border-t border-slate-100 pt-4">
+                        <h3 class="text-xs font-bold text-slate-500 mb-3 uppercase tracking-wider">受注情報（他社から受注した場合）</h3>
+                    </div>
+                    <div>
+                        <x-input-label for="recipient" value="受注先" />
+                        <x-text-input id="recipient" name="recipient" type="text" class="mt-1 block w-full" :value="old('recipient', $detail->recipient)" />
+                    </div>
+                    <div>
+                        <x-input-label for="order_received_date" value="受注日" />
+                        <x-text-input id="order_received_date" name="order_received_date" type="date" class="mt-1 block w-full" :value="old('order_received_date', $detail->order_received_date?->format('Y-m-d'))" />
+                    </div>
+                    <div>
+                        <x-input-label for="delivery_dest" value="納入先" />
+                        <x-text-input id="delivery_dest" name="delivery_dest" type="text" class="mt-1 block w-full" :value="old('delivery_dest', $detail->delivery_dest)" />
+                    </div>
+                    <div>
+                        <x-input-label for="order_amount" value="受注金額" />
+                        <x-text-input id="order_amount" name="order_amount" type="number" step="0.01" class="mt-1 block w-full" :value="old('order_amount', $detail->order_amount)" />
+                    </div>
+                    <div class="md:col-span-2">
+                        <x-input-label for="remarks" value="備考" />
+                        <textarea id="remarks" name="remarks" rows="3" class="mt-1 block w-full text-sm border-slate-300 focus:border-blue-500 focus:ring-blue-500 rounded-lg shadow-sm">{{ old('remarks', $detail->remarks) }}</textarea>
+                    </div>
+                </div>
+
+                <div class="flex justify-between items-center pt-4 border-t border-slate-100">
+                    <a href="{{ route('purchasing.index') }}" class="text-xs text-slate-400 hover:text-slate-600">検索画面に戻る</a>
+                    <button type="submit" class="inline-flex items-center px-6 py-2 bg-slate-800 hover:bg-slate-900 border border-transparent rounded-xl font-semibold text-sm text-white shadow-sm transition-all">
+                        更新する
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</x-app-layout>

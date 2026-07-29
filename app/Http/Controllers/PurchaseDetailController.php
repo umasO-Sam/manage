@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\CategoryCode;
 use App\Models\PurchaseDetail;
 use Illuminate\Contracts\Database\Eloquent\Builder;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
@@ -111,6 +112,53 @@ class PurchaseDetailController extends Controller
             'filters' => $filters,
             'categories' => $categories,
         ]);
+    }
+
+    /**
+     * 仕入管理データの編集(資材管理担当者のみ、procurement.managerミドルウェアで制御)。
+     */
+    public function edit(PurchaseDetail $purchaseDetail): View
+    {
+        return view('purchasing.edit', [
+            'detail' => $purchaseDetail,
+            'categories' => CategoryCode::orderBy('code')->get(),
+        ]);
+    }
+
+    public function update(Request $request, PurchaseDetail $purchaseDetail): RedirectResponse
+    {
+        $isProvisional = $request->boolean('is_provisional');
+
+        $data = $request->validate([
+            'item_code' => ['required', 'string', 'max:255'],
+            'machine_no' => ['nullable', 'string', 'max:255'],
+            'product_name' => ['nullable', 'string', 'max:255'],
+            'category_id' => [$isProvisional ? 'nullable' : 'required', 'integer', 'exists:category_codes,id'],
+            'manufacturer' => [$isProvisional ? 'nullable' : 'required', 'string', 'max:255'],
+            'item_name' => [$isProvisional ? 'nullable' : 'required', 'string', 'max:255'],
+            'dimensions' => ['nullable', 'string', 'max:255'],
+            'remarks' => ['nullable', 'string'],
+            'required_qty' => ['nullable', 'numeric'],
+            'usage_purpose' => ['nullable', 'string', 'max:255'],
+            'order_qty' => [$isProvisional ? 'nullable' : 'required', 'numeric'],
+            'unit' => ['nullable', 'string', 'max:50'],
+            'unit_price' => [$isProvisional ? 'nullable' : 'required', 'numeric'],
+            'stock_qty' => ['nullable', 'numeric'],
+            'supplier_name' => [$isProvisional ? 'nullable' : 'required', 'string', 'max:255'],
+            'order_date' => ['nullable', 'date'],
+            'arrival_date' => ['nullable', 'date'],
+            'invoice_date' => ['nullable', 'date'],
+            'recipient' => ['nullable', 'string', 'max:255'],
+            'order_received_date' => ['nullable', 'date'],
+            'delivery_dest' => ['nullable', 'string', 'max:255'],
+            'order_amount' => ['nullable', 'numeric'],
+            'supplier_invoice_no' => ['nullable', 'string', 'max:255'],
+        ]);
+        $data['is_provisional'] = $isProvisional;
+
+        $purchaseDetail->update($data);
+
+        return redirect()->route('purchasing.index')->with('status', 'update-success');
     }
 
     /**
