@@ -37,12 +37,36 @@ class CostAnalysisController extends Controller
             return view('purchasing.cost.index', ['orderNo' => '', 'result' => null]);
         }
 
-        $rows = DB::table('purchase_details as p')
+        $purchaseRows = DB::table('purchase_details as p')
             ->leftJoin('category_codes as c', 'p.category_id', '=', 'c.id')
             ->where('p.item_code', $orderNo)
             ->where('p.is_provisional', false)
             ->selectRaw('c.code as category_code, c.major_category, c.sub_category, (p.order_qty * p.unit_price) as amount')
             ->get();
+
+        // 人工計算画面(labor_costs)で記録される時間ベースの労務費も、旧仕入リストに直接手入力されていた
+        // 「人工」明細行と同じ分類ルールで原価計算に合算する(そうしないと新規注番で人工が一切集計されない)。
+        $laborRows = DB::table('labor_costs as l')
+            ->leftJoin('category_codes as c', 'l.category_id', '=', 'c.id')
+            ->where('l.order_no', $orderNo)
+            ->where('l.is_provisional', false)
+            ->get()
+            ->map(function ($l) {
+                $totalMinutes = ((int) $l->work_hours * 60) + (int) $l->work_minutes;
+                $hourlyRate = $l->is_overtime ? 50000 : 40000;
+                $weight = (float) $l->position_weight_cache;
+                $multiplier = $weight > 0 ? $weight : 1.0;
+                $amount = round(($totalMinutes / 480) * $hourlyRate * $multiplier);
+
+                return (object) [
+                    'category_code' => $l->code,
+                    'major_category' => $l->major_category,
+                    'sub_category' => $l->sub_category,
+                    'amount' => $amount,
+                ];
+            });
+
+        $rows = $purchaseRows->concat($laborRows);
 
         $orderAmount = (float) (DB::table('purchase_details')
             ->where('item_code', $orderNo)
