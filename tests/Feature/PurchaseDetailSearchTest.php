@@ -90,4 +90,19 @@ class PurchaseDetailSearchTest extends TestCase
             strpos($content, '受注あり')
         );
     }
+
+    public function test_search_results_show_computed_price_and_order_price(): void
+    {
+        $staff = Staff::factory()->sales()->create();
+        PurchaseDetail::create([
+            'item_code' => 'AAA111-X01', 'item_name' => '価格計算対象',
+            'unit_price' => 1000, 'required_qty' => 5, 'stock_qty' => 2,
+        ]);
+
+        $response = $this->actingAs($staff)->get(route('purchasing.index', ['item_code' => 'AAA111-X01']));
+
+        // 価格 = 単価1,000 × 必要数量5 = 5,000
+        // 注文価格 = 単価1,000 × (必要数量5 - 在庫2) = 3,000
+        $response->assertSee('5,000')->assertSee('3,000');
+    }
 }

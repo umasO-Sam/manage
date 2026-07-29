@@ -48,4 +48,16 @@ class PurchaseDetail extends Model
     {
         return (float) $this->order_qty * (float) $this->unit_price;
     }
+
+    /** 単価×必要数量。検索画面で「価格」として表示する見込み金額。 */
+    public function requiredAmount(): float
+    {
+        return (float) $this->required_qty * (float) $this->unit_price;
+    }
+
+    /** 単価×(必要数量-在庫)。在庫を差し引いた「注文価格」(不足分の発注見込み金額)。 */
+    public function orderRequiredAmount(): float
+    {
+        return ((float) $this->required_qty - (float) $this->stock_qty) * (float) $this->unit_price;
+    }
 }

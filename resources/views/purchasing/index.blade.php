@@ -205,7 +205,9 @@
                                 <th class="p-2.5 text-right">数量</th>
                                 <th class="p-2.5">単位</th>
                                 <th class="p-2.5 text-right">単価</th>
+                                <th class="p-2.5 text-right">価格</th>
                                 <th class="p-2.5 text-right">在庫</th>
+                                <th class="p-2.5 text-right">注文価格</th>
                                 <th class="p-2.5">商社名</th>
                                 <th class="p-2.5">注文日</th>
                                 <th class="p-2.5">受入日</th>
@@ -247,7 +249,9 @@
                                     <td class="p-2.5 text-right font-semibold">{{ $detail->order_qty }}</td>
                                     <td class="p-2.5">{{ $detail->unit }}</td>
                                     <td class="p-2.5 text-right text-red-700 font-bold">¥{{ number_format((float) $detail->unit_price) }}</td>
+                                    <td class="p-2.5 text-right">¥{{ number_format($detail->requiredAmount()) }}</td>
                                     <td class="p-2.5 text-right">{{ $detail->stock_qty }}</td>
+                                    <td class="p-2.5 text-right">¥{{ number_format($detail->orderRequiredAmount()) }}</td>
                                     <td class="p-2.5 font-semibold">{{ $detail->supplier_name }}</td>
                                     <td class="p-2.5 text-slate-500">{{ $detail->order_date?->format('Y/m/d') ?? '-' }}</td>
                                     <td class="p-2.5 text-slate-500">{{ $detail->arrival_date?->format('Y/m/d') ?? '-' }}</td>
@@ -261,7 +265,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="{{ Auth::user()->is_procurement_manager ? 25 : 24 }}" class="p-8 text-center text-slate-400">
+                                    <td colspan="{{ Auth::user()->is_procurement_manager ? 27 : 26 }}" class="p-8 text-center text-slate-400">
                                         <i data-lucide="search-x" class="w-10 h-10 mx-auto mb-2 text-slate-300"></i>
                                         条件に一致するデータがありません。
                                     </td>
