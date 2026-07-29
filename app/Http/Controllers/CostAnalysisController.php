@@ -15,6 +15,9 @@ class CostAnalysisController extends Controller
      *
      * @var array<string, array{label: string, majors: array<int, string>}>
      */
+    /** 「人工等」小計に含める社内人工コード(機械製缶・人工・機械設計・現地・電気設計・電気製造・ソフト対応)。 */
+    private const LABOR_CODES = [59, 60, 63, 64, 65, 67, 68];
+
     private const COST_ITEMS = [
         'material' => ['label' => '材料費', 'majors' => ['材料']],
         'outsourcing' => ['label' => '外注費', 'majors' => ['外注']],
@@ -81,10 +84,8 @@ class CostAnalysisController extends Controller
             $subtotal += $amount;
         }
 
-        // 旅費(コード61)は社内費の内訳として別枠表示するため、人工等は差分で求める(Excel側の内訳リストは
-        // コード69・70が漏れているため、合計と内訳が一致するよう差分計算にしている)。
         $travelCost = $rows->filter(fn ($r) => (int) $r->category_code === 61)->sum('amount');
-        $laborCost = $items['internal']['amount'] - $travelCost;
+        $laborCost = $rows->filter(fn ($r) => in_array((int) $r->category_code, self::LABOR_CODES, true))->sum('amount');
 
         $miscRatio = (int) floor(($subtotal * 0.05) / 100) * 100;
         $totalCost = $subtotal + $miscRatio;
