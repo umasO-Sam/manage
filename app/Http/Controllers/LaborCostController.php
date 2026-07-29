@@ -16,7 +16,7 @@ class LaborCostController extends Controller
         $staffId = $request->query('staff_id', '');
         $orderNo = trim((string) $request->query('order_no', ''));
 
-        $query = LaborCost::query()->with(['staff', 'category']);
+        $query = LaborCost::query()->with(['staff', 'category'])->where('is_provisional', false);
 
         if ($dateFrom !== '') {
             $query->where('work_date', '>=', $dateFrom);
