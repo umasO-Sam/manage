@@ -37,7 +37,7 @@ class StaffController extends Controller
             'department' => ['required', 'string', 'max:255'],
             'login_id' => ['required', 'string', 'max:255', 'unique:staff,login_id'],
             'email' => ['required', 'string', 'email', 'max:255', 'unique:staff,email'],
-            'is_procurement_manager' => ['boolean'],
+            'role' => ['required', Rule::in(array_keys(Staff::ROLE_LABELS))],
             'password' => ['required', Password::defaults(), new NotSimilarToLoginId($request->input('login_id'))],
         ]);
 
@@ -47,7 +47,6 @@ class StaffController extends Controller
             Staff::create([
                 ...$data,
                 'password' => Hash::make($data['password']),
-                'is_procurement_manager' => $request->boolean('is_procurement_manager'),
             ]);
         } catch (UniqueConstraintViolationException) {
             throw ValidationException::withMessages(['login_id' => 'このログインIDまたはメールアドレスはすでに使用されています。']);
@@ -68,21 +67,19 @@ class StaffController extends Controller
             'department' => ['required', 'string', 'max:255'],
             'login_id' => ['required', 'string', 'max:255', Rule::unique('staff', 'login_id')->ignore($staff->id)],
             'email' => ['required', 'string', 'email', 'max:255', Rule::unique('staff', 'email')->ignore($staff->id)],
-            'is_procurement_manager' => ['boolean'],
+            'role' => ['required', Rule::in(array_keys(Staff::ROLE_LABELS))],
             'password' => ['nullable', Password::defaults(), new NotSimilarToLoginId($request->input('login_id'))],
         ]);
 
-        $willRemainManager = $request->boolean('is_procurement_manager');
-
         // 最後の1人を降格すると、担当者管理・注番管理に誰もアクセスできなくなるため禁止する。
-        if ($staff->is_procurement_manager && ! $willRemainManager) {
-            $otherManagers = Staff::where('is_procurement_manager', true)
+        if ($staff->is_procurement_manager && $data['role'] !== Staff::ROLE_PROCUREMENT_MANAGER) {
+            $otherManagers = Staff::where('role', Staff::ROLE_PROCUREMENT_MANAGER)
                 ->where('id', '!=', $staff->id)
                 ->exists();
 
             if (! $otherManagers) {
                 return back()->withErrors([
-                    'is_procurement_manager' => '資材管理担当者が0人になるため、この担当者の資材管理担当を外すことはできません。先に他の担当者を資材管理担当にしてください。',
+                    'role' => '資材管理担当者が0人になるため、この担当者の資材管理担当を外すことはできません。先に他の担当者を資材管理担当にしてください。',
                 ]);
             }
         }
@@ -92,7 +89,7 @@ class StaffController extends Controller
             'department' => $data['department'],
             'login_id' => $data['login_id'],
             'email' => $data['email'],
-            'is_procurement_manager' => $request->boolean('is_procurement_manager'),
+            'role' => $data['role'],
         ]);
 
         if (! empty($data['password'])) {

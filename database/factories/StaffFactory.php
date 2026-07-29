@@ -30,7 +30,7 @@ class StaffFactory extends Factory
             'login_id' => fake()->unique()->userName(),
             'email' => fake()->unique()->safeEmail(),
             'email_verified_at' => now(),
-            'is_procurement_manager' => false,
+            'role' => Staff::ROLE_GENERAL,
             'password' => static::$password ??= Hash::make('password'),
             'remember_token' => Str::random(10),
         ];
@@ -39,7 +39,14 @@ class StaffFactory extends Factory
     public function procurementManager(): static
     {
         return $this->state(fn (array $attributes) => [
-            'is_procurement_manager' => true,
+            'role' => Staff::ROLE_PROCUREMENT_MANAGER,
+        ]);
+    }
+
+    public function sales(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'role' => Staff::ROLE_SALES,
         ]);
     }
 }

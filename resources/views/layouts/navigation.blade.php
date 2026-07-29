@@ -30,37 +30,39 @@
                         <i data-lucide="archive" class="w-4 h-4"></i>
                         <span>履歴</span>
                     </a>
-                    <x-dropdown align="left" width="56">
-                        <x-slot name="trigger">
-                            <button class="px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors {{ request()->routeIs('purchasing.*') ? 'bg-slate-200 text-slate-800' : 'text-slate-600 hover:bg-slate-50' }}">
-                                <i data-lucide="warehouse" class="w-4 h-4"></i>
-                                <span>仕入管理</span>
-                                <i data-lucide="chevron-down" class="w-3.5 h-3.5"></i>
-                            </button>
-                        </x-slot>
-                        <x-slot name="content">
-                            <x-dropdown-link :href="route('purchasing.index')">
-                                <i data-lucide="search" class="w-3.5 h-3.5 inline-block align-text-bottom mr-1"></i> 検索
-                            </x-dropdown-link>
-                            @if (Auth::user()->is_procurement_manager)
-                                <x-dropdown-link :href="route('purchasing.input')">
-                                    <i data-lucide="pencil-line" class="w-3.5 h-3.5 inline-block align-text-bottom mr-1"></i> データ入力
+                    @if (Auth::user()->canAccessPurchasing())
+                        <x-dropdown align="left" width="56">
+                            <x-slot name="trigger">
+                                <button class="px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors {{ request()->routeIs('purchasing.*') ? 'bg-slate-200 text-slate-800' : 'text-slate-600 hover:bg-slate-50' }}">
+                                    <i data-lucide="warehouse" class="w-4 h-4"></i>
+                                    <span>仕入管理</span>
+                                    <i data-lucide="chevron-down" class="w-3.5 h-3.5"></i>
+                                </button>
+                            </x-slot>
+                            <x-slot name="content">
+                                <x-dropdown-link :href="route('purchasing.index')">
+                                    <i data-lucide="search" class="w-3.5 h-3.5 inline-block align-text-bottom mr-1"></i> 検索
                                 </x-dropdown-link>
-                                <x-dropdown-link :href="route('purchasing.orders.index')">
-                                    <i data-lucide="file-text" class="w-3.5 h-3.5 inline-block align-text-bottom mr-1"></i> 注文書発行
-                                </x-dropdown-link>
-                                <x-dropdown-link :href="route('purchasing.invoices.index')">
-                                    <i data-lucide="receipt" class="w-3.5 h-3.5 inline-block align-text-bottom mr-1"></i> 明細書発行
-                                </x-dropdown-link>
-                                <x-dropdown-link :href="route('purchasing.labor.index')">
-                                    <i data-lucide="clock" class="w-3.5 h-3.5 inline-block align-text-bottom mr-1"></i> 人工計算
-                                </x-dropdown-link>
+                                @if (Auth::user()->is_procurement_manager)
+                                    <x-dropdown-link :href="route('purchasing.input')">
+                                        <i data-lucide="pencil-line" class="w-3.5 h-3.5 inline-block align-text-bottom mr-1"></i> データ入力
+                                    </x-dropdown-link>
+                                    <x-dropdown-link :href="route('purchasing.orders.index')">
+                                        <i data-lucide="file-text" class="w-3.5 h-3.5 inline-block align-text-bottom mr-1"></i> 注文書発行
+                                    </x-dropdown-link>
+                                    <x-dropdown-link :href="route('purchasing.invoices.index')">
+                                        <i data-lucide="receipt" class="w-3.5 h-3.5 inline-block align-text-bottom mr-1"></i> 明細書発行
+                                    </x-dropdown-link>
+                                    <x-dropdown-link :href="route('purchasing.labor.index')">
+                                        <i data-lucide="clock" class="w-3.5 h-3.5 inline-block align-text-bottom mr-1"></i> 人工計算
+                                    </x-dropdown-link>
+                                @endif
                                 <x-dropdown-link :href="route('purchasing.cost.index')">
                                     <i data-lucide="bar-chart-3" class="w-3.5 h-3.5 inline-block align-text-bottom mr-1"></i> 原価計算
                                 </x-dropdown-link>
-                            @endif
-                        </x-slot>
-                    </x-dropdown>
+                            </x-slot>
+                        </x-dropdown>
+                    @endif
                     @if (Auth::user()->is_procurement_manager)
                         <a href="{{ route('staff.index') }}"
                            class="px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors {{ request()->routeIs('staff.*') ? 'bg-slate-100 text-blue-600' : 'text-slate-600 hover:bg-slate-50' }}">
@@ -134,26 +136,30 @@
             <a href="{{ route('archive.index') }}" class="block px-3 py-2 rounded-lg text-sm font-medium {{ request()->routeIs('archive.*') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
                 履歴
             </a>
-            <div class="px-3 py-2 text-xs font-bold text-slate-400 uppercase tracking-wider">仕入管理</div>
-            <a href="{{ route('purchasing.index') }}" class="block px-3 py-2 rounded-lg text-sm font-medium {{ request()->routeIs('purchasing.index') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
-                検索
-            </a>
-            @if (Auth::user()->is_procurement_manager)
-                <a href="{{ route('purchasing.input') }}" class="block px-3 py-2 rounded-lg text-sm font-medium {{ request()->routeIs('purchasing.input') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
-                    データ入力
+            @if (Auth::user()->canAccessPurchasing())
+                <div class="px-3 py-2 text-xs font-bold text-slate-400 uppercase tracking-wider">仕入管理</div>
+                <a href="{{ route('purchasing.index') }}" class="block px-3 py-2 rounded-lg text-sm font-medium {{ request()->routeIs('purchasing.index') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
+                    検索
                 </a>
-                <a href="{{ route('purchasing.orders.index') }}" class="block px-3 py-2 rounded-lg text-sm font-medium {{ request()->routeIs('purchasing.orders.*') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
-                    注文書発行
-                </a>
-                <a href="{{ route('purchasing.invoices.index') }}" class="block px-3 py-2 rounded-lg text-sm font-medium {{ request()->routeIs('purchasing.invoices.*') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
-                    明細書発行
-                </a>
-                <a href="{{ route('purchasing.labor.index') }}" class="block px-3 py-2 rounded-lg text-sm font-medium {{ request()->routeIs('purchasing.labor.*') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
-                    人工計算
-                </a>
+                @if (Auth::user()->is_procurement_manager)
+                    <a href="{{ route('purchasing.input') }}" class="block px-3 py-2 rounded-lg text-sm font-medium {{ request()->routeIs('purchasing.input') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
+                        データ入力
+                    </a>
+                    <a href="{{ route('purchasing.orders.index') }}" class="block px-3 py-2 rounded-lg text-sm font-medium {{ request()->routeIs('purchasing.orders.*') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
+                        注文書発行
+                    </a>
+                    <a href="{{ route('purchasing.invoices.index') }}" class="block px-3 py-2 rounded-lg text-sm font-medium {{ request()->routeIs('purchasing.invoices.*') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
+                        明細書発行
+                    </a>
+                    <a href="{{ route('purchasing.labor.index') }}" class="block px-3 py-2 rounded-lg text-sm font-medium {{ request()->routeIs('purchasing.labor.*') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
+                        人工計算
+                    </a>
+                @endif
                 <a href="{{ route('purchasing.cost.index') }}" class="block px-3 py-2 rounded-lg text-sm font-medium {{ request()->routeIs('purchasing.cost.*') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
                     原価計算
                 </a>
+            @endif
+            @if (Auth::user()->is_procurement_manager)
                 <a href="{{ route('staff.index') }}" class="block px-3 py-2 rounded-lg text-sm font-medium {{ request()->routeIs('staff.*') ? 'bg-slate-100 text-blue-600' : 'text-slate-600' }}">
                     担当者管理
                 </a>

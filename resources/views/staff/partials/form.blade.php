@@ -37,10 +37,32 @@
     <x-input-error class="mt-2" :messages="$errors->get('password')" />
 </div>
 
-<div class="flex items-center">
-    <input id="is_procurement_manager" name="is_procurement_manager" type="checkbox" value="1"
-        class="rounded border-slate-300 text-blue-600 shadow-sm focus:ring-blue-500"
-        @checked(old('is_procurement_manager', $staff?->is_procurement_manager)) />
-    <label for="is_procurement_manager" class="ms-2 text-sm text-slate-700">資材管理担当者（カードの移動・担当者管理を行える）</label>
+@php($currentRole = old('role', $staff?->role ?? \App\Models\Staff::ROLE_GENERAL))
+
+<div>
+    <x-input-label value="権限" />
+    <div class="mt-1 space-y-2">
+        <label class="flex items-start gap-2 p-3 border rounded-lg cursor-pointer {{ $currentRole === \App\Models\Staff::ROLE_PROCUREMENT_MANAGER ? 'border-blue-400 bg-blue-50' : 'border-slate-200' }}">
+            <input type="radio" name="role" value="{{ \App\Models\Staff::ROLE_PROCUREMENT_MANAGER }}" class="mt-0.5 text-blue-600 focus:ring-blue-500" @checked($currentRole === \App\Models\Staff::ROLE_PROCUREMENT_MANAGER)>
+            <span>
+                <span class="block text-sm font-semibold text-slate-800">資材管理担当者</span>
+                <span class="block text-xs text-slate-500">カードの移動、仕入管理への全アクセス、仕入管理でのレコード編集、担当者管理を行える</span>
+            </span>
+        </label>
+        <label class="flex items-start gap-2 p-3 border rounded-lg cursor-pointer {{ $currentRole === \App\Models\Staff::ROLE_SALES ? 'border-blue-400 bg-blue-50' : 'border-slate-200' }}">
+            <input type="radio" name="role" value="{{ \App\Models\Staff::ROLE_SALES }}" class="mt-0.5 text-blue-600 focus:ring-blue-500" @checked($currentRole === \App\Models\Staff::ROLE_SALES)>
+            <span>
+                <span class="block text-sm font-semibold text-slate-800">営業担当</span>
+                <span class="block text-xs text-slate-500">購入部品手配ボード・見積依頼ボード・履歴に加え、仕入管理の検索・原価計算にアクセスできる</span>
+            </span>
+        </label>
+        <label class="flex items-start gap-2 p-3 border rounded-lg cursor-pointer {{ $currentRole === \App\Models\Staff::ROLE_GENERAL ? 'border-blue-400 bg-blue-50' : 'border-slate-200' }}">
+            <input type="radio" name="role" value="{{ \App\Models\Staff::ROLE_GENERAL }}" class="mt-0.5 text-blue-600 focus:ring-blue-500" @checked($currentRole === \App\Models\Staff::ROLE_GENERAL)>
+            <span>
+                <span class="block text-sm font-semibold text-slate-800">一般社員</span>
+                <span class="block text-xs text-slate-500">購入部品手配ボード・見積依頼ボード・履歴にアクセスできる</span>
+            </span>
+        </label>
+    </div>
+    <x-input-error class="mt-2" :messages="$errors->get('role')" />
 </div>
-<x-input-error class="-mt-3" :messages="$errors->get('is_procurement_manager')" />

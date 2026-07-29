@@ -170,7 +170,7 @@ class ImportLegacyPurchasingData extends Command
                     'department' => $row['役職'] ?: '未設定',
                     'login_id' => "legacy-{$accessId}",
                     'email' => "legacy{$accessId}@placeholder.invalid",
-                    'is_procurement_manager' => false,
+                    'role' => Staff::ROLE_GENERAL,
                     'is_labor_target' => $isLaborTarget,
                     'position_weight' => $positionWeight,
                     'password' => Hash::make(Str::random(40)),

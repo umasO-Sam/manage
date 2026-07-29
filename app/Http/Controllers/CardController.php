@@ -409,7 +409,7 @@ class CardController extends Controller
 
     private function notifyProcurementManagers(Card $card, string $headline): void
     {
-        $managers = Staff::where('is_procurement_manager', true)->get();
+        $managers = Staff::where('role', Staff::ROLE_PROCUREMENT_MANAGER)->get();
 
         if ($managers->isEmpty()) {
             Log::warning("資材管理担当者が0人のため、新規依頼(card_id={$card->id})の通知先がありません。");

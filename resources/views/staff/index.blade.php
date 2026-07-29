@@ -33,11 +33,14 @@
                                 <div class="w-12 h-12 bg-slate-100 text-slate-700 rounded-xl flex items-center justify-center font-bold text-lg">
                                     {{ mb_substr($staff->name, 0, 1) }}
                                 </div>
-                                @if ($staff->is_procurement_manager)
-                                    <span class="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800">資材管理担当者</span>
-                                @else
-                                    <span class="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800">一般社員</span>
-                                @endif
+                                @php
+                                    $roleBadgeClass = match ($staff->role) {
+                                        \App\Models\Staff::ROLE_PROCUREMENT_MANAGER => 'bg-blue-100 text-blue-800',
+                                        \App\Models\Staff::ROLE_SALES => 'bg-emerald-100 text-emerald-800',
+                                        default => 'bg-amber-100 text-amber-800',
+                                    };
+                                @endphp
+                                <span class="text-[11px] font-bold px-2.5 py-0.5 rounded-full {{ $roleBadgeClass }}">{{ $staff->roleLabel() }}</span>
                             </div>
                             <h3 class="font-bold text-slate-900 text-base">{{ $staff->name }}</h3>
                             <p class="text-xs text-slate-500 mt-1 flex items-center gap-1">
