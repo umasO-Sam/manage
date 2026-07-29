@@ -186,6 +186,28 @@ class PurchasingModuleTest extends TestCase
         $response->assertSee($worker->name)->assertSee('40,000');
     }
 
+    public function test_labor_summary_totals_include_records_beyond_display_limit(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        $worker = Staff::factory()->create(['is_labor_target' => true, 'position_weight' => 1]);
+
+        // 表示上限(1000件)を超える該当件数でも、集計値(合計時間・労務費)には
+        // 全件が反映される必要がある(以前は集計前にlimit(1000)がかかり、超過分が黙って集計から漏れていた)。
+        LaborCost::factory()->count(1005)->create([
+            'staff_id' => $worker->id, 'order_no' => 'ZATSU',
+            'work_hours' => 8, 'work_minutes' => 0, 'is_overtime' => false, 'position_weight_cache' => 1,
+            'is_provisional' => false,
+        ]);
+
+        $response = $this->actingAs($manager)->get(route('purchasing.labor.index', ['order_no' => 'ZATSU']));
+
+        // 1005件 × 8時間 × 40,000円/時間外なし × 人工480分換算 = 1005 * 40,000 = 40,200,000円
+        $response->assertOk()
+            ->assertSee('40,200,000')
+            ->assertSee('該当1,005件中')
+            ->assertSee('最新1,000件');
+    }
+
     public function test_cost_analysis_computes_profit_and_margin(): void
     {
         $manager = Staff::factory()->procurementManager()->create();

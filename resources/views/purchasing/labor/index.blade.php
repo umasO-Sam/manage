@@ -42,6 +42,12 @@
                         <div class="bg-green-50 p-4 rounded-xl shadow-sm border-l-4 border-green-600 md:col-span-2 text-green-900">労務費合計: ¥{{ number_format($summary['total_cost']) }}</div>
                     </div>
 
+                    @if ($matchedCount > $displayLimit)
+                        <div class="p-3 rounded-xl bg-amber-50 border border-amber-100 text-amber-800 text-xs">
+                            該当{{ number_format($matchedCount) }}件中、最新{{ number_format($displayLimit) }}件のみ一覧に表示しています（上部の集計値は該当する全件を対象に計算しています）。
+                        </div>
+                    @endif
+
                     <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
                         <div class="overflow-x-auto max-h-[55vh]">
                             <table class="w-full text-left border-collapse text-xs">
