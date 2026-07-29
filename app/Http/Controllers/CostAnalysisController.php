@@ -86,6 +86,7 @@ class CostAnalysisController extends Controller
 
         $travelCost = $rows->filter(fn ($r) => (int) $r->category_code === 61)->sum('amount');
         $laborCost = $rows->filter(fn ($r) => in_array((int) $r->category_code, self::LABOR_CODES, true))->sum('amount');
+        $laborBreakdown = $this->laborBreakdown($rows);
 
         $miscRatio = (int) floor(($subtotal * 0.05) / 100) * 100;
         $totalCost = $subtotal + $miscRatio;
@@ -118,6 +119,7 @@ class CostAnalysisController extends Controller
             ],
             'items' => $items,
             'labor_cost' => (int) $laborCost,
+            'labor_breakdown' => $laborBreakdown,
             'travel_cost' => (int) $travelCost,
             'misc_ratio' => $miscRatio,
             'subtotal' => (int) $subtotal,
@@ -149,5 +151,27 @@ class CostAnalysisController extends Controller
                 return true;
             })
             ->sum('amount');
+    }
+
+    /**
+     * 「人工等」小計(LABOR_CODES)を、分類コードの細分(sub_category)ごとに分けて集計する。
+     * コード60は「人工」「機械組付」の2つの細分が同じコード値を共有しているため、
+     * コードだけでなくsub_category名も合わせてグルーピングキーにする。
+     *
+     * @param  \Illuminate\Support\Collection<int, object>  $rows
+     * @return \Illuminate\Support\Collection<int, array{code: int, label: string, amount: float}>
+     */
+    private function laborBreakdown($rows)
+    {
+        return $rows
+            ->filter(fn ($r) => in_array((int) $r->category_code, self::LABOR_CODES, true))
+            ->groupBy(fn ($r) => $r->category_code.'|'.($r->sub_category ?? '未分類'))
+            ->map(fn ($group) => [
+                'code' => (int) $group->first()->category_code,
+                'label' => $group->first()->sub_category ?? '未分類',
+                'amount' => $group->sum('amount'),
+            ])
+            ->sortBy(['code', 'label'])
+            ->values();
     }
 }

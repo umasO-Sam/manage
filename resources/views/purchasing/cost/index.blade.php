@@ -76,7 +76,10 @@
                         @endforeach
 
                         <div class="pl-4 border-l-2 border-slate-100 space-y-1 text-[11px] text-slate-500">
-                            <div class="flex justify-between"><span>内訳: 人工等</span><span>¥{{ number_format($result['labor_cost']) }}</span></div>
+                            <div class="flex justify-between font-bold text-slate-600"><span>内訳: 人工等</span><span>¥{{ number_format($result['labor_cost']) }}</span></div>
+                            @foreach ($result['labor_breakdown'] as $laborItem)
+                                <div class="flex justify-between pl-4"><span>└ {{ $laborItem['label'] }}</span><span>¥{{ number_format($laborItem['amount']) }}</span></div>
+                            @endforeach
                             <div class="flex justify-between"><span>内訳: 旅費等</span><span>¥{{ number_format($result['travel_cost']) }}</span></div>
                         </div>
 

@@ -224,4 +224,36 @@ class PurchasingModuleTest extends TestCase
         // 簡易収支 = 10,000 - 2,100 = 7,900、収支率79%
         $response->assertSee('10,000')->assertSee('2,100')->assertSee('7,900')->assertSee('79');
     }
+
+    public function test_cost_analysis_breaks_down_labor_cost_by_sub_category(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        $worker = Staff::factory()->create(['is_labor_target' => true, 'position_weight' => 1]);
+
+        // コード60は「人工」「機械組付」の2つの細分が同じコード値を共有しているため、
+        // sub_categoryで正しく分離表示されるかも合わせて確認する。
+        $designCategory = CategoryCode::create(['code' => 63, 'major_category' => '社内人工', 'sub_category' => '機械設計']);
+        $laborCategory = CategoryCode::create(['code' => 60, 'major_category' => '社内人工', 'sub_category' => '人工']);
+        $assemblyCategory = CategoryCode::create(['code' => 60, 'major_category' => '社内人工', 'sub_category' => '機械組付']);
+
+        LaborCost::create([
+            'work_date' => now(), 'staff_id' => $worker->id, 'order_no' => 'A1', 'category_id' => $designCategory->id,
+            'work_hours' => 8, 'work_minutes' => 0, 'is_overtime' => false, 'position_weight_cache' => 1, 'is_provisional' => false,
+        ]);
+        LaborCost::create([
+            'work_date' => now(), 'staff_id' => $worker->id, 'order_no' => 'A1', 'category_id' => $laborCategory->id,
+            'work_hours' => 4, 'work_minutes' => 0, 'is_overtime' => false, 'position_weight_cache' => 1, 'is_provisional' => false,
+        ]);
+        LaborCost::create([
+            'work_date' => now(), 'staff_id' => $worker->id, 'order_no' => 'A1', 'category_id' => $assemblyCategory->id,
+            'work_hours' => 2, 'work_minutes' => 0, 'is_overtime' => false, 'position_weight_cache' => 1, 'is_provisional' => false,
+        ]);
+
+        $response = $this->actingAs($manager)->get(route('purchasing.cost.index', ['order_no' => 'A1']));
+
+        // 機械設計: 8h*40,000/8h=40,000、人工: 4h分=20,000、機械組付: 2h分=10,000
+        $response->assertSee('機械設計')->assertSee('40,000')
+            ->assertSee('人工')->assertSee('20,000')
+            ->assertSee('機械組付')->assertSee('10,000');
+    }
 }
