@@ -36,3 +36,48 @@ document.addEventListener('submit', (event) => {
         button.classList.add('opacity-60', 'cursor-not-allowed');
     });
 });
+
+/**
+ * パスワードポリシー(20文字以上・大文字小文字・数字を必須)を必ず満たす安全な
+ * パスワードを暗号学的乱数(crypto.getRandomValues)で生成するボタン。
+ * data-generate-password="対象input要素のid" を指定した<button>から使う。
+ * 紛らわしい文字(0/O、1/l/I)は誤読・誤入力を防ぐため文字集合から除外している。
+ */
+function generateSecurePassword(length = 20) {
+    const upper = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+    const lower = 'abcdefghijkmnpqrstuvwxyz';
+    const digits = '23456789';
+    const symbols = '!@#$%^&*-_=+';
+    const all = upper + lower + digits + symbols;
+
+    const randomIndex = (max) => {
+        const buffer = new Uint32Array(1);
+        window.crypto.getRandomValues(buffer);
+        return buffer[0] % max;
+    };
+
+    let password;
+    do {
+        password = Array.from({ length }, () => all[randomIndex(all.length)]).join('');
+    } while (!/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/[0-9]/.test(password));
+
+    return password;
+}
+
+document.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-generate-password]');
+    if (!button) return;
+
+    event.preventDefault();
+
+    const password = generateSecurePassword(20);
+    const targetIds = button.dataset.generatePassword.split(',').map((id) => id.trim());
+
+    targetIds.forEach((id) => {
+        const field = document.getElementById(id);
+        if (!field) return;
+        field.type = 'text';
+        field.value = password;
+        field.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+});

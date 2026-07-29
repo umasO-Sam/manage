@@ -20,7 +20,13 @@
         </div>
 
         <div>
-            <x-input-label for="update_password_password" value="新しいパスワード" />
+            <div class="flex items-center justify-between">
+                <x-input-label for="update_password_password" value="新しいパスワード" />
+                <button type="button" data-generate-password="update_password_password,update_password_password_confirmation"
+                        class="text-xs font-semibold text-blue-600 hover:text-blue-800">
+                    安全なパスワードを自動生成
+                </button>
+            </div>
             <x-text-input id="update_password_password" name="password" type="password" class="mt-1 block w-full" autocomplete="new-password"
                            passwordrules="minlength: 20; required: lower; required: upper; required: digit;" />
             <x-input-error :messages="$errors->updatePassword->get('password')" class="mt-2" />

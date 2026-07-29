@@ -14,7 +14,13 @@
         @method('put')
 
         <div>
-            <x-input-label for="password" value="新しいパスワード" />
+            <div class="flex items-center justify-between">
+                <x-input-label for="password" value="新しいパスワード" />
+                <button type="button" data-generate-password="password,password_confirmation"
+                        class="text-xs font-semibold text-blue-600 hover:text-blue-800">
+                    安全なパスワードを自動生成
+                </button>
+            </div>
             <x-text-input id="password" class="block mt-1 w-full" type="password" name="password" required autofocus autocomplete="new-password"
                            passwordrules="minlength: 20; required: lower; required: upper; required: digit;" />
             <x-input-error :messages="$errors->get('password')" class="mt-2" />
