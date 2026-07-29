@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\CategoryCode;
 use App\Models\LaborCost;
 use App\Models\PurchaseDetail;
 use App\Models\Staff;
@@ -72,6 +73,62 @@ class EstimateAssistTest extends TestCase
         ]));
 
         $response->assertSee('対象品A')->assertDontSee('除外対象品B');
+    }
+
+    public function test_aggregation_can_be_narrowed_by_category_manufacturer_item_name_dimensions_and_supplier(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        $partsCategory = CategoryCode::create(['code' => 3, 'major_category' => '部品']);
+        $otherCategory = CategoryCode::create(['code' => 4, 'major_category' => '材料']);
+
+        PurchaseDetail::create([
+            'item_code' => 'D1', 'item_name' => '対象品', 'manufacturer' => 'オムロン', 'dimensions' => 'E2E-X1R5E1',
+            'supplier_name' => '大津屋', 'category_id' => $partsCategory->id, 'unit_price' => 1000,
+            'required_qty' => 1, 'is_provisional' => false,
+        ]);
+        PurchaseDetail::create([
+            'item_code' => 'D1', 'item_name' => '除外品', 'manufacturer' => '別メーカー', 'dimensions' => '別型式',
+            'supplier_name' => '別商社', 'category_id' => $otherCategory->id, 'unit_price' => 2000,
+            'required_qty' => 1, 'is_provisional' => false,
+        ]);
+
+        $base = ['order_no' => 'D1', 'order_no_match' => 'perfect'];
+
+        $this->actingAs($manager)->get(route('purchasing.estimate.index', [...$base, 'category_id' => $partsCategory->id]))
+            ->assertSee('対象品')->assertDontSee('除外品');
+        $this->actingAs($manager)->get(route('purchasing.estimate.index', [...$base, 'manufacturer' => 'オムロン']))
+            ->assertSee('対象品')->assertDontSee('除外品');
+        $this->actingAs($manager)->get(route('purchasing.estimate.index', [...$base, 'item_name' => '対象品']))
+            ->assertSee('対象品')->assertDontSee('除外品');
+        $this->actingAs($manager)->get(route('purchasing.estimate.index', [...$base, 'dimensions' => 'E2E-X1R5E1']))
+            ->assertSee('対象品')->assertDontSee('除外品');
+        $this->actingAs($manager)->get(route('purchasing.estimate.index', [...$base, 'supplier_name' => '大津屋']))
+            ->assertSee('対象品')->assertDontSee('除外品');
+    }
+
+    public function test_labor_aggregation_can_be_narrowed_by_category(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        $worker = Staff::factory()->create(['is_labor_target' => true, 'position_weight' => 1]);
+        $designCategory = CategoryCode::create(['code' => 63, 'major_category' => '社内人工', 'sub_category' => '機械設計', 'item_name' => '機械設計']);
+        $siteCategory = CategoryCode::create(['code' => 64, 'major_category' => '社内人工', 'sub_category' => '現地', 'item_name' => '現地']);
+
+        LaborCost::create([
+            'work_date' => now(), 'staff_id' => $worker->id, 'order_no' => 'D2', 'category_id' => $designCategory->id,
+            'work_hours' => 8, 'work_minutes' => 0, 'is_overtime' => false, 'position_weight_cache' => 1, 'is_provisional' => false,
+        ]);
+        LaborCost::create([
+            'work_date' => now(), 'staff_id' => $worker->id, 'order_no' => 'D2', 'category_id' => $siteCategory->id,
+            'work_hours' => 4, 'work_minutes' => 0, 'is_overtime' => false, 'position_weight_cache' => 1, 'is_provisional' => false,
+        ]);
+
+        $response = $this->actingAs($manager)->get(route('purchasing.estimate.index', [
+            'order_no' => 'D2', 'order_no_match' => 'perfect', 'category_id' => $designCategory->id,
+        ]));
+
+        // 分類フィルターのプルダウン自体には「現地」も選択肢として表示されるため、
+        // 除外の確認は集計結果側(人工レコード件数)で行う。
+        $response->assertSee('人工レコード（1件）')->assertSee('機械設計');
     }
 
     public function test_reference_price_search_scores_and_sorts_by_relevance(): void

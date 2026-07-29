@@ -60,6 +60,29 @@
                         <button type="submit" class="bg-indigo-600 text-white px-8 py-2.5 rounded-lg font-bold shadow hover:bg-indigo-700 transition">集計実行</button>
                     </div>
 
+                    <div class="border-t border-slate-100 pt-3 grid grid-cols-2 md:grid-cols-5 gap-3">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">分類</label>
+                            <select name="category_id" class="w-full text-sm bg-slate-50 border border-slate-200 rounded-lg py-1.5 px-3 focus:outline-none focus:ring-2 focus:ring-slate-400">
+                                <option value="" @selected($detailFilters['category_id'] === '')>すべて</option>
+                                @foreach ($categories as $category)
+                                    <option value="{{ $category->id }}" @selected((string) $category->id === $detailFilters['category_id'])>
+                                        {{ $category->code }}:{{ $category->major_category }}@if ($category->sub_category)／{{ $category->sub_category }}@endif
+                                    </option>
+                                @endforeach
+                            </select>
+                            <p class="mt-1 text-[10px] text-slate-400">仕入・人工の両方に適用</p>
+                        </div>
+                        @foreach ([['manufacturer', 'メーカー'], ['item_name', '品名'], ['dimensions', '型式'], ['supplier_name', '商社']] as [$key, $label])
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 mb-1">{{ $label }}</label>
+                                <input type="text" name="{{ $key }}" value="{{ $detailFilters[$key] }}" placeholder="部分一致"
+                                       class="w-full text-sm bg-slate-50 border border-slate-200 rounded-lg py-1.5 px-3 focus:outline-none focus:ring-2 focus:ring-slate-400">
+                                <p class="mt-1 text-[10px] text-slate-400">仕入のみに適用</p>
+                            </div>
+                        @endforeach
+                    </div>
+
                     @if ($orderNo !== '' && $includedOrderNos->isEmpty())
                         <p class="text-xs text-slate-400">該当する注番のデータが見つかりませんでした。</p>
                     @endif

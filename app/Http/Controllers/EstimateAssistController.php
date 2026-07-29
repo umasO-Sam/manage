@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\CategoryCode;
 use App\Models\LaborCost;
 use App\Models\PurchaseDetail;
 use Illuminate\Http\Request;
@@ -22,8 +23,9 @@ class EstimateAssistController extends Controller
 
     public function index(Request $request): View
     {
-        [$orderNo, $orderNoMatch, $matchedOrderNos, $excludedOrderNos, $includedOrderNos, $purchaseRows, $laborRows]
-            = $this->aggregateByOrderNo($request);
+        $agg = $this->aggregateByOrderNo($request);
+        $purchaseRows = $agg['purchaseRows'];
+        $laborRows = $agg['laborRows'];
 
         $priceTotal = $purchaseRows->sum(fn (PurchaseDetail $d) => $d->requiredAmount());
         $orderPriceTotal = $purchaseRows->sum(fn (PurchaseDetail $d) => $d->orderRequiredAmount());
@@ -35,11 +37,13 @@ class EstimateAssistController extends Controller
         [$referenceFilters, $referenceResults, $referenceTotalCount] = $this->searchReferencePrices($request);
 
         return view('purchasing.estimate.index', [
-            'orderNo' => $orderNo,
-            'orderNoMatch' => $orderNoMatch,
-            'matchedOrderNos' => $matchedOrderNos,
-            'excludedOrderNos' => $excludedOrderNos,
-            'includedOrderNos' => $includedOrderNos,
+            'orderNo' => $agg['orderNo'],
+            'orderNoMatch' => $agg['orderNoMatch'],
+            'matchedOrderNos' => $agg['matchedOrderNos'],
+            'excludedOrderNos' => $agg['excludedOrderNos'],
+            'includedOrderNos' => $agg['includedOrderNos'],
+            'detailFilters' => $agg['detailFilters'],
+            'categories' => CategoryCode::orderBy('code')->get(),
             'purchaseRows' => $purchaseRows,
             'laborRows' => $laborRows,
             'totals' => [
@@ -58,7 +62,7 @@ class EstimateAssistController extends Controller
     }
 
     /**
-     * @return array{0: string, 1: string, 2: Collection<int, string>, 3: array<int, string>, 4: Collection<int, string>, 5: Collection<int, PurchaseDetail>, 6: Collection<int, LaborCost>}
+     * @return array{orderNo: string, orderNoMatch: string, matchedOrderNos: Collection<int, string>, excludedOrderNos: array<int, string>, includedOrderNos: Collection<int, string>, detailFilters: array<string, string>, purchaseRows: Collection<int, PurchaseDetail>, laborRows: Collection<int, LaborCost>}
      */
     private function aggregateByOrderNo(Request $request): array
     {
@@ -66,13 +70,21 @@ class EstimateAssistController extends Controller
         $orderNoMatch = $request->query('order_no_match') === 'perfect' ? 'perfect' : 'partial';
         $excludedOrderNos = array_values(array_filter((array) $request->query('excluded_order_nos', [])));
 
+        $detailFilters = [
+            'category_id' => trim((string) $request->query('category_id', '')),
+            'manufacturer' => trim((string) $request->query('manufacturer', '')),
+            'item_name' => trim((string) $request->query('item_name', '')),
+            'dimensions' => trim((string) $request->query('dimensions', '')),
+            'supplier_name' => trim((string) $request->query('supplier_name', '')),
+        ];
+
         $matchedOrderNos = collect();
         $includedOrderNos = collect();
         $purchaseRows = collect();
         $laborRows = collect();
 
         if ($orderNo === '') {
-            return [$orderNo, $orderNoMatch, $matchedOrderNos, $excludedOrderNos, $includedOrderNos, $purchaseRows, $laborRows];
+            return compact('orderNo', 'orderNoMatch', 'matchedOrderNos', 'excludedOrderNos', 'includedOrderNos', 'detailFilters', 'purchaseRows', 'laborRows');
         }
 
         $applyOrderNoFilter = function ($query, string $column) use ($orderNo, $orderNoMatch) {
@@ -97,22 +109,38 @@ class EstimateAssistController extends Controller
         $includedOrderNos = $matchedOrderNos->diff($excludedOrderNos)->values();
 
         if ($includedOrderNos->isNotEmpty()) {
-            $purchaseRows = PurchaseDetail::query()
+            $purchaseQuery = PurchaseDetail::query()
                 ->whereIn('item_code', $includedOrderNos)
-                ->where('is_provisional', false)
-                ->with('category')
-                ->orderByDesc('id')
-                ->get();
+                ->where('is_provisional', false);
 
-            $laborRows = LaborCost::query()
+            if ($detailFilters['category_id'] !== '') {
+                $purchaseQuery->where('category_id', $detailFilters['category_id']);
+            }
+            foreach (['manufacturer', 'item_name', 'dimensions', 'supplier_name'] as $column) {
+                if ($detailFilters[$column] === '') {
+                    continue;
+                }
+                $purchaseQuery->where(function ($q) use ($column, $detailFilters) {
+                    foreach ($this->katakanaWidthVariants($detailFilters[$column]) as $variant) {
+                        $q->orWhere($column, 'like', "%{$variant}%");
+                    }
+                });
+            }
+
+            $purchaseRows = $purchaseQuery->with('category')->orderByDesc('id')->get();
+
+            $laborQuery = LaborCost::query()
                 ->whereIn('order_no', $includedOrderNos)
-                ->where('is_provisional', false)
-                ->with(['staff', 'category'])
-                ->orderByDesc('work_date')
-                ->get();
+                ->where('is_provisional', false);
+
+            if ($detailFilters['category_id'] !== '') {
+                $laborQuery->where('category_id', $detailFilters['category_id']);
+            }
+
+            $laborRows = $laborQuery->with(['staff', 'category'])->orderByDesc('work_date')->get();
         }
 
-        return [$orderNo, $orderNoMatch, $matchedOrderNos, $excludedOrderNos, $includedOrderNos, $purchaseRows, $laborRows];
+        return compact('orderNo', 'orderNoMatch', 'matchedOrderNos', 'excludedOrderNos', 'includedOrderNos', 'detailFilters', 'purchaseRows', 'laborRows');
     }
 
     /**
