@@ -28,7 +28,7 @@
             ['order_received_date', '受注日'],
         ];
         $alphaLetters = range('A', 'Z');
-        $secondaryHasValue = collect($secondaryFields)->contains(fn ($f) => $filters[$f[0]] !== '');
+        $secondaryHasValue = collect($secondaryFields)->contains(fn ($f) => $filters[$f[0]] !== '') || $filters['provisional'] !== '';
         $dateHasValue = collect($dateFields)->contains(fn ($f) => $filters["{$f[0]}_mode"] !== '');
     @endphp
 
@@ -109,6 +109,15 @@
                                 </div>
                             </div>
                         @endforeach
+
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">仮登録</label>
+                            <select name="provisional" class="w-full text-sm bg-slate-50 border border-slate-200 rounded-lg py-1.5 px-3 focus:outline-none focus:ring-2 focus:ring-slate-400">
+                                <option value="" @selected($filters['provisional'] === '')>すべて</option>
+                                <option value="1" @selected($filters['provisional'] === '1')>仮登録のみ</option>
+                                <option value="0" @selected($filters['provisional'] === '0')>確定済みのみ</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
 
@@ -180,6 +189,9 @@
                     <table class="w-full text-left border-collapse text-xs whitespace-nowrap">
                         <thead>
                             <tr class="bg-slate-50 border-b border-slate-200 font-semibold text-slate-600">
+                                @if (Auth::user()->is_procurement_manager)
+                                    <th class="p-2.5"></th>
+                                @endif
                                 <th class="p-2.5">仮</th>
                                 <th class="p-2.5">注番</th>
                                 <th class="p-2.5">機械装置No</th>
@@ -204,14 +216,16 @@
                                 <th class="p-2.5 text-right">受注金額</th>
                                 <th class="p-2.5">商社納品書No</th>
                                 <th class="p-2.5">備考</th>
-                                @if (Auth::user()->is_procurement_manager)
-                                    <th class="p-2.5"></th>
-                                @endif
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100">
                             @forelse ($details as $detail)
                                 <tr class="hover:bg-slate-50 {{ $detail->hasSalesOrder() ? 'bg-blue-50/50' : '' }}">
+                                    @if (Auth::user()->is_procurement_manager)
+                                        <td class="p-2.5">
+                                            <a href="{{ route('purchasing.edit', $detail) }}" class="text-blue-700 hover:text-blue-900 font-semibold">編集</a>
+                                        </td>
+                                    @endif
                                     <td class="p-2.5">
                                         @if ($detail->is_provisional)
                                             <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-yellow-100 text-yellow-800 border border-yellow-300">仮</span>
@@ -244,11 +258,6 @@
                                     <td class="p-2.5 text-right text-indigo-700 font-bold">¥{{ number_format((float) $detail->order_amount) }}</td>
                                     <td class="p-2.5">{{ $detail->supplier_invoice_no }}</td>
                                     <td class="p-2.5 text-slate-500 max-w-[220px] truncate" title="{{ $detail->remarks }}">{{ $detail->remarks }}</td>
-                                    @if (Auth::user()->is_procurement_manager)
-                                        <td class="p-2.5">
-                                            <a href="{{ route('purchasing.edit', $detail) }}" class="text-blue-700 hover:text-blue-900 font-semibold">編集</a>
-                                        </td>
-                                    @endif
                                 </tr>
                             @empty
                                 <tr>

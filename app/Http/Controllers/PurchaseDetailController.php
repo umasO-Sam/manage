@@ -48,6 +48,8 @@ class PurchaseDetailController extends Controller
         $alphas = array_values(array_filter((array) $request->query('alpha', [])));
         $filters['alpha'] = $alphas;
         $filters['category_id'] = array_values(array_filter((array) $request->query('category_id', [])));
+        $provisional = $request->query('provisional', '');
+        $filters['provisional'] = in_array($provisional, ['1', '0'], true) ? $provisional : '';
 
         foreach (self::DATE_FIELDS as $key => $label) {
             $mode = $request->query("{$key}_mode", '');
@@ -73,6 +75,10 @@ class PurchaseDetailController extends Controller
 
         if (! empty($filters['category_id'])) {
             $query->whereIn('category_id', $filters['category_id']);
+        }
+
+        if ($filters['provisional'] !== '') {
+            $query->where('is_provisional', $filters['provisional'] === '1');
         }
 
         foreach (self::DATE_FIELDS as $key => $label) {
