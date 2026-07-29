@@ -53,10 +53,10 @@
                                     <x-dropdown-link :href="route('purchasing.invoices.index')">
                                         <i data-lucide="receipt" class="w-3.5 h-3.5 inline-block align-text-bottom mr-1"></i> 明細書発行
                                     </x-dropdown-link>
-                                    <x-dropdown-link :href="route('purchasing.labor.index')">
-                                        <i data-lucide="clock" class="w-3.5 h-3.5 inline-block align-text-bottom mr-1"></i> 人工計算
-                                    </x-dropdown-link>
                                 @endif
+                                <x-dropdown-link :href="route('purchasing.labor.index')">
+                                    <i data-lucide="clock" class="w-3.5 h-3.5 inline-block align-text-bottom mr-1"></i> 人工計算
+                                </x-dropdown-link>
                                 <x-dropdown-link :href="route('purchasing.cost.index')">
                                     <i data-lucide="bar-chart-3" class="w-3.5 h-3.5 inline-block align-text-bottom mr-1"></i> 原価計算
                                 </x-dropdown-link>
@@ -151,10 +151,10 @@
                     <a href="{{ route('purchasing.invoices.index') }}" class="block px-3 py-2 rounded-lg text-sm font-medium {{ request()->routeIs('purchasing.invoices.*') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
                         明細書発行
                     </a>
-                    <a href="{{ route('purchasing.labor.index') }}" class="block px-3 py-2 rounded-lg text-sm font-medium {{ request()->routeIs('purchasing.labor.*') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
-                        人工計算
-                    </a>
                 @endif
+                <a href="{{ route('purchasing.labor.index') }}" class="block px-3 py-2 rounded-lg text-sm font-medium {{ request()->routeIs('purchasing.labor.*') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
+                    人工計算
+                </a>
                 <a href="{{ route('purchasing.cost.index') }}" class="block px-3 py-2 rounded-lg text-sm font-medium {{ request()->routeIs('purchasing.cost.*') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
                     原価計算
                 </a>

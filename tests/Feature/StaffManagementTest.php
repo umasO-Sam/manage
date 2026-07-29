@@ -72,6 +72,10 @@ class StaffManagementTest extends TestCase
         $this->actingAs($sales)->get(route('purchasing.labor.index'))->assertOk();
         $this->actingAs($sales)->get(route('purchasing.input'))->assertForbidden();
         $this->actingAs($sales)->get(route('staff.index'))->assertForbidden();
+
+        // ナビゲーションの「仕入管理」メニューにも人工計算リンクが表示される必要がある
+        // (procurement.manager限定の項目と誤って同じ条件分岐に入れないよう確認する)。
+        $this->actingAs($sales)->get(route('purchasing.index'))->assertSee('人工計算');
     }
 
     public function test_general_role_cannot_view_purchasing_at_all(): void
