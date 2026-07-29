@@ -17,18 +17,55 @@
                     <label class="block text-xs font-bold text-slate-700 mb-1">分析対象の「注番」を入力</label>
                     <input type="text" name="order_no" value="{{ $orderNo }}" required placeholder="例: DH013-N01"
                            class="w-full border rounded-lg p-2 bg-slate-50 font-bold text-lg border-slate-300">
+                    <div class="mt-1 flex gap-3 text-[11px] text-slate-500">
+                        <label class="flex items-center gap-1">
+                            <input type="radio" name="order_no_match" value="perfect" @checked($orderNoMatch === 'perfect') class="border-slate-300">
+                            完全
+                        </label>
+                        <label class="flex items-center gap-1">
+                            <input type="radio" name="order_no_match" value="partial" @checked($orderNoMatch === 'partial') class="border-slate-300">
+                            部分
+                        </label>
+                    </div>
                 </div>
+
+                @if ($matchedOrderNos->isNotEmpty())
+                    <div class="relative" x-data="{ open: false }" @click.outside="open = false">
+                        <label class="block text-xs font-bold text-slate-700 mb-1">対象注番</label>
+                        <button type="button" @click="open = !open"
+                                class="text-xs font-semibold px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 flex items-center gap-1.5">
+                            <span>{{ $includedOrderNos->count() }} / {{ $matchedOrderNos->count() }} 件を対象</span>
+                            <span class="text-slate-400 text-[10px]" x-text="open ? '∧' : '∨'"></span>
+                        </button>
+                        <div x-show="open" x-cloak
+                             class="absolute z-20 mt-1 w-72 max-h-72 overflow-y-auto bg-white border border-slate-200 rounded-lg shadow-lg p-2 space-y-0.5">
+                            <p class="text-[11px] text-slate-400 px-2 pb-1">チェックした注番を除外します</p>
+                            @foreach ($matchedOrderNos as $mo)
+                                <label class="flex items-center gap-2 text-xs px-2 py-1 rounded hover:bg-slate-50 cursor-pointer font-mono">
+                                    <input type="checkbox" name="excluded_order_nos[]" value="{{ $mo }}"
+                                           @checked(in_array($mo, $excludedOrderNos, true)) class="rounded border-slate-300">
+                                    {{ $mo }}
+                                </label>
+                            @endforeach
+                        </div>
+                    </div>
+                @endif
+
                 <button type="submit" class="bg-indigo-600 text-white px-8 py-2.5 rounded-lg font-bold shadow hover:bg-indigo-700 transition">分析実行</button>
             </form>
 
+            @if ($orderNo !== '' && ! $result)
+                <p class="text-xs text-slate-400">該当する注番のデータが見つかりませんでした。</p>
+            @endif
+
             @if ($result)
                 <div class="flex justify-end gap-2">
-                    <a href="{{ route('purchasing.index', ['item_code' => $orderNo, 'item_code_match' => 'perfect']) }}"
+                    <a href="{{ route('purchasing.index', ['item_code' => $orderNo, 'item_code_match' => $orderNoMatch]) }}"
                        class="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition-colors">
                         <i data-lucide="search" class="w-3.5 h-3.5"></i>
                         <span>この注番の仕入レコードを検索画面で見る</span>
                     </a>
-                    <a href="{{ route('purchasing.labor.index', ['order_no' => $orderNo]) }}"
+                    <a href="{{ route('purchasing.labor.index', ['order_no' => $orderNo, 'order_no_match' => $orderNoMatch]) }}"
                        class="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full border border-green-200 bg-green-50 text-green-700 hover:bg-green-100 transition-colors">
                         <i data-lucide="clock" class="w-3.5 h-3.5"></i>
                         <span>この注番の人工データを見る</span>

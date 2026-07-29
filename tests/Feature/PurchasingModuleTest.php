@@ -228,6 +228,32 @@ class PurchasingModuleTest extends TestCase
             ->assertSee('最新1,000件');
     }
 
+    public function test_labor_index_can_exclude_a_matched_order_number(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        $worker = Staff::factory()->create(['is_labor_target' => true, 'position_weight' => 1]);
+
+        LaborCost::create([
+            'work_date' => now(), 'staff_id' => $worker->id, 'order_no' => 'AA100-X01',
+            'work_hours' => 8, 'work_minutes' => 0, 'is_overtime' => false, 'position_weight_cache' => 1, 'is_provisional' => false,
+        ]);
+        LaborCost::create([
+            'work_date' => now(), 'staff_id' => $worker->id, 'order_no' => 'AA200-X01',
+            'work_hours' => 8, 'work_minutes' => 0, 'is_overtime' => false, 'position_weight_cache' => 1, 'is_provisional' => false,
+        ]);
+
+        $all = $this->actingAs($manager)->get(route('purchasing.labor.index', ['order_no' => 'AA']));
+        $all->assertSee('AA100-X01')->assertSee('AA200-X01')->assertSee('2 / 2 件を対象');
+
+        $excluded = $this->actingAs($manager)->get(route('purchasing.labor.index', [
+            'order_no' => 'AA', 'excluded_order_nos' => ['AA200-X01'],
+        ]));
+
+        // 除外した注番も「対象注番」プルダウンの選択肢としては表示され続けるため、
+        // 除外の確認は集計結果側(労務費合計)で行う。
+        $excluded->assertSee('AA100-X01')->assertSee('1 / 2 件を対象')->assertSee('労務費合計: ¥40,000', false);
+    }
+
     public function test_cost_analysis_computes_profit_and_margin(): void
     {
         $manager = Staff::factory()->procurementManager()->create();
@@ -258,7 +284,53 @@ class PurchasingModuleTest extends TestCase
         $response = $this->actingAs($manager)->get(route('purchasing.cost.index', ['order_no' => 'A1']));
 
         $response->assertSee('item_code=A1', false)->assertSee('item_code_match=perfect', false);
-        $response->assertSee(route('purchasing.labor.index', ['order_no' => 'A1']), false);
+        $response->assertSee('purchasing/labor?order_no=A1', false)->assertSee('order_no_match=perfect', false);
+    }
+
+    public function test_cost_analysis_partial_match_aggregates_multiple_order_numbers(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        $category = CategoryCode::create(['code' => 3, 'major_category' => '部品', 'is_parts' => true]);
+        PurchaseDetail::create([
+            'item_code' => 'DH013-N01', 'category_id' => $category->id, 'item_name' => '部品A',
+            'supplier_name' => '大津屋', 'order_qty' => 1, 'unit_price' => 1000, 'order_amount' => 1000,
+            'is_provisional' => false,
+        ]);
+        PurchaseDetail::create([
+            'item_code' => 'DH013-N02', 'category_id' => $category->id, 'item_name' => '部品B',
+            'supplier_name' => '大津屋', 'order_qty' => 1, 'unit_price' => 2000, 'order_amount' => 2000,
+            'is_provisional' => false,
+        ]);
+
+        $response = $this->actingAs($manager)->get(route('purchasing.cost.index', [
+            'order_no' => 'DH013', 'order_no_match' => 'partial',
+        ]));
+
+        // 受注金額1,000+2,000=3,000
+        $response->assertSee('2 / 2 件を対象')->assertSee('3,000');
+    }
+
+    public function test_cost_analysis_can_exclude_a_matched_order_number(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        $category = CategoryCode::create(['code' => 3, 'major_category' => '部品', 'is_parts' => true]);
+        PurchaseDetail::create([
+            'item_code' => 'DH013-N01', 'category_id' => $category->id, 'item_name' => '対象部品',
+            'supplier_name' => '大津屋', 'order_qty' => 1, 'unit_price' => 1000, 'order_amount' => 1000,
+            'is_provisional' => false,
+        ]);
+        PurchaseDetail::create([
+            'item_code' => 'DH013-N02', 'category_id' => $category->id, 'item_name' => '除外部品',
+            'supplier_name' => '大津屋', 'order_qty' => 1, 'unit_price' => 2000, 'order_amount' => 2000,
+            'is_provisional' => false,
+        ]);
+
+        $response = $this->actingAs($manager)->get(route('purchasing.cost.index', [
+            'order_no' => 'DH013', 'order_no_match' => 'partial',
+            'excluded_order_nos' => ['DH013-N02'],
+        ]));
+
+        $response->assertSee('1 / 2 件を対象')->assertSee('対象部品')->assertDontSee('除外部品');
     }
 
     public function test_cost_analysis_breaks_down_labor_cost_by_sub_category(): void

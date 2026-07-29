@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\LaborCost;
 use App\Models\PurchaseDetail;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
@@ -35,14 +37,55 @@ class CostAnalysisController extends Controller
     public function index(Request $request): View
     {
         $orderNo = trim((string) $request->query('order_no', ''));
+        // 従来は完全一致のみだったため、後方互換のためデフォルトは完全一致のままとする。
+        $orderNoMatch = $request->query('order_no_match') === 'partial' ? 'partial' : 'perfect';
+        $excludedOrderNos = array_values(array_filter((array) $request->query('excluded_order_nos', [])));
+
+        $emptyState = [
+            'orderNo' => $orderNo,
+            'orderNoMatch' => $orderNoMatch,
+            'matchedOrderNos' => collect(),
+            'excludedOrderNos' => $excludedOrderNos,
+            'includedOrderNos' => collect(),
+            'result' => null,
+        ];
 
         if ($orderNo === '') {
-            return view('purchasing.cost.index', ['orderNo' => '', 'result' => null]);
+            return view('purchasing.cost.index', $emptyState);
+        }
+
+        $applyOrderNoFilter = function ($query, string $column) use ($orderNo, $orderNoMatch) {
+            return $orderNoMatch === 'perfect'
+                ? $query->where($column, $orderNo)
+                : $query->where($column, 'like', "%{$orderNo}%");
+        };
+
+        $purchaseOrderNos = $applyOrderNoFilter(PurchaseDetail::query(), 'item_code')
+            ->where('is_provisional', false)
+            ->whereNotNull('item_code')
+            ->distinct()
+            ->pluck('item_code');
+
+        $laborOrderNos = $applyOrderNoFilter(LaborCost::query(), 'order_no')
+            ->where('is_provisional', false)
+            ->whereNotNull('order_no')
+            ->distinct()
+            ->pluck('order_no');
+
+        $matchedOrderNos = $purchaseOrderNos->merge($laborOrderNos)->unique()->sort()->values();
+        $includedOrderNos = $matchedOrderNos->diff($excludedOrderNos)->values();
+
+        if ($includedOrderNos->isEmpty()) {
+            return view('purchasing.cost.index', [
+                ...$emptyState,
+                'matchedOrderNos' => $matchedOrderNos,
+                'includedOrderNos' => $includedOrderNos,
+            ]);
         }
 
         $purchaseRows = DB::table('purchase_details as p')
             ->leftJoin('category_codes as c', 'p.category_id', '=', 'c.id')
-            ->where('p.item_code', $orderNo)
+            ->whereIn('p.item_code', $includedOrderNos)
             ->where('p.is_provisional', false)
             ->selectRaw('c.code as category_code, c.major_category, c.sub_category, (p.order_qty * p.unit_price) as amount')
             ->get();
@@ -51,7 +94,7 @@ class CostAnalysisController extends Controller
         // 「人工」明細行と同じ分類ルールで原価計算に合算する(そうしないと新規注番で人工が一切集計されない)。
         $laborRows = DB::table('labor_costs as l')
             ->leftJoin('category_codes as c', 'l.category_id', '=', 'c.id')
-            ->where('l.order_no', $orderNo)
+            ->whereIn('l.order_no', $includedOrderNos)
             ->where('l.is_provisional', false)
             ->get()
             ->map(function ($l) {
@@ -71,10 +114,15 @@ class CostAnalysisController extends Controller
 
         $rows = $purchaseRows->concat($laborRows);
 
-        $orderAmount = (float) (DB::table('purchase_details')
-            ->where('item_code', $orderNo)
+        // 対象が複数の注番にまたがる場合、受注金額は各注番ごとの最大値(同一注番内の重複記載を除くため)
+        // を合算する(単一注番のみの場合はmax()と同じ結果になり、従来通りの挙動を維持する)。
+        $orderAmount = (float) DB::table('purchase_details')
+            ->select('item_code', DB::raw('MAX(order_amount) as max_amount'))
+            ->whereIn('item_code', $includedOrderNos)
             ->where('is_provisional', false)
-            ->max('order_amount') ?? 0);
+            ->groupBy('item_code')
+            ->get()
+            ->sum('max_amount');
 
         $items = [];
         $subtotal = 0.0;
@@ -98,7 +146,7 @@ class CostAnalysisController extends Controller
         $unclassifiedAmount = $rows->filter(fn ($r) => $r->category_code === null)->sum('amount');
 
         $topParts = PurchaseDetail::query()
-            ->where('item_code', $orderNo)
+            ->whereIn('item_code', $includedOrderNos)
             ->where('is_provisional', false)
             ->get()
             ->sortByDesc(fn (PurchaseDetail $d) => $d->lineTotal())
@@ -128,7 +176,14 @@ class CostAnalysisController extends Controller
             'top_parts' => $topParts,
         ];
 
-        return view('purchasing.cost.index', compact('orderNo', 'result'));
+        return view('purchasing.cost.index', [
+            'orderNo' => $orderNo,
+            'orderNoMatch' => $orderNoMatch,
+            'matchedOrderNos' => $matchedOrderNos,
+            'excludedOrderNos' => $excludedOrderNos,
+            'includedOrderNos' => $includedOrderNos,
+            'result' => $result,
+        ]);
     }
 
     /**

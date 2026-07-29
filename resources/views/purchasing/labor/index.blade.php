@@ -31,7 +31,40 @@
                     <div>
                         <label class="block mb-1">注番</label>
                         <input type="text" name="order_no" value="{{ $filters['orderNo'] }}" placeholder="部分一致" class="w-full border rounded-lg p-2 border-slate-300 font-normal">
+                        <div class="mt-1 flex gap-3 text-[11px] font-normal text-slate-500">
+                            <label class="flex items-center gap-1">
+                                <input type="radio" name="order_no_match" value="perfect" @checked($filters['orderNoMatch'] === 'perfect') class="border-slate-300">
+                                完全
+                            </label>
+                            <label class="flex items-center gap-1">
+                                <input type="radio" name="order_no_match" value="partial" @checked($filters['orderNoMatch'] === 'partial') class="border-slate-300">
+                                部分
+                            </label>
+                        </div>
                     </div>
+
+                    @if ($matchedOrderNos->isNotEmpty())
+                        <div class="relative" x-data="{ open: false }" @click.outside="open = false">
+                            <label class="block mb-1">対象注番</label>
+                            <button type="button" @click="open = !open"
+                                    class="w-full text-xs font-semibold px-3 py-1.5 rounded-lg border border-slate-300 bg-slate-50 hover:bg-slate-100 flex items-center justify-between gap-1.5">
+                                <span>{{ $includedOrderNos->count() }} / {{ $matchedOrderNos->count() }} 件を対象</span>
+                                <span class="text-slate-400 text-[10px]" x-text="open ? '∧' : '∨'"></span>
+                            </button>
+                            <div x-show="open" x-cloak
+                                 class="absolute z-20 mt-1 w-64 max-h-72 overflow-y-auto bg-white border border-slate-200 rounded-lg shadow-lg p-2 space-y-0.5">
+                                <p class="text-[11px] font-normal text-slate-400 px-2 pb-1">チェックした注番を除外します</p>
+                                @foreach ($matchedOrderNos as $mo)
+                                    <label class="flex items-center gap-2 text-xs font-normal px-2 py-1 rounded hover:bg-slate-50 cursor-pointer font-mono">
+                                        <input type="checkbox" name="excluded_order_nos[]" value="{{ $mo }}"
+                                               @checked(in_array($mo, $excludedOrderNos, true)) class="rounded border-slate-300">
+                                        {{ $mo }}
+                                    </label>
+                                @endforeach
+                            </div>
+                        </div>
+                    @endif
+
                     <button type="submit" class="w-full bg-green-600 text-white p-2 rounded-lg font-bold shadow hover:bg-green-700 transition">集計実行</button>
                 </form>
 
