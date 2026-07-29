@@ -16,6 +16,23 @@ class LaborCostController extends Controller
         $staffId = $request->query('staff_id', '');
         $orderNo = trim((string) $request->query('order_no', ''));
 
+        $laborStaff = Staff::where('is_labor_target', true)->orderBy('name')->get();
+        $filters = compact('dateFrom', 'dateTo', 'staffId', 'orderNo');
+
+        // 絞り込み条件が何も指定されていない状態(ナビゲーションからの初回遷移など)で
+        // 全件(11万件超)を集計しにいくと非常に重いため、条件が1つもなければ
+        // クエリ自体を実行せず「条件を指定してください」という空の状態で返す。
+        if ($dateFrom === '' && $dateTo === '' && $staffId === '' && $orderNo === '') {
+            return view('purchasing.labor.index', [
+                'rows' => collect(),
+                'matchedCount' => 0,
+                'displayLimit' => 1000,
+                'laborStaff' => $laborStaff,
+                'filters' => $filters,
+                'summary' => ['total_hours' => 0, 'total_mins' => 0, 'total_labor' => 0, 'total_cost' => 0],
+            ]);
+        }
+
         $query = LaborCost::query()->with(['staff', 'category'])->where('is_provisional', false);
 
         if ($dateFrom !== '') {
@@ -46,8 +63,8 @@ class LaborCostController extends Controller
             'rows' => $rows,
             'matchedCount' => $allRows->count(),
             'displayLimit' => $displayLimit,
-            'laborStaff' => Staff::where('is_labor_target', true)->orderBy('name')->get(),
-            'filters' => compact('dateFrom', 'dateTo', 'staffId', 'orderNo'),
+            'laborStaff' => $laborStaff,
+            'filters' => $filters,
             'summary' => [
                 'total_hours' => intdiv($totalMinutes, 60),
                 'total_mins' => $totalMinutes % 60,

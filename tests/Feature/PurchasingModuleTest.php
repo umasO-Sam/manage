@@ -186,6 +186,26 @@ class PurchasingModuleTest extends TestCase
         $response->assertSee($worker->name)->assertSee('40,000');
     }
 
+    public function test_labor_index_shows_nothing_when_no_filter_is_specified(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        $worker = Staff::factory()->create(['is_labor_target' => true, 'position_weight' => 1]);
+        LaborCost::create([
+            'work_date' => now(), 'staff_id' => $worker->id, 'order_no' => 'A1',
+            'work_hours' => 8, 'work_minutes' => 0, 'is_overtime' => false, 'position_weight_cache' => 1,
+        ]);
+
+        // ナビゲーションからの遷移など、条件を何も指定していない状態では
+        // 全件集計(重い)を行わず、条件入力を促す空の状態を表示する。
+        $response = $this->actingAs($manager)->get(route('purchasing.labor.index'));
+
+        // 担当者名は絞り込みフォームのプルダウン候補としては表示されるため、
+        // 集計結果側(労務費合計0円・空の一覧)だけを確認する。
+        $response->assertOk()
+            ->assertSee('労務費合計: ¥0', false)
+            ->assertSee('条件を指定して集計を実行してください。');
+    }
+
     public function test_labor_summary_totals_include_records_beyond_display_limit(): void
     {
         $manager = Staff::factory()->procurementManager()->create();
