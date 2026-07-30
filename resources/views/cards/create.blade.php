@@ -27,7 +27,7 @@
                     <div>
                         <x-input-label for="order_number_id" value="注番" />
                         <select id="order_number_id" name="order_number_id" required
-                                class="mt-1 block w-full font-mono border-slate-300 focus:border-blue-500 focus:ring-blue-500 rounded-lg shadow-sm text-sm">
+                                class="mt-1 block w-full font-mono rounded-lg shadow-sm text-sm {{ $errors->has('order_number_id') ? 'bg-red-50 border-red-300 focus:border-red-400 focus:ring-red-400' : 'border-slate-300 focus:border-blue-500 focus:ring-blue-500' }}">
                             <option value="" disabled selected>選択してください</option>
                             @foreach ($orderNumbers as $orderNumber)
                                 <option value="{{ $orderNumber->id }}" @selected((string) old('order_number_id') === (string) $orderNumber->id)>

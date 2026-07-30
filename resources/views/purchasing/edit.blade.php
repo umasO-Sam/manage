@@ -43,7 +43,7 @@
                     </div>
                     <div>
                         <x-input-label for="category_id" value="分類 *" />
-                        <select id="category_id" name="category_id" class="mt-1 block w-full text-sm border-slate-300 focus:border-blue-500 focus:ring-blue-500 rounded-lg shadow-sm">
+                        <select id="category_id" name="category_id" class="mt-1 block w-full text-sm rounded-lg shadow-sm {{ $errors->has('category_id') ? 'bg-red-50 border-red-300 focus:border-red-400 focus:ring-red-400' : 'border-slate-300 focus:border-blue-500 focus:ring-blue-500' }}">
                             <option value="">選択してください</option>
                             @foreach ($categories as $category)
                                 <option value="{{ $category->id }}" @selected((string) old('category_id', $detail->category_id) === (string) $category->id)>

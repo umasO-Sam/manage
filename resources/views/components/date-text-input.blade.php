@@ -10,6 +10,7 @@
             $initial = $value;
         }
     }
+    $hasError = $errors->has($name);
 @endphp
 
 <div
@@ -34,7 +35,7 @@
         id="{{ $id }}"
         x-model="text"
         placeholder="YYYY/MM/DD (例: 2027/11/04)"
-        class="border-slate-300 focus:border-blue-500 focus:ring-blue-500 rounded-lg shadow-sm text-sm w-full pr-8"
+        class="rounded-lg shadow-sm text-sm w-full pr-8 {{ $hasError ? 'bg-red-50 border-red-300 focus:border-red-400 focus:ring-red-400' : 'border-slate-300 focus:border-blue-500 focus:ring-blue-500' }}"
     >
     <span class="absolute right-2 text-slate-400 pointer-events-none">
         <i data-lucide="calendar" class="w-4 h-4"></i>
