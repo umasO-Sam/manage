@@ -1,9 +1,18 @@
 <x-app-layout>
     <x-slot name="header">
-        <h2 class="font-bold text-2xl text-slate-900 flex items-center gap-2">
-            <i data-lucide="pencil-line" class="text-slate-600 w-6 h-6"></i>
-            <span>仕入管理データ入力</span>
-        </h2>
+        <div x-data="{ showCategoryTable: false }" class="flex items-center justify-between">
+            <h2 class="font-bold text-2xl text-slate-900 flex items-center gap-2">
+                <i data-lucide="pencil-line" class="text-slate-600 w-6 h-6"></i>
+                <span>仕入管理データ入力</span>
+            </h2>
+            <button type="button" @click="showCategoryTable = true"
+                    class="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 transition-colors">
+                <i data-lucide="table" class="w-3.5 h-3.5"></i>
+                <span>分類表</span>
+            </button>
+
+            @include('purchasing.partials.category-reference-modal')
+        </div>
     </x-slot>
 
     <div class="py-8" x-data="{ formType: '{{ old('form_type', 'purchase') }}', isProvisional: false }">

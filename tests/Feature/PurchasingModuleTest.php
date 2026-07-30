@@ -35,6 +35,18 @@ class PurchasingModuleTest extends TestCase
         $this->actingAs($manager)->get(route('purchasing.cost.index'))->assertOk();
     }
 
+    public function test_data_input_screen_shows_a_category_reference_table(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+
+        $response = $this->actingAs($manager)->get(route('purchasing.input'));
+
+        $response->assertSee('分類表');
+        $response->assertSee('分類コード早見表');
+        $response->assertSee('機械組付')->assertSee('改造・組付・配管・試運転・調整・立会い・バラシ・積込み・出張準備');
+        $response->assertSee('スイッチ／センサ')->assertSee('インバータ・シーケンサー・コントロールボックス');
+    }
+
     public function test_procurement_manager_can_register_a_confirmed_purchase_detail(): void
     {
         $manager = Staff::factory()->procurementManager()->create();
