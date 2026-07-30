@@ -7,10 +7,45 @@ use App\Models\PurchaseDetail;
 use Illuminate\Contracts\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\View\View;
 
 class PurchaseDetailController extends Controller
 {
+    /**
+     * @var array<string, array<int, string>> 検索画面の「直接編集」で1行ずつ更新可能な項目とバリデーションルール。
+     * 単一レコード編集(update)と異なり、一部項目だけを変更する運用のため「必須」は課さない
+     * (項目自体には既存値が入っているため、空欄で送信された場合のみ意図的にクリアされる)。
+     * ただしitem_code(注番)はレコードの識別に使われるため必須のままにする。
+     */
+    private const BULK_EDITABLE_FIELDS = [
+        'item_code' => ['required', 'string', 'max:255'],
+        'machine_no' => ['nullable', 'string', 'max:255'],
+        'product_name' => ['nullable', 'string', 'max:255'],
+        'category_id' => ['nullable', 'integer', 'exists:category_codes,id'],
+        'manufacturer' => ['nullable', 'string', 'max:255'],
+        'item_name' => ['nullable', 'string', 'max:255'],
+        'dimensions' => ['nullable', 'string', 'max:255'],
+        'remarks' => ['nullable', 'string'],
+        'required_qty' => ['nullable', 'numeric'],
+        'usage_purpose' => ['nullable', 'string', 'max:255'],
+        'order_qty' => ['nullable', 'numeric'],
+        'unit' => ['nullable', 'string', 'max:50'],
+        'unit_price' => ['nullable', 'numeric'],
+        'stock_qty' => ['nullable', 'numeric'],
+        'supplier_name' => ['nullable', 'string', 'max:255'],
+        'order_date' => ['nullable', 'date'],
+        'arrival_date' => ['nullable', 'date'],
+        'invoice_date' => ['nullable', 'date'],
+        'recipient' => ['nullable', 'string', 'max:255'],
+        'order_received_date' => ['nullable', 'date'],
+        'delivery_dest' => ['nullable', 'string', 'max:255'],
+        'order_amount' => ['nullable', 'numeric'],
+        'sales_date' => ['nullable', 'date'],
+        'supplier_invoice_no' => ['nullable', 'string', 'max:255'],
+    ];
+
     /**
      * @var array<string, string> クエリ文字列のキー => purchase_details のカラム名
      */
@@ -173,6 +208,35 @@ class PurchaseDetailController extends Controller
         $redirectUrl = route('purchasing.index').($returnQuery !== '' ? "?{$returnQuery}" : '');
 
         return redirect()->to($redirectUrl)->with('status', 'update-success');
+    }
+
+    /**
+     * 検索画面の「直接編集」から、表示中の複数レコードをまとめて更新する。
+     * 画面側で変更点の確認を済ませた上で送信される想定のため、ここでは
+     * 型のバリデーションのみ行い、1件ずつ更新する。
+     */
+    public function bulkUpdate(Request $request): RedirectResponse
+    {
+        $updates = (array) $request->input('updates', []);
+
+        DB::transaction(function () use ($updates, $request) {
+            foreach ($updates as $id => $fields) {
+                $purchaseDetail = PurchaseDetail::find($id);
+                if (! $purchaseDetail) {
+                    continue;
+                }
+
+                $validated = Validator::make((array) $fields, self::BULK_EDITABLE_FIELDS)->validate();
+                $validated['is_provisional'] = $request->boolean("updates.{$id}.is_provisional");
+
+                $purchaseDetail->update($validated);
+            }
+        });
+
+        $returnQuery = (string) $request->input('return_query', '');
+        $redirectUrl = route('purchasing.index').($returnQuery !== '' ? "?{$returnQuery}" : '');
+
+        return redirect()->to($redirectUrl)->with('status', 'bulk-update-success');
     }
 
     /**

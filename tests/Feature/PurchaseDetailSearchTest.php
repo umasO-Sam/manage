@@ -163,4 +163,87 @@ class PurchaseDetailSearchTest extends TestCase
 
         $response->assertRedirect(route('purchasing.index'));
     }
+
+    public function test_direct_edit_button_is_only_shown_to_procurement_managers(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        $sales = Staff::factory()->sales()->create();
+
+        $this->actingAs($manager)->get(route('purchasing.index'))->assertSee('直接編集');
+        $this->actingAs($sales)->get(route('purchasing.index'))->assertDontSee('直接編集');
+    }
+
+    public function test_bulk_update_saves_changed_fields_for_multiple_records(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        $category = \App\Models\CategoryCode::create(['code' => 1, 'major_category' => '部品']);
+        $newCategory = \App\Models\CategoryCode::create(['code' => 2, 'major_category' => '材料']);
+        $detailA = PurchaseDetail::create([
+            'item_code' => 'BLK001-N01', 'item_name' => '対象A', 'manufacturer' => 'メーカーA',
+            'category_id' => $category->id, 'order_qty' => 1, 'unit_price' => 100, 'supplier_name' => '商社A',
+        ]);
+        $detailB = PurchaseDetail::create([
+            'item_code' => 'BLK002-N01', 'item_name' => '対象B', 'manufacturer' => 'メーカーB',
+            'category_id' => $category->id, 'order_qty' => 1, 'unit_price' => 200, 'supplier_name' => '商社B',
+        ]);
+
+        $response = $this->actingAs($manager)->post(route('purchasing.bulk-update'), [
+            'updates' => [
+                $detailA->id => ['item_code' => 'BLK001-N01', 'item_name' => '更新後A', 'unit_price' => 150, 'category_id' => $newCategory->id],
+                $detailB->id => ['item_code' => 'BLK002-N01', 'item_name' => '更新後B', 'unit_price' => 250],
+            ],
+            'return_query' => 'item_code=BLK',
+        ]);
+
+        $response->assertRedirect(route('purchasing.index').'?item_code=BLK');
+        $this->assertSame('更新後A', $detailA->fresh()->item_name);
+        $this->assertSame('150.00', $detailA->fresh()->unit_price);
+        $this->assertSame($newCategory->id, $detailA->fresh()->category_id);
+        $this->assertSame('更新後B', $detailB->fresh()->item_name);
+        $this->assertSame('250.00', $detailB->fresh()->unit_price);
+    }
+
+    public function test_bulk_update_handles_the_is_provisional_checkbox_correctly_when_unchecked(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        $detail = PurchaseDetail::create([
+            'item_code' => 'BLK003-N01', 'item_name' => '対象', 'is_provisional' => true,
+        ]);
+
+        // HTMLのチェックボックスは未チェック時に値が送信されないため、is_provisionalキー自体を省略する。
+        $this->actingAs($manager)->post(route('purchasing.bulk-update'), [
+            'updates' => [
+                $detail->id => ['item_code' => 'BLK003-N01', 'item_name' => '対象'],
+            ],
+        ]);
+
+        $this->assertFalse($detail->fresh()->is_provisional);
+    }
+
+    public function test_bulk_update_rejects_blanking_out_item_code(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        $detail = PurchaseDetail::create(['item_code' => 'BLK004-N01', 'item_name' => '対象']);
+
+        $this->actingAs($manager)->post(route('purchasing.bulk-update'), [
+            'updates' => [
+                $detail->id => ['item_code' => '', 'item_name' => '変更後'],
+            ],
+        ])->assertSessionHasErrors();
+
+        $this->assertSame('BLK004-N01', $detail->fresh()->item_code);
+        $this->assertSame('対象', $detail->fresh()->item_name);
+    }
+
+    public function test_sales_role_cannot_bulk_update(): void
+    {
+        $sales = Staff::factory()->sales()->create();
+        $detail = PurchaseDetail::create(['item_code' => 'BLK005-N01', 'item_name' => '対象']);
+
+        $this->actingAs($sales)->post(route('purchasing.bulk-update'), [
+            'updates' => [$detail->id => ['item_code' => 'BLK005-N01', 'item_name' => '変更後']],
+        ])->assertForbidden();
+
+        $this->assertSame('対象', $detail->fresh()->item_name);
+    }
 }
