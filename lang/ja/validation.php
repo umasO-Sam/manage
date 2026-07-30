@@ -231,6 +231,7 @@ return [
         'order_amount' => '受注金額',
         'sales_date' => '売上日',
         'supplier_invoice_no' => '商社納品書No',
+        'paste_data' => '貼り付け欄',
 
         // 人工計算・日報入力(labor_costs)
         'work_date' => '作業日',

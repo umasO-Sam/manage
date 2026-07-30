@@ -68,6 +68,7 @@ Route::middleware('auth')->group(function () {
 
         Route::get('/purchasing/input', [PurchaseInputController::class, 'create'])->name('purchasing.input');
         Route::post('/purchasing/input', [PurchaseInputController::class, 'store'])->name('purchasing.input.store');
+        Route::post('/purchasing/input/bulk-paste', [PurchaseInputController::class, 'storeBulkPaste'])->name('purchasing.input.bulk-paste');
 
         Route::get('/purchasing/{purchaseDetail}/edit', [PurchaseDetailController::class, 'edit'])->name('purchasing.edit');
         Route::put('/purchasing/{purchaseDetail}', [PurchaseDetailController::class, 'update'])->name('purchasing.update');

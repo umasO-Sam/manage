@@ -242,6 +242,126 @@ class PurchasingModuleTest extends TestCase
         $this->assertStringContainsString('注文日には有効な日付を指定してください。', $errors->first('order_date'));
     }
 
+    public function test_bulk_paste_registers_multiple_rows_with_shared_item_code_and_date(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        $category = CategoryCode::create(['code' => 1, 'major_category' => '機械', 'sub_category' => 'バルブ']);
+
+        $pasteData = "バタフライ弁（キッツ）\t1\t1\tG-10BJUE-50A\t1\t1500\t㈱モノタロウ\tキッツ\n"
+            ."安全弁\t2\t1\tSV-20\t3\t2000\t大津屋\t";
+
+        $response = $this->actingAs($manager)->post(route('purchasing.input.bulk-paste'), [
+            'item_code' => 'AB123-C45',
+            'order_date' => '2026/07/30',
+            'paste_data' => $pasteData,
+        ]);
+
+        $response->assertSessionDoesntHaveErrors();
+        $response->assertRedirect(route('purchasing.input'));
+        $this->assertSame(2, PurchaseDetail::where('item_code', 'AB123-C45')->count());
+
+        $first = PurchaseDetail::where('item_name', 'バタフライ弁（キッツ）')->firstOrFail();
+        $this->assertSame('1', $first->machine_no);
+        $this->assertSame($category->id, $first->category_id);
+        $this->assertSame('G-10BJUE-50A', $first->dimensions);
+        $this->assertSame('1.00', $first->order_qty);
+        $this->assertSame('1500.00', $first->unit_price);
+        $this->assertSame('㈱モノタロウ', $first->supplier_name);
+        $this->assertSame('キッツ', $first->manufacturer);
+        $this->assertSame('2026-07-30', $first->order_date->toDateString());
+
+        $second = PurchaseDetail::where('item_name', '安全弁')->firstOrFail();
+        $this->assertNull($second->manufacturer);
+    }
+
+    public function test_bulk_paste_skips_a_pasted_header_row(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        CategoryCode::create(['code' => 1, 'major_category' => '機械']);
+
+        $pasteData = "品名\t機械装置No\t分類\t型式\t数量\t単価\t商社名\tメーカー\n"
+            ."バタフライ弁\t1\t1\tG-10\t1\t100\t大津屋\tキッツ";
+
+        $response = $this->actingAs($manager)->post(route('purchasing.input.bulk-paste'), [
+            'item_code' => 'AB123-C45',
+            'paste_data' => $pasteData,
+        ]);
+
+        $response->assertSessionDoesntHaveErrors();
+        $this->assertSame(1, PurchaseDetail::where('item_code', 'AB123-C45')->count());
+    }
+
+    public function test_bulk_paste_rejects_more_than_the_maximum_rows(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        CategoryCode::create(['code' => 1, 'major_category' => '機械']);
+
+        $pasteData = collect(range(1, 201))
+            ->map(fn ($i) => "部品{$i}\t\t1\t\t1\t100\t商社\t")
+            ->implode("\n");
+
+        $response = $this->actingAs($manager)->post(route('purchasing.input.bulk-paste'), [
+            'item_code' => 'AB123-C45',
+            'paste_data' => $pasteData,
+        ]);
+
+        $response->assertSessionHasErrors('paste_data');
+        $errors = session('errors')->getBag('default');
+        $this->assertStringContainsString('200行までです', $errors->first('paste_data'));
+        $this->assertSame(0, PurchaseDetail::count());
+    }
+
+    public function test_bulk_paste_reports_row_level_errors_in_japanese_and_saves_nothing(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        CategoryCode::create(['code' => 1, 'major_category' => '機械']);
+
+        $pasteData = "有効な部品\t\t1\t\t1\t100\t商社\t\n"
+            ."\t\t99\tG-10\tabc\t\t\t";
+
+        $response = $this->actingAs($manager)->post(route('purchasing.input.bulk-paste'), [
+            'item_code' => 'AB123-C45',
+            'paste_data' => $pasteData,
+        ]);
+
+        $response->assertSessionHasErrors('paste_data');
+        $errors = session('errors')->getBag('default')->get('paste_data');
+        $this->assertTrue(collect($errors)->contains(fn ($e) => str_contains($e, '2行目') && str_contains($e, '品名を入力してください')));
+        $this->assertTrue(collect($errors)->contains(fn ($e) => str_contains($e, '2行目') && str_contains($e, '分類コード')));
+        $this->assertTrue(collect($errors)->contains(fn ($e) => str_contains($e, '2行目') && str_contains($e, '数量を数値')));
+        $this->assertTrue(collect($errors)->contains(fn ($e) => str_contains($e, '2行目') && str_contains($e, '商社名を入力してください')));
+        $this->assertSame(0, PurchaseDetail::count());
+    }
+
+    public function test_bulk_paste_normalizes_full_width_digits_and_yen_signs(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        $category = CategoryCode::create(['code' => 5, 'major_category' => '機械']);
+
+        $pasteData = "部品\t\t５\t\t１\t¥1,200\t商社\t";
+
+        $response = $this->actingAs($manager)->post(route('purchasing.input.bulk-paste'), [
+            'item_code' => 'AB123-C45',
+            'paste_data' => $pasteData,
+        ]);
+
+        $response->assertSessionDoesntHaveErrors();
+        $detail = PurchaseDetail::where('item_code', 'AB123-C45')->firstOrFail();
+        $this->assertSame($category->id, $detail->category_id);
+        $this->assertSame('1.00', $detail->order_qty);
+        $this->assertSame('1200.00', $detail->unit_price);
+    }
+
+    public function test_bulk_paste_requires_procurement_manager(): void
+    {
+        $staff = Staff::factory()->create();
+
+        $this->actingAs($staff)->post(route('purchasing.input.bulk-paste'), [
+            'item_code' => 'AB123-C45',
+            'paste_data' => "部品\t\t1\t\t1\t100\t商社\t",
+        ])->assertForbidden();
+    }
+
     public function test_order_search_excludes_provisional_rows(): void
     {
         $manager = Staff::factory()->procurementManager()->create();

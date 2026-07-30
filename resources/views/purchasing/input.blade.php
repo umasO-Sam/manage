@@ -15,6 +15,9 @@
             @if (session('status') === 'input-provisional')
                 <div class="p-3 rounded-xl bg-yellow-50 border border-yellow-200 text-yellow-800 text-sm">仮登録として保存しました。後で内容を確定してください。</div>
             @endif
+            @if (session('status') === 'bulk-paste-created')
+                <div class="p-3 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-800 text-sm">{{ session('bulk_paste_count') }}件を一括登録しました。</div>
+            @endif
             @if ($errors->any())
                 <div class="p-3 rounded-xl bg-red-50 border border-red-100 text-red-800 text-sm">
                     @foreach ($errors->all() as $error)
@@ -41,9 +44,13 @@
                     <input type="radio" x-model="formType" value="labor" class="text-green-600 focus:ring-green-500">
                     社内人工(日報)登録
                 </label>
+                <label class="flex items-center gap-2 cursor-pointer font-semibold text-sm">
+                    <input type="radio" x-model="formType" value="bulk" class="text-indigo-600 focus:ring-indigo-500">
+                    エクセル一括登録
+                </label>
             </div>
 
-            <form method="POST" action="{{ route('purchasing.input.store') }}" class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-5">
+            <form x-show="formType !== 'bulk'" x-cloak method="POST" action="{{ route('purchasing.input.store') }}" class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-5">
                 @csrf
                 <input type="hidden" name="form_type" x-bind:value="formType">
                 <input type="hidden" name="is_provisional" x-bind:value="isProvisional ? 1 : 0">
@@ -220,6 +227,38 @@
                 <div class="flex justify-end pt-4 border-t border-slate-100">
                     <button type="submit" class="inline-flex items-center px-6 py-2 bg-slate-800 hover:bg-slate-900 border border-transparent rounded-xl font-semibold text-sm text-white shadow-sm transition-all">
                         登録する
+                    </button>
+                </div>
+            </form>
+
+            <form x-show="formType === 'bulk'" x-cloak method="POST" action="{{ route('purchasing.input.bulk-paste') }}" class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-5">
+                @csrf
+                <p class="text-xs text-slate-500">
+                    エクセルの表(見出し行を含めてもかまいません)をコピーして下の欄に貼り付けると、最大{{ $bulkPasteMaxRows }}行までまとめて登録できます。<br>
+                    列の順番は固定です: 品名・機械装置No・分類(コード番号)・型式・数量・単価・商社名・メーカー
+                </p>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <x-input-label for="bulk_item_code" value="注番 *" />
+                        <x-text-input id="bulk_item_code" name="item_code" type="text" class="mt-1 block w-full" :value="old('item_code')" />
+                    </div>
+                    <div>
+                        <x-input-label for="bulk_order_date" value="注文日付" />
+                        <x-date-text-input id="bulk_order_date" name="order_date" class="mt-1 block w-full" :value="old('order_date')" />
+                    </div>
+                </div>
+
+                <div>
+                    <x-input-label for="paste_data" value="貼り付け欄 *" />
+                    <textarea id="paste_data" name="paste_data" rows="12"
+                              placeholder="品名&#9;機械装置No&#9;分類&#9;型式&#9;数量&#9;単価&#9;商社名&#9;メーカー&#10;バタフライ弁（キッツ）&#9;1&#9;1&#9;G-10BJUE-50A&#9;1&#9;1&#9;㈱モノタロウ&#9;キッツ"
+                              class="mt-1 block w-full font-mono text-xs border-slate-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-lg shadow-sm">{{ old('paste_data') }}</textarea>
+                </div>
+
+                <div class="flex justify-end pt-4 border-t border-slate-100">
+                    <button type="submit" class="inline-flex items-center px-6 py-2 bg-indigo-600 hover:bg-indigo-700 border border-transparent rounded-xl font-semibold text-sm text-white shadow-sm transition-all">
+                        一括登録する
                     </button>
                 </div>
             </form>
