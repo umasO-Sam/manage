@@ -10,6 +10,73 @@ window.Alpine = Alpine;
  */
 window.refreshIcons = () => createIcons({ icons });
 
+/**
+ * 仕入管理データ入力「エクセル一括登録」の貼り付け欄。
+ * エクセルからのコピー&ペーストをセル単位のテーブルとして受け取り、
+ * 送信時にタブ区切りテキスト(隠しtextarea `paste_data`)へ直列化してサーバーへ渡す。
+ * サーバー側のパース処理(タブ区切り・見出し行スキップ)はそのまま流用するため、
+ * ここで作る文字列フォーマットは従来の貼り付けテキストと同一にする。
+ */
+Alpine.data('bulkPasteGrid', (initialText) => ({
+    columns: ['品名', '機械装置No', '分類', '型式', '数量', '単価', '商社名', 'メーカー'],
+    rows: [],
+
+    maxRows: 200,
+
+    init() {
+        this.rows = this.parseText(initialText);
+        this.ensureRows(this.maxRows);
+    },
+
+    emptyRow() {
+        return this.columns.map(() => '');
+    },
+
+    parseText(text) {
+        const lines = text.split(/\r\n|\r|\n/).filter((line) => line.trim() !== '');
+
+        return lines.map((line) => {
+            const cols = line.split('\t');
+
+            return this.columns.map((_, i) => (cols[i] ?? '').trim());
+        });
+    },
+
+    ensureRows(min) {
+        while (this.rows.length < min) {
+            this.rows.push(this.emptyRow());
+        }
+    },
+
+    handlePaste(event, r, c) {
+        event.preventDefault();
+        const text = (event.clipboardData || window.clipboardData).getData('text');
+        let lines = text.split(/\r\n|\r|\n/);
+        while (lines.length > 1 && lines[lines.length - 1] === '') {
+            lines.pop();
+        }
+
+        lines.forEach((line, li) => {
+            const targetRow = r + li;
+            this.ensureRows(targetRow + 1);
+            const cols = line.split('\t');
+            cols.forEach((value, ci) => {
+                const targetCol = c + ci;
+                if (targetCol < this.columns.length) {
+                    this.rows[targetRow][targetCol] = value.trim();
+                }
+            });
+        });
+    },
+
+    serialized() {
+        return this.rows
+            .filter((row) => row.some((value) => value !== ''))
+            .map((row) => row.join('\t'))
+            .join('\n');
+    },
+}));
+
 Alpine.start();
 
 document.addEventListener('DOMContentLoaded', () => createIcons({ icons }));

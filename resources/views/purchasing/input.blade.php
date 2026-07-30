@@ -6,8 +6,8 @@
         </h2>
     </x-slot>
 
-    <div class="py-8" x-data="{ formType: 'purchase', isProvisional: false }">
-        <div class="max-w-4xl mx-auto sm:px-6 lg:px-8 space-y-6">
+    <div class="py-8" x-data="{ formType: '{{ old('form_type', 'purchase') }}', isProvisional: false }">
+        <div class="mx-auto sm:px-6 lg:px-8 space-y-6" x-bind:class="formType === 'bulk' ? 'max-w-6xl' : 'max-w-4xl'">
 
             @if (session('status') === 'input-created')
                 <div class="p-3 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-800 text-sm">登録しました。</div>
@@ -236,10 +236,15 @@
                 </div>
             </form>
 
-            <form x-show="formType === 'bulk'" x-cloak method="POST" action="{{ route('purchasing.input.bulk-paste') }}" class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-5">
+            <form x-show="formType === 'bulk'" x-cloak method="POST" action="{{ route('purchasing.input.bulk-paste') }}"
+                  @keydown.enter.prevent
+                  class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-5"
+                  x-data="bulkPasteGrid({{ \Illuminate\Support\Js::from((string) old('paste_data', '')) }})">
                 @csrf
+                <input type="hidden" name="form_type" value="bulk">
                 <p class="text-xs text-slate-500">
-                    エクセルの表(見出し行を含めてもかまいません)をコピーして下の欄に貼り付けると、最大{{ $bulkPasteMaxRows }}行までまとめて登録できます。<br>
+                    エクセルの表(見出し行を含めてもかまいません)を下の表にコピー&amp;ペーストすると、貼り付けた位置からセル単位に配置されます。
+                    最大{{ $bulkPasteMaxRows }}行までまとめて登録できます。<br>
                     列の順番は固定です: 品名・機械装置No・分類(コード番号)・型式・数量・単価・商社名・メーカー<br>
                     分類欄に「1」と入力した行は、分類未定として分類を空欄のまま仮登録として保存します。
                 </p>
@@ -255,17 +260,40 @@
                     </div>
                 </div>
 
-                <div>
-                    <x-input-label for="paste_data" value="貼り付け欄 *" />
-                    <textarea id="paste_data" name="paste_data" rows="12"
-                              placeholder="品名&#9;機械装置No&#9;分類&#9;型式&#9;数量&#9;単価&#9;商社名&#9;メーカー&#10;バタフライ弁（キッツ）&#9;1&#9;1&#9;G-10BJUE-50A&#9;1&#9;1&#9;㈱モノタロウ&#9;キッツ"
-                              class="mt-1 block w-full font-mono text-xs rounded-lg shadow-sm {{ $errors->has('paste_data') ? 'bg-red-50 border-red-300 focus:border-red-400 focus:ring-red-400' : 'border-slate-300 focus:border-indigo-500 focus:ring-indigo-500' }}">{{ old('paste_data') }}</textarea>
-                </div>
-
-                <div class="flex justify-end pt-4 border-t border-slate-100">
+                <div class="flex justify-end">
                     <button type="submit" class="inline-flex items-center px-6 py-2 bg-indigo-600 hover:bg-indigo-700 border border-transparent rounded-xl font-semibold text-sm text-white shadow-sm transition-all">
                         確認する
                     </button>
+                </div>
+
+                <div>
+                    <x-input-label value="貼り付け欄 *" />
+                    <div class="mt-1 overflow-x-auto border rounded-lg {{ $errors->has('paste_data') ? 'border-red-300' : 'border-slate-300' }}">
+                        <table class="min-w-full text-xs border-collapse">
+                            <thead>
+                                <tr class="bg-slate-100">
+                                    <th class="w-8 border-b border-r border-slate-200 px-1 py-1.5 text-slate-400 font-normal">#</th>
+                                    <template x-for="col in columns" :key="col">
+                                        <th class="border-b border-r border-slate-200 last:border-r-0 px-2 py-1.5 font-bold text-slate-600 whitespace-nowrap text-left" x-text="col"></th>
+                                    </template>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <template x-for="(row, r) in rows" :key="r">
+                                    <tr>
+                                        <td class="border-b border-r border-slate-200 text-center text-slate-400 bg-slate-50" x-text="r + 1"></td>
+                                        <template x-for="(cell, c) in row" :key="c">
+                                            <td class="border-b border-r border-slate-200 last:border-r-0 p-0">
+                                                <input type="text" x-model="rows[r][c]" @paste="handlePaste($event, r, c)"
+                                                       class="w-full min-w-[7rem] px-2 py-1 text-xs border-0 focus:ring-1 focus:ring-inset focus:ring-indigo-400 focus:outline-none">
+                                            </td>
+                                        </template>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </div>
+                    <textarea name="paste_data" x-bind:value="serialized()" class="hidden"></textarea>
                 </div>
             </form>
         </div>
