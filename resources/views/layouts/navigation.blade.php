@@ -15,7 +15,7 @@
                 <div class="hidden md:flex space-x-1 ml-8">
                     @foreach (\App\Models\WorkflowType::orderBy('id')->get() as $nav)
                         <a href="{{ route('cards.index', $nav) }}"
-                           class="px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors {{ request()->route('workflow')?->is($nav) ? $nav->accentClasses()['nav_active'] : 'text-slate-600 hover:bg-slate-50' }}">
+                           class="px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 whitespace-nowrap transition-colors {{ request()->route('workflow')?->is($nav) ? $nav->accentClasses()['nav_active'] : 'text-slate-600 hover:bg-slate-50' }}">
                             <i data-lucide="{{ $nav->icon }}" class="w-4 h-4"></i>
                             <span>{{ $nav->name }}ボード</span>
                             @if (($unreadCardCountsByWorkflow[$nav->id] ?? 0) > 0)
@@ -73,7 +73,7 @@
                         <a href="{{ route('staff.index') }}"
                            class="px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors {{ request()->routeIs('staff.*') ? 'bg-slate-100 text-blue-600' : 'text-slate-600 hover:bg-slate-50' }}">
                             <i data-lucide="users" class="w-4 h-4"></i>
-                            <span>担当者管理</span>
+                            <span>ＩＤ管理</span>
                         </a>
                         <a href="{{ route('order-numbers.index') }}"
                            class="px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors {{ request()->routeIs('order-numbers.*') ? 'bg-slate-100 text-blue-600' : 'text-slate-600 hover:bg-slate-50' }}">
@@ -130,7 +130,7 @@
     <div :class="{'block': open, 'hidden': ! open}" class="hidden md:hidden border-t border-slate-200">
         <div class="pt-2 pb-3 space-y-1 px-2">
             @foreach (\App\Models\WorkflowType::orderBy('id')->get() as $nav)
-                <a href="{{ route('cards.index', $nav) }}" class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium {{ request()->route('workflow')?->is($nav) ? $nav->accentClasses()['nav_active'] : 'text-slate-600' }}">
+                <a href="{{ route('cards.index', $nav) }}" class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap {{ request()->route('workflow')?->is($nav) ? $nav->accentClasses()['nav_active'] : 'text-slate-600' }}">
                     <span>{{ $nav->name }}ボード</span>
                     @if (($unreadCardCountsByWorkflow[$nav->id] ?? 0) > 0)
                         <span class="inline-flex items-center justify-center min-w-[1.125rem] h-[1.125rem] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold leading-none">
@@ -173,7 +173,7 @@
             @endif
             @if (Auth::user()->is_procurement_manager)
                 <a href="{{ route('staff.index') }}" class="block px-3 py-2 rounded-lg text-sm font-medium {{ request()->routeIs('staff.*') ? 'bg-slate-100 text-blue-600' : 'text-slate-600' }}">
-                    担当者管理
+                    ＩＤ管理
                 </a>
                 <a href="{{ route('order-numbers.index') }}" class="block px-3 py-2 rounded-lg text-sm font-medium {{ request()->routeIs('order-numbers.*') ? 'bg-slate-100 text-blue-600' : 'text-slate-600' }}">
                     注番管理

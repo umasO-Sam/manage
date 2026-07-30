@@ -30,7 +30,7 @@ class DatabaseSeeder extends Seeder
 
         WorkflowType::create([
             'slug' => 'purchase',
-            'name' => '購入部品手配',
+            'name' => '購入手配',
             'due_date_label' => '希望納期',
             'icon' => 'shopping-cart',
             'accent' => 'blue',
@@ -44,7 +44,7 @@ class DatabaseSeeder extends Seeder
 
         WorkflowType::create([
             'slug' => 'estimate',
-            'name' => '見積り依頼',
+            'name' => '見積依頼',
             'due_date_label' => '希望回答期限',
             'icon' => 'file-text',
             'accent' => 'orange',
