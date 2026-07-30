@@ -234,6 +234,20 @@ class CardWorkflowTest extends TestCase
         $valid->assertSessionDoesntHaveErrors('unit');
     }
 
+    public function test_estimate_request_unit_cannot_contain_digits(): void
+    {
+        $workflowType = $this->estimateWorkflow();
+        $orderNumber = $this->orderNumber();
+        $staff = Staff::factory()->create();
+
+        $response = $this->actingAs($staff)->post(route('cards.store', $workflowType), [
+            'order_number_id' => $orderNumber->id, 'item_name' => 'テスト部品', 'model_number' => 'ABC-123',
+            'manufacturer' => 'テストメーカー', 'quantity' => 2, 'unit' => '個5', 'due_date' => now()->addWeek()->toDateString(),
+        ]);
+
+        $response->assertSessionHasErrors('unit');
+    }
+
     public function test_validation_error_shows_the_japanese_field_label_not_the_raw_key(): void
     {
         $workflowType = $this->purchaseWorkflow();
@@ -249,6 +263,22 @@ class CardWorkflowTest extends TestCase
         $errors = session('errors')->getBag('default');
         $this->assertStringContainsString('品名を入力してください。', $errors->first('item_name'));
         $this->assertStringContainsString('型式を入力してください。', $errors->first('model_number'));
+    }
+
+    public function test_missing_required_fields_are_highlighted_with_a_light_red_background(): void
+    {
+        $workflowType = $this->purchaseWorkflow();
+        $orderNumber = $this->orderNumber();
+        $staff = Staff::factory()->create();
+
+        $this->actingAs($staff)->post(route('cards.store', $workflowType), [
+            'order_number_id' => $orderNumber->id, 'quantity' => 2, 'unit' => '個', 'due_date_type' => 'asap',
+        ]);
+
+        $response = $this->actingAs($staff)->get(route('cards.create', $workflowType));
+
+        $response->assertSee('bg-red-50', false);
+        $response->assertSee('class="rounded-lg shadow-sm text-sm bg-red-50 border-red-300 focus:border-red-400 focus:ring-red-400 mt-1 block w-full" id="item_name"', false);
     }
 
     public function test_due_date_type_asap_does_not_require_a_specific_date(): void

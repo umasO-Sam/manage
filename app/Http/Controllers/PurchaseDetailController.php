@@ -31,7 +31,7 @@ class PurchaseDetailController extends Controller
         'required_qty' => ['nullable', 'numeric'],
         'usage_purpose' => ['nullable', 'string', 'max:255'],
         'order_qty' => ['nullable', 'numeric'],
-        'unit' => ['nullable', 'string', 'max:50'],
+        'unit' => ['nullable', 'string', 'max:50', 'regex:/^[^\d０-９]+$/u'],
         'unit_price' => ['nullable', 'numeric'],
         'stock_qty' => ['nullable', 'numeric'],
         'supplier_name' => ['nullable', 'string', 'max:255'],
@@ -212,7 +212,7 @@ class PurchaseDetailController extends Controller
             'required_qty' => ['nullable', 'numeric'],
             'usage_purpose' => ['nullable', 'string', 'max:255'],
             'order_qty' => [$isProvisional ? 'nullable' : 'required', 'numeric'],
-            'unit' => ['nullable', 'string', 'max:50'],
+            'unit' => ['nullable', 'string', 'max:50', 'regex:/^[^\d０-９]+$/u'],
             'unit_price' => [$isProvisional ? 'nullable' : 'required', 'numeric'],
             'stock_qty' => ['nullable', 'numeric'],
             'supplier_name' => [$isProvisional ? 'nullable' : 'required', 'string', 'max:255'],
@@ -225,6 +225,8 @@ class PurchaseDetailController extends Controller
             'order_amount' => ['nullable', 'numeric'],
             'sales_date' => ['nullable', 'date'],
             'supplier_invoice_no' => ['nullable', 'string', 'max:255'],
+        ], [
+            'unit.regex' => '単位に数字は使用できません。',
         ]);
         $data['is_provisional'] = $isProvisional;
 
@@ -252,7 +254,9 @@ class PurchaseDetailController extends Controller
                     continue;
                 }
 
-                $validated = Validator::make((array) $fields, self::BULK_EDITABLE_FIELDS)->validate();
+                $validated = Validator::make((array) $fields, self::BULK_EDITABLE_FIELDS, [
+                    'unit.regex' => '単位に数字は使用できません。',
+                ])->validate();
                 $validated['is_provisional'] = $request->boolean("updates.{$id}.is_provisional");
 
                 $purchaseDetail->update($validated);

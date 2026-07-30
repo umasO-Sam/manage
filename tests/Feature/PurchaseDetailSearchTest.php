@@ -183,6 +183,42 @@ class PurchaseDetailSearchTest extends TestCase
         $this->assertNull($detail->fresh()->manufacturer);
     }
 
+    public function test_purchase_detail_update_rejects_a_unit_containing_digits(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        $category = \App\Models\CategoryCode::create(['code' => 1, 'major_category' => '部品']);
+        $detail = PurchaseDetail::create([
+            'item_code' => 'AAA112-X01', 'item_name' => '対象品',
+            'category_id' => $category->id, 'order_qty' => 1, 'unit_price' => 100, 'supplier_name' => '商社A',
+        ]);
+
+        $response = $this->actingAs($manager)->put(route('purchasing.update', $detail), [
+            'item_code' => 'AAA112-X01', 'item_name' => '対象品', 'unit' => '個5',
+            'category_id' => $category->id, 'order_qty' => 1, 'unit_price' => 100, 'supplier_name' => '商社A',
+        ]);
+
+        $response->assertSessionHasErrors('unit');
+        $errors = session('errors')->getBag('default');
+        $this->assertStringContainsString('単位に数字は使用できません。', $errors->first('unit'));
+    }
+
+    public function test_bulk_update_rejects_a_unit_containing_digits(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        $detail = PurchaseDetail::create(['item_code' => 'BLK006-N01', 'item_name' => '対象']);
+
+        $response = $this->actingAs($manager)->post(route('purchasing.bulk-update'), [
+            'updates' => [
+                $detail->id => ['item_code' => 'BLK006-N01', 'item_name' => '対象', 'unit' => '個5'],
+            ],
+        ]);
+
+        $response->assertSessionHasErrors();
+        $errors = session('errors')->getBag('default');
+        $this->assertStringContainsString('単位に数字は使用できません。', $errors->first('unit'));
+        $this->assertNull($detail->fresh()->unit);
+    }
+
     public function test_direct_edit_button_is_only_shown_to_procurement_managers(): void
     {
         $manager = Staff::factory()->procurementManager()->create();
