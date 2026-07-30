@@ -47,7 +47,7 @@
     @endphp
 
     <div class="py-8" x-data="bulkEditor()">
-        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-6">
+        <div class="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
 
             @if (session('status') === 'update-success')
                 <div class="p-3 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-800 text-sm">更新しました。</div>
@@ -311,7 +311,7 @@
                                             <span x-show="!editMode" class="font-mono font-bold text-blue-900">{{ $detail->item_code }}</span>
                                             <input x-show="editMode" x-cloak type="text" name="updates[{{ $detail->id }}][item_code]"
                                                    value="{{ $detail->item_code }}" data-original="{{ $detail->item_code }}" data-label="注番"
-                                                   class="w-full font-mono text-xs border rounded px-1.5 py-1 border-slate-300">
+                                                   class="w-full min-w-[140px] font-mono text-xs border rounded px-1.5 py-1 border-slate-300">
                                         </td>
                                         <td class="p-2.5">
                                             <span x-show="!editMode">{{ $detail->machine_no }}</span>
@@ -323,7 +323,7 @@
                                             <span x-show="!editMode">{{ $detail->product_name }}</span>
                                             <input x-show="editMode" x-cloak type="text" name="updates[{{ $detail->id }}][product_name]"
                                                    value="{{ $detail->product_name }}" data-original="{{ $detail->product_name }}" data-label="製品名"
-                                                   class="w-full text-xs border rounded px-1.5 py-1 border-slate-300">
+                                                   class="w-full min-w-[160px] text-xs border rounded px-1.5 py-1 border-slate-300">
                                         </td>
                                         <td class="p-2.5">
                                             <span x-show="!editMode">
@@ -333,7 +333,7 @@
                                             </span>
                                             <select x-show="editMode" x-cloak name="updates[{{ $detail->id }}][category_id]"
                                                     data-original="{{ $detail->category_id }}" data-label="分類"
-                                                    class="w-full text-xs border rounded px-1 py-1 border-slate-300">
+                                                    class="w-full min-w-[220px] text-xs border rounded px-1 py-1 border-slate-300">
                                                 <option value="">(未設定)</option>
                                                 @foreach ($categories as $category)
                                                     <option value="{{ $category->id }}" @selected($detail->category_id === $category->id)>
@@ -342,12 +342,12 @@
                                                 @endforeach
                                             </select>
                                         </td>
-                                        @foreach ([['manufacturer', ''], ['item_name', 'font-semibold'], ['dimensions', '']] as [$field, $cls])
+                                        @foreach ([['manufacturer', '', ''], ['item_name', 'font-semibold', 'min-w-[160px]'], ['dimensions', '', 'min-w-[160px]']] as [$field, $cls, $minWidth])
                                             <td class="p-2.5">
                                                 <span x-show="!editMode" class="{{ $cls }}">{{ $detail->{$field} }}</span>
                                                 <input x-show="editMode" x-cloak type="text" name="updates[{{ $detail->id }}][{{ $field }}]"
                                                        value="{{ $detail->{$field} }}" data-original="{{ $detail->{$field} }}" data-label="{{ collect($editableTextFields)->firstWhere('0', $field)[1] }}"
-                                                       class="w-full text-xs border rounded px-1.5 py-1 border-slate-300">
+                                                       class="w-full {{ $minWidth }} text-xs border rounded px-1.5 py-1 border-slate-300">
                                             </td>
                                         @endforeach
                                         <td class="p-2.5 text-right">
@@ -366,7 +366,7 @@
                                             <span x-show="!editMode" class="font-semibold">{{ $detail->order_qty }}</span>
                                             <input x-show="editMode" x-cloak type="number" step="0.01" name="updates[{{ $detail->id }}][order_qty]"
                                                    value="{{ $detail->order_qty }}" data-original="{{ $detail->order_qty }}" data-label="数量"
-                                                   class="w-full text-xs text-right border rounded px-1.5 py-1 border-slate-300">
+                                                   class="w-full min-w-[90px] text-xs text-right border rounded px-1.5 py-1 border-slate-300">
                                         </td>
                                         <td class="p-2.5">
                                             <span x-show="!editMode">{{ $detail->unit }}</span>
@@ -378,7 +378,7 @@
                                             <span x-show="!editMode" class="text-red-700 font-bold">¥{{ number_format((float) $detail->unit_price) }}</span>
                                             <input x-show="editMode" x-cloak type="number" step="0.01" name="updates[{{ $detail->id }}][unit_price]"
                                                    value="{{ $detail->unit_price }}" data-original="{{ $detail->unit_price }}" data-label="単価"
-                                                   class="w-full text-xs text-right border rounded px-1.5 py-1 border-slate-300">
+                                                   class="w-full min-w-[110px] text-xs text-right border rounded px-1.5 py-1 border-slate-300">
                                         </td>
                                         <td class="p-2.5 text-right">¥{{ number_format($detail->requiredAmount()) }}</td>
                                         <td class="p-2.5 text-right">
