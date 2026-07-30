@@ -494,6 +494,166 @@ class PurchasingModuleTest extends TestCase
         ])->assertForbidden();
     }
 
+    public function test_labor_bulk_paste_shows_a_confirmation_screen_without_saving_when_not_yet_confirmed(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        $worker = Staff::factory()->create(['sid' => 35, 'is_labor_target' => true, 'position_weight' => 1]);
+        CategoryCode::create(['code' => 63, 'major_category' => '社内人工']);
+
+        $pasteData = "2026/6/17\t35\tHI016-N03\t\t63\t1\t30\t\tTRUE";
+
+        $response = $this->actingAs($manager)->post(route('purchasing.input.labor-bulk-paste'), [
+            'labor_paste_data' => $pasteData,
+        ]);
+
+        $response->assertOk();
+        $response->assertSee('社内人工一括登録の確認');
+        $response->assertSee($worker->name);
+        $response->assertSee('登録する');
+        $this->assertSame(0, LaborCost::count());
+    }
+
+    public function test_labor_bulk_paste_saves_only_after_confirmation_and_resolves_staff_by_sid(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        $worker = Staff::factory()->create(['sid' => 35, 'is_labor_target' => true, 'position_weight' => 1]);
+        $category = CategoryCode::create(['code' => 63, 'major_category' => '社内人工']);
+
+        $pasteData = "2026/6/17\t35\tHI016-N03\t\t63\t1\t30\t\tTRUE";
+
+        $response = $this->actingAs($manager)->post(route('purchasing.input.labor-bulk-paste'), [
+            'labor_paste_data' => $pasteData,
+            'confirmed' => '1',
+        ]);
+
+        $response->assertSessionDoesntHaveErrors();
+        $response->assertRedirect(route('purchasing.input'));
+        $this->assertSame(1, LaborCost::count());
+
+        $laborCost = LaborCost::firstOrFail();
+        $this->assertSame($worker->id, $laborCost->staff_id);
+        $this->assertSame('2026-06-17', $laborCost->work_date->toDateString());
+        $this->assertSame('HI016-N03', $laborCost->order_no);
+        $this->assertSame($category->id, $laborCost->category_id);
+        $this->assertSame(1, $laborCost->work_hours);
+        $this->assertSame(30, $laborCost->work_minutes);
+        $this->assertTrue($laborCost->is_overtime);
+        $this->assertFalse($laborCost->is_provisional);
+    }
+
+    public function test_labor_bulk_paste_registers_multiple_rows_and_treats_blank_overtime_as_false(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        Staff::factory()->create(['sid' => 35, 'is_labor_target' => true, 'position_weight' => 1]);
+        Staff::factory()->create(['sid' => 36, 'is_labor_target' => true, 'position_weight' => 1]);
+        CategoryCode::create(['code' => 63, 'major_category' => '社内人工']);
+        CategoryCode::create(['code' => 59, 'major_category' => '社内人工']);
+
+        $pasteData = "2026/6/17\t35\tHI016-N03\t\t63\t1\t30\t\tTRUE\n"
+            ."2026/6/17\t36\tJSS004-N06\t\t59\t5\t40\t\t";
+
+        $response = $this->actingAs($manager)->post(route('purchasing.input.labor-bulk-paste'), [
+            'labor_paste_data' => $pasteData,
+            'confirmed' => '1',
+        ]);
+
+        $response->assertSessionDoesntHaveErrors();
+        $this->assertSame(2, LaborCost::count());
+
+        $second = LaborCost::where('order_no', 'JSS004-N06')->firstOrFail();
+        $this->assertFalse($second->is_overtime);
+        $this->assertSame(5, $second->work_hours);
+        $this->assertSame(40, $second->work_minutes);
+    }
+
+    public function test_labor_bulk_paste_skips_a_pasted_header_row(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        Staff::factory()->create(['sid' => 40, 'is_labor_target' => true]);
+        CategoryCode::create(['code' => 71, 'major_category' => '社内人工']);
+
+        $pasteData = "年月日\tＳＩＤ\t注番\t機械装置Ｎｏ\t分類コード\t時間\t分\t補足\t時間外\n"
+            ."2026/4/22\t40\tZATSU\t\t71\t7\t0\t棚卸し\t";
+
+        $response = $this->actingAs($manager)->post(route('purchasing.input.labor-bulk-paste'), [
+            'labor_paste_data' => $pasteData,
+            'confirmed' => '1',
+        ]);
+
+        $response->assertSessionDoesntHaveErrors();
+        $this->assertSame(1, LaborCost::count());
+        $this->assertSame('棚卸し', LaborCost::firstOrFail()->note);
+    }
+
+    public function test_labor_bulk_paste_reports_row_level_errors_in_japanese_and_saves_nothing(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        CategoryCode::create(['code' => 63, 'major_category' => '社内人工']);
+
+        $pasteData = "変な日付\t999\tHI016-N03\t\t99\tabc\txyz\t\t";
+
+        $response = $this->actingAs($manager)->post(route('purchasing.input.labor-bulk-paste'), [
+            'labor_paste_data' => $pasteData,
+        ]);
+
+        $response->assertSessionHasErrors('labor_paste_data');
+        $errors = session('errors')->getBag('default')->get('labor_paste_data');
+        $this->assertTrue(collect($errors)->contains(fn ($e) => str_contains($e, '1行目') && str_contains($e, '年月日を解釈できません')));
+        $this->assertTrue(collect($errors)->contains(fn ($e) => str_contains($e, '1行目') && str_contains($e, 'SID')));
+        $this->assertTrue(collect($errors)->contains(fn ($e) => str_contains($e, '1行目') && str_contains($e, '分類コード')));
+        $this->assertTrue(collect($errors)->contains(fn ($e) => str_contains($e, '1行目') && str_contains($e, '時間を数値')));
+        $this->assertTrue(collect($errors)->contains(fn ($e) => str_contains($e, '1行目') && str_contains($e, '分を数値')));
+        $this->assertSame(0, LaborCost::count());
+    }
+
+    public function test_labor_bulk_paste_rejects_blank_hours_or_minutes(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        Staff::factory()->create(['sid' => 35, 'is_labor_target' => true]);
+        CategoryCode::create(['code' => 63, 'major_category' => '社内人工']);
+
+        $pasteData = "2026/6/17\t35\tHI016-N03\t\t63\t\t\t\t";
+
+        $response = $this->actingAs($manager)->post(route('purchasing.input.labor-bulk-paste'), [
+            'labor_paste_data' => $pasteData,
+        ]);
+
+        $response->assertSessionHasErrors('labor_paste_data');
+        $errors = session('errors')->getBag('default')->get('labor_paste_data');
+        $this->assertTrue(collect($errors)->contains(fn ($e) => str_contains($e, '1行目') && str_contains($e, '時間を入力してください')));
+        $this->assertTrue(collect($errors)->contains(fn ($e) => str_contains($e, '1行目') && str_contains($e, '分を入力してください')));
+        $this->assertSame(0, LaborCost::count());
+    }
+
+    public function test_labor_bulk_paste_rejects_more_than_the_maximum_rows(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        Staff::factory()->create(['sid' => 1, 'is_labor_target' => true]);
+        CategoryCode::create(['code' => 63, 'major_category' => '社内人工']);
+
+        $pasteData = collect(range(1, 201))
+            ->map(fn ($i) => "2026/6/17\t1\tHI016-N{$i}\t\t63\t1\t0\t\t")
+            ->implode("\n");
+
+        $response = $this->actingAs($manager)->post(route('purchasing.input.labor-bulk-paste'), [
+            'labor_paste_data' => $pasteData,
+        ]);
+
+        $response->assertSessionHasErrors('labor_paste_data');
+        $errors = session('errors')->getBag('default');
+        $this->assertStringContainsString('200行までです', $errors->first('labor_paste_data'));
+        $this->assertSame(0, LaborCost::count());
+    }
+
+    public function test_labor_bulk_paste_requires_procurement_manager(): void
+    {
+        $staff = Staff::factory()->create();
+
+        $this->actingAs($staff)->post(route('purchasing.input.labor-bulk-paste'), [
+            'labor_paste_data' => "2026/6/17\t35\tHI016-N03\t\t63\t1\t30\t\t",
+        ])->assertForbidden();
+    }
+
     public function test_order_search_excludes_provisional_rows(): void
     {
         $manager = Staff::factory()->procurementManager()->create();

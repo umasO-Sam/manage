@@ -8,6 +8,7 @@ use App\Models\PurchaseDetail;
 use App\Models\Staff;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
@@ -17,6 +18,7 @@ class PurchaseInputController extends Controller
      * @var int コピー&ペースト一括登録で一度に受け付ける最大行数。
      */
     private const BULK_PASTE_MAX_ROWS = 200;
+
     public function create(): View
     {
         return view('purchasing.input', [
@@ -139,11 +141,7 @@ class PurchaseInputController extends Controller
             ]);
         }
 
-        $categories = CategoryCode::all();
-        $categoryIdsByCode = $categories->pluck('id', 'code');
-        $categoryLabelsById = $categories->mapWithKeys(
-            fn ($c) => [$c->id => $c->code.':'.$c->major_category.($c->sub_category ? '／'.$c->sub_category : '')]
-        );
+        [$categoryIdsByCode, $categoryLabelsById] = $this->categoryLookupMaps();
         $itemCode = $request->string('item_code')->value();
         $orderDate = $request->input('order_date');
 
@@ -216,6 +214,149 @@ class PurchaseInputController extends Controller
             ->with('status', 'bulk-paste-created')
             ->with('bulk_paste_count', count($rows))
             ->with('bulk_paste_item_code', $itemCode);
+    }
+
+    /**
+     * エクセルの日報(タブ区切り)をコピー&ペーストして社内人工データを一括登録する。
+     * 列順は固定: 年月日, SID, 注番, 機械装置No, 分類コード, 時間, 分, 補足, 時間外。
+     * 年月日は「2026/7/30」のように年を含む形式で入力する。SIDは担当者管理で割り当てた番号
+     * (staff.sid)で担当者を特定する。
+     *
+     * confirmedが未送信の場合は登録を実行せず、内容確認画面を表示する(storeBulkPasteと同様)。
+     */
+    public function storeLaborBulkPaste(Request $request): RedirectResponse|View
+    {
+        $request->validate([
+            'labor_paste_data' => ['required', 'string'],
+        ]);
+
+        $lines = preg_split('/\r\n|\r|\n/', trim($request->string('labor_paste_data')->value()));
+        $lines = array_values(array_filter($lines, fn ($line) => trim($line) !== ''));
+
+        // エクセルから見出し行ごと選択・コピーされるケースを考慮し、1列目が「年月日」の行は見出しとして読み飛ばす。
+        if (isset($lines[0]) && trim(explode("\t", $lines[0])[0]) === '年月日') {
+            array_shift($lines);
+        }
+
+        if (count($lines) === 0) {
+            return back()->withInput()->withErrors(['labor_paste_data' => '貼り付けるデータがありません。']);
+        }
+
+        if (count($lines) > self::BULK_PASTE_MAX_ROWS) {
+            return back()->withInput()->withErrors([
+                'labor_paste_data' => '一度に貼り付けできるのは'.self::BULK_PASTE_MAX_ROWS.'行までです。('.count($lines).'行貼り付けられています)',
+            ]);
+        }
+
+        [$categoryIdsByCode, $categoryLabelsById] = $this->categoryLookupMaps();
+        $staffBySid = Staff::whereNotNull('sid')->get()->keyBy('sid');
+
+        $rows = [];
+        $errors = [];
+
+        foreach ($lines as $index => $line) {
+            $rowNumber = $index + 1;
+            $columns = array_pad(explode("\t", $line), 9, '');
+            [$dateText, $sidText, $orderNo, $machineNo, $categoryCodeText, $hoursText, $minutesText, $note, $overtimeText]
+                = array_map(fn ($value) => trim($value), array_slice($columns, 0, 9));
+
+            $workDate = $dateText !== '' ? $this->parseLaborDate($dateText) : null;
+            if ($dateText === '') {
+                $errors[] = "{$rowNumber}行目: 年月日を入力してください。";
+            } elseif ($workDate === null) {
+                $errors[] = "{$rowNumber}行目: 年月日を解釈できません(「{$dateText}」)。";
+            }
+
+            $normalizedSid = $this->normalizeNumber($sidText);
+            $staff = ($normalizedSid !== '' && is_numeric($normalizedSid)) ? $staffBySid->get((int) $normalizedSid) : null;
+            if ($sidText === '') {
+                $errors[] = "{$rowNumber}行目: SIDを入力してください。";
+            } elseif ($staff === null) {
+                $errors[] = "{$rowNumber}行目: SID「{$sidText}」に該当する担当者が見つかりません。";
+            }
+
+            $normalizedCategoryCode = $this->normalizeNumber($categoryCodeText);
+            $categoryId = $categoryIdsByCode->get($normalizedCategoryCode);
+            if ($categoryCodeText === '' || $categoryId === null) {
+                $errors[] = "{$rowNumber}行目: 分類コード「{$categoryCodeText}」が見つかりません。";
+            }
+
+            $normalizedHours = $this->normalizeNumber($hoursText);
+            if ($normalizedHours === '') {
+                $errors[] = "{$rowNumber}行目: 時間を入力してください。";
+            } elseif (! is_numeric($normalizedHours)) {
+                $errors[] = "{$rowNumber}行目: 時間を数値で入力してください。";
+            }
+            $normalizedMinutes = $this->normalizeNumber($minutesText);
+            if ($normalizedMinutes === '') {
+                $errors[] = "{$rowNumber}行目: 分を入力してください。";
+            } elseif (! is_numeric($normalizedMinutes)) {
+                $errors[] = "{$rowNumber}行目: 分を数値で入力してください。";
+            }
+
+            $rows[] = [
+                'work_date' => $workDate,
+                'staff_id' => $staff?->id,
+                'staff_name' => $staff?->name,
+                'sid_display' => $sidText,
+                'order_no' => $orderNo !== '' ? $orderNo : null,
+                'machine_no' => $machineNo !== '' ? $machineNo : null,
+                'category_id' => $categoryId,
+                'category_display' => $categoryLabelsById[$categoryId] ?? '',
+                'work_hours' => is_numeric($normalizedHours) ? (int) $normalizedHours : 0,
+                'work_minutes' => is_numeric($normalizedMinutes) ? (int) $normalizedMinutes : 0,
+                'is_overtime' => in_array(strtoupper($overtimeText), ['TRUE', '1'], true),
+                'position_weight_cache' => $staff?->position_weight,
+                'note' => $note !== '' ? $note : null,
+                'is_provisional' => false,
+            ];
+        }
+
+        if (count($errors) > 0) {
+            return back()->withInput()->withErrors(['labor_paste_data' => $errors]);
+        }
+
+        if (! $request->boolean('confirmed')) {
+            return view('purchasing.labor-bulk-paste-confirm', [
+                'rows' => $rows,
+                'pasteData' => $request->input('labor_paste_data'),
+            ]);
+        }
+
+        DB::transaction(function () use ($rows) {
+            foreach ($rows as $row) {
+                LaborCost::create($row);
+            }
+        });
+
+        return redirect()->route('purchasing.input')
+            ->with('status', 'labor-bulk-paste-created')
+            ->with('bulk_paste_count', count($rows));
+    }
+
+    /**
+     * @return array{0: Collection<int|string, int>, 1: Collection<int, string>}
+     */
+    private function categoryLookupMaps(): array
+    {
+        $categories = CategoryCode::all();
+        $categoryIdsByCode = $categories->pluck('id', 'code');
+        $categoryLabelsById = $categories->mapWithKeys(
+            fn ($c) => [$c->id => $c->code.':'.$c->major_category.($c->sub_category ? '／'.$c->sub_category : '')]
+        );
+
+        return [$categoryIdsByCode, $categoryLabelsById];
+    }
+
+    /**
+     * 「2026/7/30」のような年を含む日付表示をYYYY-MM-DDへ変換する。解釈できなければnullを返す。
+     */
+    private function parseLaborDate(string $text): ?string
+    {
+        $normalized = str_replace('／', '/', $this->normalizeNumber($text));
+        $timestamp = strtotime($normalized);
+
+        return $timestamp === false ? null : date('Y-m-d', $timestamp);
     }
 
     /**

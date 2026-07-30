@@ -7,7 +7,7 @@
     </x-slot>
 
     <div class="py-8" x-data="{ formType: '{{ old('form_type', 'purchase') }}', isProvisional: false }">
-        <div class="mx-auto sm:px-6 lg:px-8 space-y-6" x-bind:class="formType === 'bulk' ? 'max-w-6xl' : 'max-w-4xl'">
+        <div class="mx-auto sm:px-6 lg:px-8 space-y-6" x-bind:class="(formType === 'bulk' || formType === 'labor_bulk') ? 'max-w-6xl' : 'max-w-4xl'">
 
             @if (session('status') === 'input-created')
                 <div class="p-3 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-800 text-sm">登録しました。</div>
@@ -17,6 +17,9 @@
             @endif
             @if (session('status') === 'bulk-paste-created')
                 <div class="p-3 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-800 text-sm">{{ session('bulk_paste_count') }}件を一括登録しました。</div>
+            @endif
+            @if (session('status') === 'labor-bulk-paste-created')
+                <div class="p-3 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-800 text-sm">{{ session('bulk_paste_count') }}件の社内人工データを一括登録しました。</div>
             @endif
             @if ($errors->any())
                 <div class="p-3 rounded-xl bg-red-50 border border-red-100 text-red-800 text-sm">
@@ -51,11 +54,15 @@
                 </label>
                 <label class="flex items-center gap-2 cursor-pointer font-semibold text-sm">
                     <input type="radio" x-model="formType" value="bulk" class="text-indigo-600 focus:ring-indigo-500">
-                    エクセル一括登録
+                    エクセル一括登録(仕入)
+                </label>
+                <label class="flex items-center gap-2 cursor-pointer font-semibold text-sm">
+                    <input type="radio" x-model="formType" value="labor_bulk" class="text-green-600 focus:ring-green-500">
+                    エクセル一括登録(人工)
                 </label>
             </div>
 
-            <form x-show="formType !== 'bulk'" x-cloak method="POST" action="{{ route('purchasing.input.store') }}" class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-5">
+            <form x-show="formType === 'purchase' || formType === 'labor'" x-cloak method="POST" action="{{ route('purchasing.input.store') }}" class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-5">
                 @csrf
                 <input type="hidden" name="form_type" x-bind:value="formType">
                 <input type="hidden" name="is_provisional" x-bind:value="isProvisional ? 1 : 0">
@@ -238,8 +245,7 @@
 
             <form x-show="formType === 'bulk'" x-cloak method="POST" action="{{ route('purchasing.input.bulk-paste') }}"
                   @keydown.enter.prevent
-                  class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-5"
-                  x-data="bulkPasteGrid({{ \Illuminate\Support\Js::from((string) old('paste_data', '')) }})">
+                  class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-5">
                 @csrf
                 <input type="hidden" name="form_type" value="bulk">
                 <p class="text-xs text-slate-500">
@@ -266,35 +272,29 @@
                     </button>
                 </div>
 
-                <div>
-                    <x-input-label value="貼り付け欄 *" />
-                    <div class="mt-1 overflow-x-auto border rounded-lg {{ $errors->has('paste_data') ? 'border-red-300' : 'border-slate-300' }}">
-                        <table class="min-w-full text-xs border-collapse">
-                            <thead>
-                                <tr class="bg-slate-100">
-                                    <th class="w-8 border-b border-r border-slate-200 px-1 py-1.5 text-slate-400 font-normal">#</th>
-                                    <template x-for="col in columns" :key="col">
-                                        <th class="border-b border-r border-slate-200 last:border-r-0 px-2 py-1.5 font-bold text-slate-600 whitespace-nowrap text-left" x-text="col"></th>
-                                    </template>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <template x-for="(row, r) in rows" :key="r">
-                                    <tr>
-                                        <td class="border-b border-r border-slate-200 text-center text-slate-400 bg-slate-50" x-text="r + 1"></td>
-                                        <template x-for="(cell, c) in row" :key="c">
-                                            <td class="border-b border-r border-slate-200 last:border-r-0 p-0">
-                                                <input type="text" x-model="rows[r][c]" @paste="handlePaste($event, r, c)"
-                                                       class="w-full min-w-[7rem] px-2 py-1 text-xs border-0 focus:ring-1 focus:ring-inset focus:ring-indigo-400 focus:outline-none">
-                                            </td>
-                                        </template>
-                                    </tr>
-                                </template>
-                            </tbody>
-                        </table>
-                    </div>
-                    <textarea name="paste_data" x-bind:value="serialized()" class="hidden"></textarea>
+                <x-bulk-paste-grid field="paste_data" :columns="['品名', '機械装置No', '分類', '型式', '数量', '単価', '商社名', 'メーカー']" :max-rows="$bulkPasteMaxRows" />
+            </form>
+
+            <form x-show="formType === 'labor_bulk'" x-cloak method="POST" action="{{ route('purchasing.input.labor-bulk-paste') }}"
+                  @keydown.enter.prevent
+                  class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-5">
+                @csrf
+                <input type="hidden" name="form_type" value="labor_bulk">
+                <p class="text-xs text-slate-500">
+                    エクセルの日報の表(見出し行を含めてもかまいません)を下の表にコピー&amp;ペーストすると、貼り付けた位置からセル単位に配置されます。
+                    最大{{ $bulkPasteMaxRows }}行までまとめて登録できます。<br>
+                    列の順番は固定です: 年月日・SID・注番・機械装置No・分類コード・時間・分・補足・時間外<br>
+                    年月日は「2026/7/30」のように年を含む形式で入力してください。時間・分は空欄不可です(作業なしの場合は0を入力)。<br>
+                    SIDは担当者管理で割り当てた番号です。時間外は「TRUE」で時間外扱いになります(空欄・それ以外は通常扱い)。
+                </p>
+
+                <div class="flex justify-end">
+                    <button type="submit" class="inline-flex items-center px-6 py-2 bg-green-600 hover:bg-green-700 border border-transparent rounded-xl font-semibold text-sm text-white shadow-sm transition-all">
+                        確認する
+                    </button>
                 </div>
+
+                <x-bulk-paste-grid field="labor_paste_data" :columns="['年月日', 'SID', '注番', '機械装置No', '分類コード', '時間', '分', '補足', '時間外']" :max-rows="$bulkPasteMaxRows" color="green" />
             </form>
         </div>
     </div>

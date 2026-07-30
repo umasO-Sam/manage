@@ -11,17 +11,16 @@ window.Alpine = Alpine;
 window.refreshIcons = () => createIcons({ icons });
 
 /**
- * 仕入管理データ入力「エクセル一括登録」の貼り付け欄。
+ * 一括登録画面の貼り付け欄(仕入管理データ入力・社内人工日報入力で共用)。
  * エクセルからのコピー&ペーストをセル単位のテーブルとして受け取り、
- * 送信時にタブ区切りテキスト(隠しtextarea `paste_data`)へ直列化してサーバーへ渡す。
+ * 送信時にタブ区切りテキスト(隠しtextarea)へ直列化してサーバーへ渡す。
  * サーバー側のパース処理(タブ区切り・見出し行スキップ)はそのまま流用するため、
  * ここで作る文字列フォーマットは従来の貼り付けテキストと同一にする。
  */
-Alpine.data('bulkPasteGrid', (initialText) => ({
-    columns: ['品名', '機械装置No', '分類', '型式', '数量', '単価', '商社名', 'メーカー'],
+Alpine.data('bulkPasteGrid', (initialText, columns, maxRows = 200) => ({
+    columns,
     rows: [],
-
-    maxRows: 200,
+    maxRows,
 
     init() {
         this.rows = this.parseText(initialText);
