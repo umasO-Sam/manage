@@ -119,15 +119,15 @@
                     </div>
                     <div>
                         <x-input-label for="order_date" value="注文日付" />
-                        <x-text-input id="order_date" name="order_date" type="date" class="mt-1 block w-full" :value="old('order_date')" />
+                        <x-date-text-input id="order_date" name="order_date" class="mt-1 block w-full" :value="old('order_date')" />
                     </div>
                     <div>
                         <x-input-label for="arrival_date" value="受入日付" />
-                        <x-text-input id="arrival_date" name="arrival_date" type="date" class="mt-1 block w-full" :value="old('arrival_date')" />
+                        <x-date-text-input id="arrival_date" name="arrival_date" class="mt-1 block w-full" :value="old('arrival_date')" />
                     </div>
                     <div>
                         <x-input-label for="invoice_date" value="納品書日付" />
-                        <x-text-input id="invoice_date" name="invoice_date" type="date" class="mt-1 block w-full" :value="old('invoice_date')" />
+                        <x-date-text-input id="invoice_date" name="invoice_date" class="mt-1 block w-full" :value="old('invoice_date')" />
                     </div>
                     <div>
                         <x-input-label for="supplier_invoice_no" value="商社納品書番号" />
@@ -143,7 +143,7 @@
                     </div>
                     <div>
                         <x-input-label for="order_received_date" value="受注日" />
-                        <x-text-input id="order_received_date" name="order_received_date" type="date" class="mt-1 block w-full" :value="old('order_received_date')" />
+                        <x-date-text-input id="order_received_date" name="order_received_date" class="mt-1 block w-full" :value="old('order_received_date')" />
                     </div>
                     <div>
                         <x-input-label for="delivery_dest" value="納入先" />
@@ -155,7 +155,7 @@
                     </div>
                     <div>
                         <x-input-label for="sales_date" value="売上日" />
-                        <x-text-input id="sales_date" name="sales_date" type="date" class="mt-1 block w-full" :value="old('sales_date')" />
+                        <x-date-text-input id="sales_date" name="sales_date" class="mt-1 block w-full" :value="old('sales_date')" />
                         <p class="mt-1 text-[11px] text-slate-400">実際に売り上がったタイミングで登録してください。</p>
                     </div>
                     <div class="md:col-span-2">
@@ -167,7 +167,7 @@
                 <div x-show="formType === 'labor'" x-cloak class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <x-input-label for="work_date" value="作業日 *" />
-                        <x-text-input id="work_date" name="work_date" type="date" class="mt-1 block w-full" :value="old('work_date')" />
+                        <x-date-text-input id="work_date" name="work_date" class="mt-1 block w-full" :value="old('work_date')" />
                     </div>
                     <div>
                         <x-input-label for="staff_id" value="担当者 *" />

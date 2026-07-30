@@ -169,6 +169,54 @@ class PurchasingModuleTest extends TestCase
         ]);
     }
 
+    public function test_purchase_detail_accepts_slash_formatted_dates(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        $category = CategoryCode::create(['code' => 1, 'major_category' => '材料']);
+
+        $response = $this->actingAs($manager)->post(route('purchasing.input.store'), [
+            'form_type' => 'purchase',
+            'is_provisional' => '0',
+            'item_code' => 'AB123-C45',
+            'category_id' => $category->id,
+            'manufacturer' => 'テストメーカー',
+            'item_name' => 'テスト部品',
+            'order_qty' => 1,
+            'unit_price' => 100,
+            'supplier_name' => 'テスト商社',
+            'order_date' => '2027/11/04',
+            'sales_date' => '2027/12/01',
+        ]);
+
+        $response->assertRedirect(route('purchasing.input'));
+        $detail = PurchaseDetail::where('item_code', 'AB123-C45')->firstOrFail();
+        $this->assertSame('2027-11-04', $detail->order_date->toDateString());
+        $this->assertSame('2027-12-01', $detail->sales_date->toDateString());
+    }
+
+    public function test_purchase_detail_rejects_invalid_date_text_with_japanese_message(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        $category = CategoryCode::create(['code' => 1, 'major_category' => '材料']);
+
+        $response = $this->actingAs($manager)->post(route('purchasing.input.store'), [
+            'form_type' => 'purchase',
+            'is_provisional' => '0',
+            'item_code' => 'AB123-C45',
+            'category_id' => $category->id,
+            'manufacturer' => 'テストメーカー',
+            'item_name' => 'テスト部品',
+            'order_qty' => 1,
+            'unit_price' => 100,
+            'supplier_name' => 'テスト商社',
+            'order_date' => 'よろしくない値',
+        ]);
+
+        $response->assertSessionHasErrors(['order_date']);
+        $errors = session('errors')->getBag('default');
+        $this->assertStringContainsString('注文日には有効な日付を指定してください。', $errors->first('order_date'));
+    }
+
     public function test_order_search_excludes_provisional_rows(): void
     {
         $manager = Staff::factory()->procurementManager()->create();
