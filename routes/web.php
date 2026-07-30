@@ -56,6 +56,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/staff', [StaffController::class, 'store'])->name('staff.store');
         Route::get('/staff/{staff}/edit', [StaffController::class, 'edit'])->name('staff.edit');
         Route::put('/staff/{staff}', [StaffController::class, 'update'])->name('staff.update');
+        Route::post('/staff/bulk-update', [StaffController::class, 'bulkUpdate'])->name('staff.bulk-update');
         Route::delete('/staff/{staff}', [StaffController::class, 'destroy'])->name('staff.destroy');
 
         Route::get('/order-numbers', [OrderNumberController::class, 'index'])->name('order-numbers.index');
@@ -69,6 +70,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/purchasing/input', [PurchaseInputController::class, 'create'])->name('purchasing.input');
         Route::post('/purchasing/input', [PurchaseInputController::class, 'store'])->name('purchasing.input.store');
         Route::post('/purchasing/input/bulk-paste', [PurchaseInputController::class, 'storeBulkPaste'])->name('purchasing.input.bulk-paste');
+        Route::post('/purchasing/input/labor-bulk-paste', [PurchaseInputController::class, 'storeLaborBulkPaste'])->name('purchasing.input.labor-bulk-paste');
 
         Route::get('/purchasing/{purchaseDetail}/edit', [PurchaseDetailController::class, 'edit'])->name('purchasing.edit');
         Route::put('/purchasing/{purchaseDetail}', [PurchaseDetailController::class, 'update'])->name('purchasing.update');

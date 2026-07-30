@@ -13,6 +13,12 @@
 </div>
 
 <div>
+    <x-input-label for="sid" value="SID（任意・社内人工日報の一括登録で使用）" />
+    <x-text-input id="sid" name="sid" type="number" class="mt-1 block w-40" :value="old('sid', $staff?->sid)" />
+    <x-input-error class="mt-2" :messages="$errors->get('sid')" />
+</div>
+
+<div>
     <x-input-label for="login_id" value="ログインID" />
     <x-text-input id="login_id" name="login_id" type="text" class="mt-1 block w-full" :value="old('login_id', $staff?->login_id)" required />
     <x-input-error class="mt-2" :messages="$errors->get('login_id')" />

@@ -89,6 +89,219 @@ class StaffManagementTest extends TestCase
         $this->actingAs($general)->get(route('archive.index'))->assertOk();
     }
 
+    public function test_manager_can_set_sid_when_creating_a_staff(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+
+        $response = $this->actingAs($manager)->post(route('staff.store'), [
+            'name' => '新入社員',
+            'department' => '製造部',
+            'sid' => 50,
+            'login_id' => 'new-staff',
+            'email' => 'new-staff@example.com',
+            'role' => Staff::ROLE_GENERAL,
+            'password' => 'Abcdefgh123456789012',
+        ]);
+
+        $response->assertRedirect(route('staff.index'));
+        $this->assertDatabaseHas('staff', ['login_id' => 'new-staff', 'sid' => 50]);
+    }
+
+    public function test_manager_can_update_and_clear_sid(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        $target = Staff::factory()->create(['sid' => 12]);
+
+        $response = $this->actingAs($manager)->put(route('staff.update', $target), [
+            'name' => $target->name,
+            'department' => $target->department,
+            'sid' => 99,
+            'login_id' => $target->login_id,
+            'email' => $target->email,
+            'role' => $target->role,
+        ]);
+
+        $response->assertRedirect(route('staff.index'));
+        $this->assertSame(99, $target->fresh()->sid);
+
+        $response = $this->actingAs($manager)->put(route('staff.update', $target), [
+            'name' => $target->name,
+            'department' => $target->department,
+            'sid' => '',
+            'login_id' => $target->login_id,
+            'email' => $target->email,
+            'role' => $target->role,
+        ]);
+
+        $response->assertRedirect(route('staff.index'));
+        $this->assertNull($target->fresh()->sid);
+    }
+
+    public function test_sid_must_be_unique_across_staff(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        Staff::factory()->create(['sid' => 12]);
+        $target = Staff::factory()->create(['sid' => 13]);
+
+        $response = $this->actingAs($manager)->put(route('staff.update', $target), [
+            'name' => $target->name,
+            'department' => $target->department,
+            'sid' => 12,
+            'login_id' => $target->login_id,
+            'email' => $target->email,
+            'role' => $target->role,
+        ]);
+
+        $response->assertSessionHasErrors('sid');
+        $this->assertSame(13, $target->fresh()->sid);
+    }
+
+    public function test_manager_can_bulk_update_staff_from_table_view(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        $target = Staff::factory()->create(['name' => '旧名前', 'sid' => null]);
+
+        $response = $this->actingAs($manager)->post(route('staff.bulk-update'), [
+            'updates' => [
+                $target->id => [
+                    'name' => '新しい名前',
+                    'department' => '新しい部署',
+                    'sid' => 21,
+                    'login_id' => $target->login_id,
+                    'email' => $target->email,
+                    'role' => Staff::ROLE_SALES,
+                ],
+            ],
+        ]);
+
+        $response->assertRedirect(route('staff.index'));
+        $target->refresh();
+        $this->assertSame('新しい名前', $target->name);
+        $this->assertSame('新しい部署', $target->department);
+        $this->assertSame(21, $target->sid);
+        $this->assertSame(Staff::ROLE_SALES, $target->role);
+    }
+
+    public function test_bulk_update_does_not_touch_password(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        $target = Staff::factory()->create();
+        $originalPassword = $target->password;
+
+        $this->actingAs($manager)->post(route('staff.bulk-update'), [
+            'updates' => [
+                $target->id => [
+                    'name' => $target->name,
+                    'department' => $target->department,
+                    'login_id' => $target->login_id,
+                    'email' => $target->email,
+                    'role' => $target->role,
+                ],
+            ],
+        ]);
+
+        $this->assertSame($originalPassword, $target->fresh()->password);
+    }
+
+    public function test_bulk_update_allows_swapping_manager_role_between_two_rows_in_one_request(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        $promotee = Staff::factory()->create(['role' => Staff::ROLE_GENERAL]);
+
+        $response = $this->actingAs($manager)->post(route('staff.bulk-update'), [
+            'updates' => [
+                $manager->id => [
+                    'name' => $manager->name,
+                    'department' => $manager->department,
+                    'login_id' => $manager->login_id,
+                    'email' => $manager->email,
+                    'role' => Staff::ROLE_GENERAL,
+                ],
+                $promotee->id => [
+                    'name' => $promotee->name,
+                    'department' => $promotee->department,
+                    'login_id' => $promotee->login_id,
+                    'email' => $promotee->email,
+                    'role' => Staff::ROLE_PROCUREMENT_MANAGER,
+                ],
+            ],
+        ]);
+
+        $response->assertSessionDoesntHaveErrors();
+        $this->assertFalse($manager->fresh()->is_procurement_manager);
+        $this->assertTrue($promotee->fresh()->is_procurement_manager);
+    }
+
+    public function test_bulk_update_rejects_when_no_manager_would_remain_and_saves_nothing(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        $other = Staff::factory()->create(['name' => '変更前']);
+
+        $response = $this->actingAs($manager)->post(route('staff.bulk-update'), [
+            'updates' => [
+                $manager->id => [
+                    'name' => $manager->name,
+                    'department' => $manager->department,
+                    'login_id' => $manager->login_id,
+                    'email' => $manager->email,
+                    'role' => Staff::ROLE_GENERAL,
+                ],
+                $other->id => [
+                    'name' => '変更後',
+                    'department' => $other->department,
+                    'login_id' => $other->login_id,
+                    'email' => $other->email,
+                    'role' => Staff::ROLE_GENERAL,
+                ],
+            ],
+        ]);
+
+        $response->assertSessionHasErrors('bulk_update');
+        $this->assertTrue($manager->fresh()->is_procurement_manager);
+        $this->assertSame('変更前', $other->fresh()->name);
+    }
+
+    public function test_bulk_update_rejects_duplicate_login_id_and_saves_nothing(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        $existing = Staff::factory()->create(['login_id' => 'taken-id']);
+        $target = Staff::factory()->create(['name' => '変更前']);
+
+        $response = $this->actingAs($manager)->post(route('staff.bulk-update'), [
+            'updates' => [
+                $target->id => [
+                    'name' => '変更後',
+                    'department' => $target->department,
+                    'login_id' => 'taken-id',
+                    'email' => $target->email,
+                    'role' => $target->role,
+                ],
+            ],
+        ]);
+
+        $response->assertSessionHasErrors('bulk_update');
+        $this->assertSame('変更前', $target->fresh()->name);
+        $this->assertSame('taken-id', $existing->fresh()->login_id);
+    }
+
+    public function test_bulk_update_requires_procurement_manager(): void
+    {
+        $staff = Staff::factory()->create();
+        $target = Staff::factory()->create();
+
+        $this->actingAs($staff)->post(route('staff.bulk-update'), [
+            'updates' => [
+                $target->id => [
+                    'name' => '変更後',
+                    'department' => $target->department,
+                    'login_id' => $target->login_id,
+                    'email' => $target->email,
+                    'role' => $target->role,
+                ],
+            ],
+        ])->assertForbidden();
+    }
+
     public function test_manager_can_delete_a_staff_with_no_history(): void
     {
         $manager = Staff::factory()->procurementManager()->create();
