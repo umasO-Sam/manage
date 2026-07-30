@@ -146,12 +146,15 @@ class PurchaseInputController extends Controller
             [$itemName, $machineNo, $categoryCode, $dimensions, $orderQty, $unitPrice, $supplierName, $manufacturer]
                 = array_map(fn ($value) => trim($value), array_slice($columns, 0, 8));
 
-            $categoryId = $categoryIdsByCode->get($this->normalizeNumber($categoryCode));
+            $normalizedCategoryCode = $this->normalizeNumber($categoryCode);
+            // 分類欄が「1」の行は「分類未定」の目印として扱い、分類は空欄・仮登録扱いで保存する。
+            $isUnclassified = $normalizedCategoryCode === '1';
+            $categoryId = $isUnclassified ? null : $categoryIdsByCode->get($normalizedCategoryCode);
 
             if ($itemName === '') {
                 $errors[] = "{$rowNumber}行目: 品名を入力してください。";
             }
-            if ($categoryCode === '' || $categoryId === null) {
+            if (! $isUnclassified && ($categoryCode === '' || $categoryId === null)) {
                 $errors[] = "{$rowNumber}行目: 分類コード「{$categoryCode}」が見つかりません。";
             }
             if ($orderQty === '' || ! is_numeric($this->normalizeNumber($orderQty))) {
@@ -175,7 +178,7 @@ class PurchaseInputController extends Controller
                 'unit_price' => is_numeric($this->normalizeNumber($unitPrice)) ? $this->normalizeNumber($unitPrice) : null,
                 'supplier_name' => $supplierName !== '' ? $supplierName : null,
                 'order_date' => $orderDate,
-                'is_provisional' => false,
+                'is_provisional' => $isUnclassified,
             ];
         }
 

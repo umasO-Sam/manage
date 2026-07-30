@@ -245,10 +245,10 @@ class PurchasingModuleTest extends TestCase
     public function test_bulk_paste_registers_multiple_rows_with_shared_item_code_and_date(): void
     {
         $manager = Staff::factory()->procurementManager()->create();
-        $category = CategoryCode::create(['code' => 1, 'major_category' => '機械', 'sub_category' => 'バルブ']);
+        $category = CategoryCode::create(['code' => 3, 'major_category' => '機械', 'sub_category' => 'バルブ']);
 
-        $pasteData = "バタフライ弁（キッツ）\t1\t1\tG-10BJUE-50A\t1\t1500\t㈱モノタロウ\tキッツ\n"
-            ."安全弁\t2\t1\tSV-20\t3\t2000\t大津屋\t";
+        $pasteData = "バタフライ弁（キッツ）\t1\t3\tG-10BJUE-50A\t1\t1500\t㈱モノタロウ\tキッツ\n"
+            ."安全弁\t2\t3\tSV-20\t3\t2000\t大津屋\t";
 
         $response = $this->actingAs($manager)->post(route('purchasing.input.bulk-paste'), [
             'item_code' => 'AB123-C45',
@@ -269,9 +269,29 @@ class PurchasingModuleTest extends TestCase
         $this->assertSame('㈱モノタロウ', $first->supplier_name);
         $this->assertSame('キッツ', $first->manufacturer);
         $this->assertSame('2026-07-30', $first->order_date->toDateString());
+        $this->assertFalse($first->is_provisional);
 
         $second = PurchaseDetail::where('item_name', '安全弁')->firstOrFail();
         $this->assertNull($second->manufacturer);
+    }
+
+    public function test_bulk_paste_treats_category_1_as_unclassified_and_marks_provisional(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        // 分類コード1が実在していても「1」は分類未定の目印として優先される。
+        CategoryCode::create(['code' => 1, 'major_category' => '本来の分類1']);
+
+        $pasteData = 'バタフライ弁（キッツ）'."\t1\t1\tG-10BJUE-50A\t1\t1500\t㈱モノタロウ\tキッツ";
+
+        $response = $this->actingAs($manager)->post(route('purchasing.input.bulk-paste'), [
+            'item_code' => 'AB123-C45',
+            'paste_data' => $pasteData,
+        ]);
+
+        $response->assertSessionDoesntHaveErrors();
+        $detail = PurchaseDetail::where('item_code', 'AB123-C45')->firstOrFail();
+        $this->assertNull($detail->category_id);
+        $this->assertTrue($detail->is_provisional);
     }
 
     public function test_bulk_paste_skips_a_pasted_header_row(): void
