@@ -194,7 +194,8 @@ class PurchaseInputController extends Controller
 
         return redirect()->route('purchasing.input')
             ->with('status', 'bulk-paste-created')
-            ->with('bulk_paste_count', count($rows));
+            ->with('bulk_paste_count', count($rows))
+            ->with('bulk_paste_item_code', $itemCode);
     }
 
     /**

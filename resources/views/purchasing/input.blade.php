@@ -27,11 +27,16 @@
             @endif
 
             @if ($provisionalCount > 0)
+                @php
+                    $provisionalSearchUrl = session('status') === 'bulk-paste-created' && session('bulk_paste_item_code')
+                        ? route('purchasing.index', ['item_code' => session('bulk_paste_item_code'), 'item_code_match' => 'perfect'])
+                        : route('purchasing.index');
+                @endphp
                 <div class="p-4 rounded-xl border-l-4 border-yellow-500 bg-yellow-50 flex items-center justify-between">
                     <div class="text-sm text-yellow-800">
                         未確定の仮登録データが <span class="font-bold text-red-600">{{ $provisionalCount }}</span> 件あります。
                     </div>
-                    <a href="{{ route('purchasing.index') }}" class="text-xs bg-yellow-100 hover:bg-yellow-200 text-yellow-800 font-bold py-1.5 px-3 rounded-lg border border-yellow-300">検索画面で確認</a>
+                    <a href="{{ $provisionalSearchUrl }}" class="text-xs bg-yellow-100 hover:bg-yellow-200 text-yellow-800 font-bold py-1.5 px-3 rounded-lg border border-yellow-300">検索画面で確認</a>
                 </div>
             @endif
 

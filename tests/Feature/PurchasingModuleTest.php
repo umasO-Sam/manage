@@ -294,6 +294,36 @@ class PurchasingModuleTest extends TestCase
         $this->assertTrue($detail->is_provisional);
     }
 
+    public function test_provisional_banner_links_to_search_filtered_by_the_just_bulk_pasted_item_code(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        CategoryCode::create(['code' => 1, 'major_category' => '本来の分類1']);
+
+        $pasteData = 'バタフライ弁（キッツ）'."\t1\t1\tG-10BJUE-50A\t1\t1500\t㈱モノタロウ\tキッツ";
+        $this->actingAs($manager)->post(route('purchasing.input.bulk-paste'), [
+            'item_code' => 'AB123-C45',
+            'paste_data' => $pasteData,
+        ]);
+
+        $expectedUrl = route('purchasing.index', ['item_code' => 'AB123-C45', 'item_code_match' => 'perfect']);
+        $this->actingAs($manager)->get(route('purchasing.input'))
+            ->assertSee(e($expectedUrl), false);
+    }
+
+    public function test_provisional_banner_links_to_plain_search_when_not_from_a_bulk_paste(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        PurchaseDetail::create([
+            'item_code' => 'AB123-C45', 'item_name' => 'テスト部品', 'order_qty' => 1, 'unit_price' => 100,
+            'is_provisional' => true,
+        ]);
+
+        $response = $this->actingAs($manager)->get(route('purchasing.input'));
+
+        $response->assertSee(e(route('purchasing.index')), false);
+        $response->assertDontSee('item_code=AB123-C45');
+    }
+
     public function test_bulk_paste_skips_a_pasted_header_row(): void
     {
         $manager = Staff::factory()->procurementManager()->create();
