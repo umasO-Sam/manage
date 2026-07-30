@@ -929,4 +929,135 @@ class PurchasingModuleTest extends TestCase
             ->assertSee('人工')->assertSee('20,000')
             ->assertSee('機械組付')->assertSee('10,000');
     }
+
+    public function test_cost_analysis_cutoff_month_excludes_purchases_received_after_the_month_end(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        $category = CategoryCode::create(['code' => 3, 'major_category' => '部品', 'is_parts' => true]);
+        PurchaseDetail::create([
+            'item_code' => 'A1', 'category_id' => $category->id, 'item_name' => '6月受入分',
+            'supplier_name' => '大津屋', 'order_qty' => 1, 'unit_price' => 1000, 'arrival_date' => '2026-06-30',
+            'is_provisional' => false,
+        ]);
+        PurchaseDetail::create([
+            'item_code' => 'A1', 'category_id' => $category->id, 'item_name' => '7月受入分',
+            'supplier_name' => '大津屋', 'order_qty' => 1, 'unit_price' => 2000, 'arrival_date' => '2026-07-01',
+            'is_provisional' => false,
+        ]);
+        PurchaseDetail::create([
+            'item_code' => 'A1', 'category_id' => $category->id, 'item_name' => '未受入分',
+            'supplier_name' => '大津屋', 'order_qty' => 1, 'unit_price' => 4000, 'arrival_date' => null,
+            'is_provisional' => false,
+        ]);
+
+        $response = $this->actingAs($manager)->get(route('purchasing.cost.index', [
+            'order_no' => 'A1', 'cutoff_month' => '2026-06',
+        ]));
+
+        // 部品費は6月受入分の1,000のみ(7月受入分・未受入分は含まない)。比率雑費0(100円未満切り捨て)で総原価1,000。
+        $response->assertSee('2026年6月末')->assertSee('1,000')
+            ->assertSee('6月受入分')->assertDontSee('7月受入分')->assertDontSee('未受入分');
+    }
+
+    public function test_cost_analysis_cutoff_month_excludes_labor_after_the_month_end(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        $worker = Staff::factory()->create(['sid' => 1, 'position_weight' => 1]);
+        $category = CategoryCode::create(['code' => 63, 'major_category' => '社内人工', 'sub_category' => '機械設計']);
+
+        LaborCost::create([
+            'work_date' => '2026-06-30', 'staff_id' => $worker->id, 'order_no' => 'A1', 'category_id' => $category->id,
+            'work_hours' => 4, 'work_minutes' => 0, 'is_overtime' => false, 'position_weight_cache' => 1, 'is_provisional' => false,
+        ]);
+        LaborCost::create([
+            'work_date' => '2026-07-01', 'staff_id' => $worker->id, 'order_no' => 'A1', 'category_id' => $category->id,
+            'work_hours' => 4, 'work_minutes' => 0, 'is_overtime' => false, 'position_weight_cache' => 1, 'is_provisional' => false,
+        ]);
+
+        $response = $this->actingAs($manager)->get(route('purchasing.cost.index', [
+            'order_no' => 'A1', 'cutoff_month' => '2026-06',
+        ]));
+
+        // 6/30作業分の4h(40,000/8h*4h=20,000)のみが人工等に含まれ、7/1作業分は含まれない。
+        $response->assertSee('20,000')->assertDontSee('40,000');
+    }
+
+    public function test_cost_analysis_without_cutoff_month_aggregates_all_periods(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        $category = CategoryCode::create(['code' => 3, 'major_category' => '部品', 'is_parts' => true]);
+        PurchaseDetail::create([
+            'item_code' => 'A1', 'category_id' => $category->id, 'item_name' => '未受入分',
+            'supplier_name' => '大津屋', 'order_qty' => 1, 'unit_price' => 4000, 'arrival_date' => null,
+            'is_provisional' => false,
+        ]);
+
+        $response = $this->actingAs($manager)->get(route('purchasing.cost.index', ['order_no' => 'A1']));
+
+        $response->assertSee('未受入分')->assertDontSee('2026年');
+    }
+
+    public function test_cost_analysis_export_combines_analysis_purchase_and_labor_sections_in_one_csv(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        $worker = Staff::factory()->create(['sid' => 7, 'position_weight' => 1]);
+        $category = CategoryCode::create(['code' => 3, 'major_category' => '部品', 'is_parts' => true]);
+        $laborCategory = CategoryCode::create(['code' => 63, 'major_category' => '社内人工', 'sub_category' => '機械設計']);
+
+        PurchaseDetail::create([
+            'item_code' => 'A1', 'category_id' => $category->id, 'item_name' => '部品X',
+            'supplier_name' => '大津屋', 'order_qty' => 2, 'unit_price' => 1000, 'order_amount' => 10000,
+            'is_provisional' => false,
+        ]);
+        LaborCost::create([
+            'work_date' => '2026-06-15', 'staff_id' => $worker->id, 'order_no' => 'A1', 'category_id' => $laborCategory->id,
+            'work_hours' => 4, 'work_minutes' => 0, 'is_overtime' => false, 'position_weight_cache' => 1, 'is_provisional' => false,
+        ]);
+
+        $response = $this->actingAs($manager)->get(route('purchasing.cost.export', ['order_no' => 'A1']));
+
+        $response->assertOk();
+        $response->assertHeader('Content-Type', 'text/csv; charset=UTF-8');
+
+        $csv = $response->streamedContent();
+        $this->assertStringContainsString('■原価計算結果', $csv);
+        $this->assertStringContainsString('■仕入レコード', $csv);
+        $this->assertStringContainsString('■人工データ', $csv);
+        $this->assertStringContainsString('部品X', $csv);
+        $this->assertStringContainsString('大津屋', $csv);
+        $this->assertStringContainsString('7:'.$worker->name, $csv);
+    }
+
+    public function test_cost_analysis_export_respects_cutoff_month_filter(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        $category = CategoryCode::create(['code' => 3, 'major_category' => '部品', 'is_parts' => true]);
+
+        PurchaseDetail::create([
+            'item_code' => 'A1', 'category_id' => $category->id, 'item_name' => '6月受入分',
+            'supplier_name' => '大津屋', 'order_qty' => 1, 'unit_price' => 1000, 'arrival_date' => '2026-06-30',
+            'is_provisional' => false,
+        ]);
+        PurchaseDetail::create([
+            'item_code' => 'A1', 'category_id' => $category->id, 'item_name' => '7月受入分',
+            'supplier_name' => '大津屋', 'order_qty' => 1, 'unit_price' => 2000, 'arrival_date' => '2026-07-01',
+            'is_provisional' => false,
+        ]);
+
+        $response = $this->actingAs($manager)->get(route('purchasing.cost.export', [
+            'order_no' => 'A1', 'cutoff_month' => '2026-06',
+        ]));
+
+        $csv = $response->streamedContent();
+        $this->assertStringContainsString('2026年6月末まで', $csv);
+        $this->assertStringContainsString('6月受入分', $csv);
+        $this->assertStringNotContainsString('7月受入分', $csv);
+    }
+
+    public function test_cost_analysis_export_requires_purchasing_access(): void
+    {
+        $general = Staff::factory()->create();
+
+        $this->actingAs($general)->get(route('purchasing.cost.export', ['order_no' => 'A1']))->assertForbidden();
+    }
 }

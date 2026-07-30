@@ -42,6 +42,7 @@ Route::middleware('auth')->group(function () {
     Route::middleware('purchasing.viewer')->group(function () {
         Route::get('/purchasing', [PurchaseDetailController::class, 'index'])->name('purchasing.index');
         Route::get('/purchasing/cost', [CostAnalysisController::class, 'index'])->name('purchasing.cost.index');
+        Route::get('/purchasing/cost/export', [CostAnalysisController::class, 'export'])->name('purchasing.cost.export');
         Route::get('/purchasing/labor', [LaborCostController::class, 'index'])->name('purchasing.labor.index');
         Route::get('/purchasing/estimate', [EstimateAssistController::class, 'index'])->name('purchasing.estimate.index');
         Route::get('/purchasing/cost-report', [CostReportController::class, 'index'])->name('purchasing.cost-report.index');

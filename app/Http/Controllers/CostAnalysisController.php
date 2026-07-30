@@ -4,10 +4,12 @@ namespace App\Http\Controllers;
 
 use App\Models\LaborCost;
 use App\Models\PurchaseDetail;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class CostAnalysisController extends Controller
 {
@@ -36,10 +38,58 @@ class CostAnalysisController extends Controller
      */
     public function index(Request $request): View
     {
+        return view('purchasing.cost.index', $this->analyze($request));
+    }
+
+    /**
+     * CSV出力(原価計算結果・集計対象の仕入レコード・人工データを1ファイルにまとめる)。
+     * 画面表示と同じクエリパラメータ(注番・完全/部分一致・除外注番・締め月)をそのまま使うことで、
+     * 画面に表示されている集計内容と出力内容を一致させる。
+     */
+    public function export(Request $request): StreamedResponse
+    {
+        $analysis = $this->analyze($request);
+        $fileName = 'cost_analysis_'.($analysis['orderNo'] !== '' ? $analysis['orderNo'].'_' : '').now()->format('Ymd_His').'.csv';
+
+        return response()->streamDownload(function () use ($analysis) {
+            $stream = fopen('php://output', 'w');
+            fwrite($stream, "\xEF\xBB\xBF"); // Excelでの文字化け防止のUTF-8 BOM
+
+            $this->writeAnalysisSection($stream, $analysis);
+            $this->writePurchaseSection($stream, $analysis);
+            $this->writeLaborSection($stream, $analysis);
+
+            fclose($stream);
+        }, $fileName, ['Content-Type' => 'text/csv']);
+    }
+
+    /**
+     * @return array{orderNo: string, orderNoMatch: string, matchedOrderNos: Collection<int, string>, excludedOrderNos: array<int, string>, includedOrderNos: Collection<int, string>, cutoffMonth: string, cutoffDate: ?string, result: ?array<string, mixed>}
+     */
+    private function analyze(Request $request): array
+    {
         $orderNo = trim((string) $request->query('order_no', ''));
         // 従来は完全一致のみだったため、後方互換のためデフォルトは完全一致のままとする。
         $orderNoMatch = $request->query('order_no_match') === 'partial' ? 'partial' : 'perfect';
         $excludedOrderNos = array_values(array_filter((array) $request->query('excluded_order_nos', [])));
+
+        // 「M月末まで」の仕掛計上締め。<input type="month">からの"YYYY-MM"を月末日に変換する。
+        // 仕入・外注等は受入日、社内人工は作業日を基準に、この日付以前の分だけを集計する
+        // (未受入・未作業のためまだコストが発生していない行は自動的に除外される)。
+        $cutoffMonth = trim((string) $request->query('cutoff_month', ''));
+        $cutoffDate = null;
+        $cutoffDateEnd = null;
+        if ($cutoffMonth !== '') {
+            try {
+                $cutoffDate = Carbon::createFromFormat('Y-m', $cutoffMonth)->endOfMonth()->toDateString();
+                // arrival_date/work_dateはEloquentのdateキャスト経由だと"YYYY-MM-DD 00:00:00"形式で
+                // 保存されるため、純粋な日付文字列との<=比較だと締め日当日ちょうどの行が文字列比較上
+                // 弾かれてしまう。時刻部分まで含めた上限にして両方の保存形式を正しく含める。
+                $cutoffDateEnd = $cutoffDate.' 23:59:59';
+            } catch (\Exception) {
+                $cutoffMonth = '';
+            }
+        }
 
         $emptyState = [
             'orderNo' => $orderNo,
@@ -47,11 +97,13 @@ class CostAnalysisController extends Controller
             'matchedOrderNos' => collect(),
             'excludedOrderNos' => $excludedOrderNos,
             'includedOrderNos' => collect(),
+            'cutoffMonth' => $cutoffMonth,
+            'cutoffDate' => $cutoffDate,
             'result' => null,
         ];
 
         if ($orderNo === '') {
-            return view('purchasing.cost.index', $emptyState);
+            return $emptyState;
         }
 
         $applyOrderNoFilter = function ($query, string $column) use ($orderNo, $orderNoMatch) {
@@ -76,17 +128,18 @@ class CostAnalysisController extends Controller
         $includedOrderNos = $matchedOrderNos->diff($excludedOrderNos)->values();
 
         if ($includedOrderNos->isEmpty()) {
-            return view('purchasing.cost.index', [
+            return [
                 ...$emptyState,
                 'matchedOrderNos' => $matchedOrderNos,
                 'includedOrderNos' => $includedOrderNos,
-            ]);
+            ];
         }
 
         $purchaseRows = DB::table('purchase_details as p')
             ->leftJoin('category_codes as c', 'p.category_id', '=', 'c.id')
             ->whereIn('p.item_code', $includedOrderNos)
             ->where('p.is_provisional', false)
+            ->when($cutoffDate !== null, fn ($q) => $q->whereNotNull('p.arrival_date')->where('p.arrival_date', '<=', $cutoffDateEnd))
             ->selectRaw('c.code as category_code, c.major_category, c.sub_category, (p.order_qty * p.unit_price) as amount')
             ->get();
 
@@ -96,6 +149,7 @@ class CostAnalysisController extends Controller
             ->leftJoin('category_codes as c', 'l.category_id', '=', 'c.id')
             ->whereIn('l.order_no', $includedOrderNos)
             ->where('l.is_provisional', false)
+            ->when($cutoffDate !== null, fn ($q) => $q->whereNotNull('l.work_date')->where('l.work_date', '<=', $cutoffDateEnd))
             ->get()
             ->map(function ($l) {
                 $totalMinutes = ((int) $l->work_hours * 60) + (int) $l->work_minutes;
@@ -148,6 +202,7 @@ class CostAnalysisController extends Controller
         $topParts = PurchaseDetail::query()
             ->whereIn('item_code', $includedOrderNos)
             ->where('is_provisional', false)
+            ->when($cutoffDate !== null, fn ($q) => $q->whereNotNull('arrival_date')->where('arrival_date', '<=', $cutoffDateEnd))
             ->get()
             ->sortByDesc(fn (PurchaseDetail $d) => $d->lineTotal())
             ->take(5)
@@ -176,18 +231,20 @@ class CostAnalysisController extends Controller
             'top_parts' => $topParts,
         ];
 
-        return view('purchasing.cost.index', [
+        return [
             'orderNo' => $orderNo,
             'orderNoMatch' => $orderNoMatch,
             'matchedOrderNos' => $matchedOrderNos,
             'excludedOrderNos' => $excludedOrderNos,
             'includedOrderNos' => $includedOrderNos,
+            'cutoffMonth' => $cutoffMonth,
+            'cutoffDate' => $cutoffDate,
             'result' => $result,
-        ]);
+        ];
     }
 
     /**
-     * @param  \Illuminate\Support\Collection<int, object>  $rows
+     * @param  Collection<int, object>  $rows
      * @param  array<int, string>  $majors
      */
     private function costItemAmount($rows, array $majors): float
@@ -213,8 +270,8 @@ class CostAnalysisController extends Controller
      * コード60は「人工」「機械組付」の2つの細分が同じコード値を共有しているため、
      * コードだけでなくsub_category名も合わせてグルーピングキーにする。
      *
-     * @param  \Illuminate\Support\Collection<int, object>  $rows
-     * @return \Illuminate\Support\Collection<int, array{code: int, label: string, amount: float}>
+     * @param  Collection<int, object>  $rows
+     * @return Collection<int, array{code: int, label: string, amount: float}>
      */
     private function laborBreakdown($rows)
     {
@@ -228,5 +285,129 @@ class CostAnalysisController extends Controller
             ])
             ->sortBy(['code', 'label'])
             ->values();
+    }
+
+    /**
+     * @param  resource  $stream
+     * @param  array<string, mixed>  $analysis
+     */
+    private function writeAnalysisSection($stream, array $analysis): void
+    {
+        fputcsv($stream, ['■原価計算結果']);
+        fputcsv($stream, ['注番', $analysis['orderNo']]);
+        fputcsv($stream, ['対象注番数', $analysis['includedOrderNos']->count()]);
+        fputcsv($stream, ['対象注番一覧', $analysis['includedOrderNos']->implode('、')]);
+        fputcsv($stream, [
+            '計上締め',
+            $analysis['cutoffDate'] !== null ? Carbon::parse($analysis['cutoffDate'])->isoFormat('YYYY年M月末まで') : '指定なし(全期間)',
+        ]);
+
+        $result = $analysis['result'];
+        if ($result === null) {
+            fputcsv($stream, ['該当データなし']);
+            fputcsv($stream, []);
+
+            return;
+        }
+
+        fputcsv($stream, ['受注金額', $result['summary']['order_amount']]);
+        fputcsv($stream, ['総原価(比率雑費込み)', $result['summary']['total_cost']]);
+        fputcsv($stream, ['簡易収支', $result['summary']['gross_profit']]);
+        fputcsv($stream, ['収支率(%)', $result['summary']['profit_margin']]);
+        foreach ($result['items'] as $item) {
+            fputcsv($stream, [$item['label'], $item['amount']]);
+        }
+        fputcsv($stream, ['内訳:人工等', $result['labor_cost']]);
+        foreach ($result['labor_breakdown'] as $laborItem) {
+            fputcsv($stream, ['　└'.$laborItem['label'], $laborItem['amount']]);
+        }
+        fputcsv($stream, ['内訳:旅費等', $result['travel_cost']]);
+        fputcsv($stream, ['小計', $result['subtotal']]);
+        fputcsv($stream, ['比率雑費(小計の5%・100円未満切り捨て)', $result['misc_ratio']]);
+        if ($result['misc_category_amount'] > 0) {
+            fputcsv($stream, ['「他/他」未分類バケット(集計除外)', $result['misc_category_amount']]);
+        }
+        if ($result['unclassified_amount'] > 0) {
+            fputcsv($stream, ['分類コード未設定(集計除外)', $result['unclassified_amount']]);
+        }
+        fputcsv($stream, []);
+    }
+
+    /**
+     * @param  resource  $stream
+     * @param  array<string, mixed>  $analysis
+     */
+    private function writePurchaseSection($stream, array $analysis): void
+    {
+        fputcsv($stream, ['■仕入レコード']);
+        fputcsv($stream, [
+            '注番', '機械装置No', '製品名', '分類', 'メーカー', '品名', '形式/寸法', '数量', '単位', '単価', '金額',
+            '商社名', '注文日', '受入日', '納品書日', '受注先', '受注日', '納入先', '受注金額', '売上日', '商社納品書No', '備考',
+        ]);
+
+        if ($analysis['includedOrderNos']->isEmpty()) {
+            fputcsv($stream, []);
+
+            return;
+        }
+
+        $cutoffDateEnd = $analysis['cutoffDate'] !== null ? $analysis['cutoffDate'].' 23:59:59' : null;
+
+        PurchaseDetail::query()
+            ->with('category')
+            ->whereIn('item_code', $analysis['includedOrderNos'])
+            ->where('is_provisional', false)
+            ->when($cutoffDateEnd !== null, fn ($q) => $q->whereNotNull('arrival_date')->where('arrival_date', '<=', $cutoffDateEnd))
+            ->orderBy('item_code')
+            ->orderBy('id')
+            ->get()
+            ->each(function (PurchaseDetail $d) use ($stream) {
+                fputcsv($stream, [
+                    $d->item_code, $d->machine_no, $d->product_name,
+                    $d->category ? $d->category->code.':'.$d->category->major_category.($d->category->sub_category ? '／'.$d->category->sub_category : '') : '',
+                    $d->manufacturer, $d->item_name, $d->dimensions, $d->order_qty, $d->unit, $d->unit_price, $d->lineTotal(),
+                    $d->supplier_name,
+                    $d->order_date?->format('Y-m-d'), $d->arrival_date?->format('Y-m-d'), $d->invoice_date?->format('Y-m-d'),
+                    $d->recipient, $d->order_received_date?->format('Y-m-d'), $d->delivery_dest, $d->order_amount, $d->sales_date?->format('Y-m-d'),
+                    $d->supplier_invoice_no, $d->remarks,
+                ]);
+            });
+
+        fputcsv($stream, []);
+    }
+
+    /**
+     * @param  resource  $stream
+     * @param  array<string, mixed>  $analysis
+     */
+    private function writeLaborSection($stream, array $analysis): void
+    {
+        fputcsv($stream, ['■人工データ']);
+        fputcsv($stream, ['作業日', '担当者(SID)', '注番', '機械装置No', '分類', '時間', '分', '人工', '概算額', '時間外', '補足']);
+
+        if ($analysis['includedOrderNos']->isEmpty()) {
+            return;
+        }
+
+        $cutoffDateEnd = $analysis['cutoffDate'] !== null ? $analysis['cutoffDate'].' 23:59:59' : null;
+
+        LaborCost::query()
+            ->with(['staff', 'category'])
+            ->whereIn('order_no', $analysis['includedOrderNos'])
+            ->where('is_provisional', false)
+            ->when($cutoffDateEnd !== null, fn ($q) => $q->whereNotNull('work_date')->where('work_date', '<=', $cutoffDateEnd))
+            ->orderBy('work_date')
+            ->orderBy('id')
+            ->get()
+            ->each(function (LaborCost $l) use ($stream) {
+                fputcsv($stream, [
+                    $l->work_date?->format('Y-m-d'),
+                    $l->staff ? ($l->staff->sid !== null ? $l->staff->sid.':'.$l->staff->name : $l->staff->name) : '',
+                    $l->order_no, $l->machine_no,
+                    $l->category ? $l->category->code.':'.$l->category->major_category.($l->category->sub_category ? '／'.$l->category->sub_category : '') : '',
+                    $l->work_hours, $l->work_minutes, round($l->totalMinutes() / 480, 3), $l->estimatedCost(),
+                    $l->is_overtime ? '1' : '', $l->note,
+                ]);
+            });
     }
 }

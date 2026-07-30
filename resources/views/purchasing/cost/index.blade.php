@@ -29,6 +29,13 @@
                     </div>
                 </div>
 
+                <div class="w-full md:w-52">
+                    <label class="block text-xs font-bold text-slate-700 mb-1">M月末まで(仕掛計上締め)</label>
+                    <input type="month" name="cutoff_month" value="{{ $cutoffMonth }}"
+                           class="w-full border rounded-lg p-2 bg-slate-50 border-slate-300">
+                    <p class="mt-1 text-[11px] text-slate-400">未指定なら全期間を集計します。仕入・外注等は受入日、社内人工は作業日が基準です。</p>
+                </div>
+
                 @if ($matchedOrderNos->isNotEmpty())
                     <div class="relative" x-data="{ open: false }" @click.outside="open = false">
                         <label class="block text-xs font-bold text-slate-700 mb-1">対象注番</label>
@@ -59,6 +66,13 @@
             @endif
 
             @if ($result)
+                @if ($cutoffDate)
+                    <div class="bg-blue-50 border border-blue-200 rounded-xl p-3 text-xs text-blue-800 flex items-center gap-1.5">
+                        <i data-lucide="calendar-clock" class="w-3.5 h-3.5"></i>
+                        <span>{{ \Illuminate\Support\Carbon::parse($cutoffDate)->isoFormat('YYYY年M月末') }}までに仕掛として計上する分のみを集計しています(仕入・外注等は受入日、社内人工は作業日が基準)。</span>
+                    </div>
+                @endif
+
                 <div class="flex justify-end gap-2">
                     <a href="{{ route('purchasing.index', ['item_code' => $orderNo, 'item_code_match' => $orderNoMatch]) }}"
                        class="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition-colors">
@@ -69,6 +83,11 @@
                        class="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full border border-green-200 bg-green-50 text-green-700 hover:bg-green-100 transition-colors">
                         <i data-lucide="clock" class="w-3.5 h-3.5"></i>
                         <span>この注番の人工データを見る</span>
+                    </a>
+                    <a href="{{ route('purchasing.cost.export', request()->query()) }}"
+                       class="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 transition-colors">
+                        <i data-lucide="download" class="w-3.5 h-3.5"></i>
+                        <span>CSVダウンロード</span>
                     </a>
                 </div>
 
