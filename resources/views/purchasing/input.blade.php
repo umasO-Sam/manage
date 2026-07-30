@@ -184,14 +184,14 @@
                     </div>
                     <div>
                         <x-input-label for="labor_machine_no" value="機械装置No" />
-                        <x-text-input id="labor_machine_no" name="machine_no" type="text" class="mt-1 block w-full" :value="old('machine_no')" />
+                        <x-text-input id="labor_machine_no" name="labor_machine_no" type="text" class="mt-1 block w-full" :value="old('labor_machine_no')" />
                     </div>
                     <div>
                         <x-input-label for="labor_category_id" value="作業分類 *" />
-                        <select id="labor_category_id" name="category_id" class="mt-1 block w-full text-sm border-slate-300 focus:border-green-500 focus:ring-green-500 rounded-lg shadow-sm">
+                        <select id="labor_category_id" name="labor_category_id" class="mt-1 block w-full text-sm border-slate-300 focus:border-green-500 focus:ring-green-500 rounded-lg shadow-sm">
                             <option value="">選択してください</option>
                             @foreach ($categories as $category)
-                                <option value="{{ $category->id }}" @selected((string) old('category_id') === (string) $category->id)>
+                                <option value="{{ $category->id }}" @selected((string) old('labor_category_id') === (string) $category->id)>
                                     {{ $category->code }} - {{ $category->major_category }}/{{ $category->sub_category }}
                                 </option>
                             @endforeach

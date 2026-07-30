@@ -131,7 +131,7 @@ class PurchasingModuleTest extends TestCase
             'work_date' => now()->toDateString(),
             'staff_id' => $worker->id,
             'order_no' => 'AB123-C45',
-            'category_id' => $category->id,
+            'labor_category_id' => $category->id,
             'work_hours' => 4,
             'work_minutes' => 30,
         ]);
@@ -139,8 +139,33 @@ class PurchasingModuleTest extends TestCase
         $response->assertRedirect(route('purchasing.input'));
         $this->assertDatabaseHas('labor_costs', [
             'staff_id' => $worker->id,
+            'category_id' => $category->id,
             'work_hours' => 4,
             'work_minutes' => 30,
+        ]);
+    }
+
+    public function test_purchase_detail_category_is_saved_correctly(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        $category = CategoryCode::create(['code' => 31, 'major_category' => '電機', 'sub_category' => 'スイッチ／センサ']);
+
+        $response = $this->actingAs($manager)->post(route('purchasing.input.store'), [
+            'form_type' => 'purchase',
+            'is_provisional' => '0',
+            'item_code' => 'AB123-C45',
+            'category_id' => $category->id,
+            'manufacturer' => 'テストメーカー',
+            'item_name' => 'テスト部品',
+            'order_qty' => 1,
+            'unit_price' => 100,
+            'supplier_name' => 'テスト商社',
+        ]);
+
+        $response->assertRedirect(route('purchasing.input'));
+        $this->assertDatabaseHas('purchase_details', [
+            'item_code' => 'AB123-C45',
+            'category_id' => $category->id,
         ]);
     }
 

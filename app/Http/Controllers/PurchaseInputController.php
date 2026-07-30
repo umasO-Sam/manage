@@ -75,13 +75,16 @@ class PurchaseInputController extends Controller
             'work_date' => [$isProvisional ? 'nullable' : 'required', 'date'],
             'staff_id' => [$isProvisional ? 'nullable' : 'required', 'integer', 'exists:staff,id'],
             'order_no' => ['nullable', 'string', 'max:255'],
-            'machine_no' => ['nullable', 'string', 'max:255'],
-            'category_id' => [$isProvisional ? 'nullable' : 'required', 'integer', 'exists:category_codes,id'],
+            'labor_machine_no' => ['nullable', 'string', 'max:255'],
+            'labor_category_id' => [$isProvisional ? 'nullable' : 'required', 'integer', 'exists:category_codes,id'],
             'work_hours' => ['nullable', 'integer', 'min:0'],
             'work_minutes' => ['nullable', 'integer', 'min:0', 'max:59'],
             'is_overtime' => ['nullable', 'boolean'],
             'note' => ['nullable', 'string', 'max:255'],
         ]);
+        $data['machine_no'] = $data['labor_machine_no'] ?? null;
+        $data['category_id'] = $data['labor_category_id'] ?? null;
+        unset($data['labor_machine_no'], $data['labor_category_id']);
         $data['is_overtime'] = $request->boolean('is_overtime');
         $data['is_provisional'] = $isProvisional;
         $data['position_weight_cache'] = $data['staff_id'] ?? null

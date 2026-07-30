@@ -236,6 +236,8 @@ return [
         'work_date' => '作業日',
         'staff_id' => '担当者',
         'order_no' => '注番',
+        'labor_machine_no' => '機械装置No',
+        'labor_category_id' => '作業分類',
         'work_hours' => '時間',
         'work_minutes' => '分',
         'note' => '補足',
