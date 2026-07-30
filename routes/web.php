@@ -45,12 +45,9 @@ Route::middleware('auth')->group(function () {
         Route::get('/purchasing/cost/export', [CostAnalysisController::class, 'export'])->name('purchasing.cost.export');
         Route::get('/purchasing/labor', [LaborCostController::class, 'index'])->name('purchasing.labor.index');
         Route::get('/purchasing/estimate', [EstimateAssistController::class, 'index'])->name('purchasing.estimate.index');
-        Route::get('/purchasing/cost-report', [CostReportController::class, 'index'])->name('purchasing.cost-report.index');
-        Route::get('/purchasing/cost-report/results', [CostReportController::class, 'results'])->name('purchasing.cost-report.results');
-        Route::get('/purchasing/cost-report/export', [CostReportController::class, 'export'])->name('purchasing.cost-report.export');
     });
 
-    // データ入力・注文書・明細書・レコード編集・担当者管理は資材管理担当者限定。
+    // データ入力・注文書・明細書・原価一覧・レコード編集・担当者管理は資材管理担当者限定。
     Route::middleware('procurement.manager')->group(function () {
         Route::get('/staff', [StaffController::class, 'index'])->name('staff.index');
         Route::get('/staff/create', [StaffController::class, 'create'])->name('staff.create');
@@ -84,6 +81,10 @@ Route::middleware('auth')->group(function () {
 
         Route::get('/purchasing/invoices', [PurchaseInvoiceController::class, 'index'])->name('purchasing.invoices.index');
         Route::post('/purchasing/invoices/print', [PurchaseInvoiceController::class, 'print'])->name('purchasing.invoices.print');
+
+        Route::get('/purchasing/cost-report', [CostReportController::class, 'index'])->name('purchasing.cost-report.index');
+        Route::get('/purchasing/cost-report/results', [CostReportController::class, 'results'])->name('purchasing.cost-report.results');
+        Route::get('/purchasing/cost-report/export', [CostReportController::class, 'export'])->name('purchasing.cost-report.export');
     });
 });
 

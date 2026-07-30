@@ -2,7 +2,7 @@
     <x-slot name="header">
         <h2 class="font-bold text-2xl text-slate-900 flex items-center gap-2">
             <i data-lucide="table" class="text-slate-600 w-6 h-6"></i>
-            <span>受注別 原価一覧</span>
+            <span>原価一覧</span>
         </h2>
         <p class="text-xs text-slate-500 mt-1">
             選択した注番ごとに、仕入・人工を横断集計した原価・損益の一覧です。

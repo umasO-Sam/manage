@@ -63,9 +63,11 @@
                                 <x-dropdown-link :href="route('purchasing.cost.index')">
                                     <i data-lucide="bar-chart-3" class="w-3.5 h-3.5 inline-block align-text-bottom mr-1"></i> 原価計算
                                 </x-dropdown-link>
-                                <x-dropdown-link :href="route('purchasing.cost-report.index')">
-                                    <i data-lucide="table" class="w-3.5 h-3.5 inline-block align-text-bottom mr-1"></i> 受注別原価一覧
-                                </x-dropdown-link>
+                                @if (Auth::user()->is_procurement_manager)
+                                    <x-dropdown-link :href="route('purchasing.cost-report.index')">
+                                        <i data-lucide="table" class="w-3.5 h-3.5 inline-block align-text-bottom mr-1"></i> 原価一覧
+                                    </x-dropdown-link>
+                                @endif
                             </x-slot>
                         </x-dropdown>
                     @endif
@@ -167,9 +169,11 @@
                 <a href="{{ route('purchasing.cost.index') }}" class="block px-3 py-2 rounded-lg text-sm font-medium {{ request()->routeIs('purchasing.cost.*') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
                     原価計算
                 </a>
-                <a href="{{ route('purchasing.cost-report.index') }}" class="block px-3 py-2 rounded-lg text-sm font-medium {{ request()->routeIs('purchasing.cost-report.*') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
-                    受注別原価一覧
-                </a>
+                @if (Auth::user()->is_procurement_manager)
+                    <a href="{{ route('purchasing.cost-report.index') }}" class="block px-3 py-2 rounded-lg text-sm font-medium {{ request()->routeIs('purchasing.cost-report.*') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
+                        原価一覧
+                    </a>
+                @endif
             @endif
             @if (Auth::user()->is_procurement_manager)
                 <a href="{{ route('staff.index') }}" class="block px-3 py-2 rounded-lg text-sm font-medium {{ request()->routeIs('staff.*') ? 'bg-slate-100 text-blue-600' : 'text-slate-600' }}">

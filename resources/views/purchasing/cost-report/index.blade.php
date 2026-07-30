@@ -2,7 +2,7 @@
     <x-slot name="header">
         <h2 class="font-bold text-2xl text-slate-900 flex items-center gap-2">
             <i data-lucide="table" class="text-slate-600 w-6 h-6"></i>
-            <span>受注別 原価一覧（対象選択）</span>
+            <span>原価一覧（対象選択）</span>
         </h2>
         <p class="text-xs text-slate-500 mt-1">
             まだ「売上日」の入力が揃っていないレコードがあるため、受注日を手がかりにした候補から集計対象の注番を選んでください。

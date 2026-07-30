@@ -13,20 +13,20 @@ class CostReportTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_procurement_manager_and_sales_can_view_the_selection_and_results_pages(): void
+    public function test_procurement_manager_can_view_the_selection_and_results_pages(): void
     {
-        foreach ([Staff::factory()->procurementManager()->create(), Staff::factory()->sales()->create()] as $staff) {
-            $this->actingAs($staff)->get(route('purchasing.cost-report.index'))->assertOk();
-            $this->actingAs($staff)->get(route('purchasing.cost-report.results'))->assertOk();
-        }
+        $manager = Staff::factory()->procurementManager()->create();
+
+        $this->actingAs($manager)->get(route('purchasing.cost-report.index'))->assertOk();
+        $this->actingAs($manager)->get(route('purchasing.cost-report.results'))->assertOk();
     }
 
-    public function test_general_staff_cannot_view_the_pages(): void
+    public function test_sales_and_general_staff_cannot_view_the_pages(): void
     {
-        $staff = Staff::factory()->create();
-
-        $this->actingAs($staff)->get(route('purchasing.cost-report.index'))->assertForbidden();
-        $this->actingAs($staff)->get(route('purchasing.cost-report.results'))->assertForbidden();
+        foreach ([Staff::factory()->sales()->create(), Staff::factory()->create()] as $staff) {
+            $this->actingAs($staff)->get(route('purchasing.cost-report.index'))->assertForbidden();
+            $this->actingAs($staff)->get(route('purchasing.cost-report.results'))->assertForbidden();
+        }
     }
 
     private function seedCategories(): array
