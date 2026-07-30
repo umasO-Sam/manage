@@ -114,7 +114,7 @@
                 </div>
 
                 @if ($result['misc_category_amount'] > 0 || $result['unclassified_amount'] > 0)
-                    <div class="bg-amber-50 border border-amber-300 rounded-xl p-4 text-sm text-amber-800 space-y-1">
+                    <div class="bg-amber-50 border border-amber-300 rounded-xl p-4 text-sm text-amber-800 space-y-1" x-data="{ showFlagged: false }">
                         <div class="font-bold flex items-center gap-1.5">
                             <i data-lucide="alert-triangle" class="w-4 h-4"></i>
                             分類誤りの疑いがあります
@@ -125,6 +125,43 @@
                         @if ($result['unclassified_amount'] > 0)
                             <p>分類コード自体が未設定の仕入データが ¥{{ number_format($result['unclassified_amount']) }} 分あり、原価計算から漏れています。</p>
                         @endif
+
+                        <button type="button" @click="showFlagged = ! showFlagged" class="mt-1 text-xs font-bold underline hover:no-underline">
+                            <span x-text="showFlagged ? '対象レコードを隠す' : '対象レコードを表示（' + {{ $result['flagged_rows']->count() }} + '件）'"></span>
+                        </button>
+
+                        <div x-show="showFlagged" x-cloak class="mt-2 bg-white rounded-lg border border-amber-200 overflow-hidden">
+                            <table class="w-full text-left border-collapse text-xs">
+                                <thead>
+                                    <tr class="bg-amber-100/50 border-b border-amber-200 text-amber-900">
+                                        <th class="p-2">種別</th>
+                                        <th class="p-2">理由</th>
+                                        <th class="p-2">注番</th>
+                                        <th class="p-2">品名 / 担当者</th>
+                                        <th class="p-2">商社 / 作業日</th>
+                                        <th class="p-2 text-right">金額</th>
+                                        <th class="p-2"></th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-amber-100">
+                                    @foreach ($result['flagged_rows'] as $row)
+                                        <tr>
+                                            <td class="p-2">{{ $row['type'] }}</td>
+                                            <td class="p-2">{{ $row['reason'] }}</td>
+                                            <td class="p-2 font-mono">{{ $row['order_no'] }}</td>
+                                            <td class="p-2">{{ $row['label'] }}</td>
+                                            <td class="p-2 text-slate-500">{{ $row['sub_label'] }}</td>
+                                            <td class="p-2 text-right font-bold">¥{{ number_format($row['amount']) }}</td>
+                                            <td class="p-2">
+                                                @if ($row['purchase_detail_id'] && Auth::user()->is_procurement_manager)
+                                                    <a href="{{ route('purchasing.edit', $row['purchase_detail_id']) }}" class="text-indigo-700 hover:text-indigo-900 font-semibold">編集</a>
+                                                @endif
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 @endif
 

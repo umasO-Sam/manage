@@ -199,6 +199,9 @@ class CostAnalysisController extends Controller
         // 分類コード自体が付いていない仕入行: 集計から漏れているため警告表示する。
         $unclassifiedAmount = $rows->filter(fn ($r) => $r->category_code === null)->sum('amount');
 
+        // 上記2つの警告に該当する実レコードをユーザーが特定できるよう、明細も併せて集める。
+        $flaggedRows = $this->flaggedRows($includedOrderNos, $cutoffDate, $cutoffDateEnd);
+
         $topParts = PurchaseDetail::query()
             ->whereIn('item_code', $includedOrderNos)
             ->where('is_provisional', false)
@@ -228,6 +231,7 @@ class CostAnalysisController extends Controller
             'subtotal' => (int) $subtotal,
             'misc_category_amount' => (int) $miscCategoryAmount,
             'unclassified_amount' => (int) $unclassifiedAmount,
+            'flagged_rows' => $flaggedRows,
             'top_parts' => $topParts,
         ];
 
@@ -285,6 +289,58 @@ class CostAnalysisController extends Controller
             ])
             ->sortBy(['code', 'label'])
             ->values();
+    }
+
+    /**
+     * 「分類誤りの疑い」警告(「他/他」バケット・分類コード未設定)に該当する実レコードを、
+     * 仕入・人工を横断した一覧として返す(画面での内訳表示・原因調査用)。
+     *
+     * @param  Collection<int, string>  $includedOrderNos
+     * @return Collection<int, array{type: string, reason: string, order_no: ?string, label: string, sub_label: ?string, amount: int, purchase_detail_id: ?int}>
+     */
+    private function flaggedRows(Collection $includedOrderNos, ?string $cutoffDate, ?string $cutoffDateEnd): Collection
+    {
+        $isFlaggedCategory = function ($q) {
+            $q->whereNull('category_id')->orWhereHas('category', fn ($c) => $c->where('major_category', '他'));
+        };
+
+        $flaggedPurchases = PurchaseDetail::query()
+            ->with('category')
+            ->whereIn('item_code', $includedOrderNos)
+            ->where('is_provisional', false)
+            ->when($cutoffDate !== null, fn ($q) => $q->whereNotNull('arrival_date')->where('arrival_date', '<=', $cutoffDateEnd))
+            ->where($isFlaggedCategory)
+            ->orderBy('item_code')
+            ->get()
+            ->map(fn (PurchaseDetail $d) => [
+                'type' => '仕入',
+                'reason' => $d->category_id === null ? '分類コード未設定' : '「他/他」バケット',
+                'order_no' => $d->item_code,
+                'label' => $d->item_name,
+                'sub_label' => $d->supplier_name,
+                'amount' => (int) round($d->lineTotal()),
+                'purchase_detail_id' => $d->id,
+            ]);
+
+        $flaggedLabor = LaborCost::query()
+            ->with(['staff', 'category'])
+            ->whereIn('order_no', $includedOrderNos)
+            ->where('is_provisional', false)
+            ->when($cutoffDate !== null, fn ($q) => $q->whereNotNull('work_date')->where('work_date', '<=', $cutoffDateEnd))
+            ->where($isFlaggedCategory)
+            ->orderBy('work_date')
+            ->get()
+            ->map(fn (LaborCost $l) => [
+                'type' => '人工',
+                'reason' => $l->category_id === null ? '分類コード未設定' : '「他/他」バケット',
+                'order_no' => $l->order_no,
+                'label' => $l->staff?->name ?? '(担当者不明)',
+                'sub_label' => $l->work_date?->format('Y/m/d'),
+                'amount' => (int) round($l->estimatedCost()),
+                'purchase_detail_id' => null,
+            ]);
+
+        return $flaggedPurchases->concat($flaggedLabor)->values();
     }
 
     /**

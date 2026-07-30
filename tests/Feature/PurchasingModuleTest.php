@@ -930,6 +930,65 @@ class PurchasingModuleTest extends TestCase
             ->assertSee('機械組付')->assertSee('10,000');
     }
 
+    public function test_cost_analysis_lists_flagged_records_for_unclassified_and_misc_category(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        $worker = Staff::factory()->create(['sid' => 9, 'position_weight' => 1]);
+        $miscCategory = CategoryCode::create(['code' => 44, 'major_category' => '他', 'sub_category' => '他']);
+
+        PurchaseDetail::create([
+            'item_code' => 'A1', 'category_id' => null, 'item_name' => '未分類部品',
+            'supplier_name' => '大津屋', 'order_qty' => 1, 'unit_price' => 500,
+            'is_provisional' => false,
+        ]);
+        PurchaseDetail::create([
+            'item_code' => 'A1', 'category_id' => $miscCategory->id, 'item_name' => '他分類部品',
+            'supplier_name' => '大津屋商事', 'order_qty' => 1, 'unit_price' => 700,
+            'is_provisional' => false,
+        ]);
+        LaborCost::create([
+            'work_date' => now(), 'staff_id' => $worker->id, 'order_no' => 'A1', 'category_id' => null,
+            'work_hours' => 1, 'work_minutes' => 0, 'is_overtime' => false, 'position_weight_cache' => 1, 'is_provisional' => false,
+        ]);
+
+        $response = $this->actingAs($manager)->get(route('purchasing.cost.index', ['order_no' => 'A1']));
+
+        $response->assertSee('分類誤りの疑いがあります');
+        $response->assertSee('対象レコードを表示（', false);
+        $response->assertSee('未分類部品')->assertSee('他分類部品');
+        $response->assertSee($worker->name);
+        $response->assertSee('分類コード未設定')->assertSee('「他/他」バケット');
+    }
+
+    public function test_cost_analysis_flagged_record_has_an_edit_link_for_purchase_manager(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        $detail = PurchaseDetail::create([
+            'item_code' => 'A1', 'category_id' => null, 'item_name' => '未分類部品',
+            'supplier_name' => '大津屋', 'order_qty' => 1, 'unit_price' => 500,
+            'is_provisional' => false,
+        ]);
+
+        $response = $this->actingAs($manager)->get(route('purchasing.cost.index', ['order_no' => 'A1']));
+
+        $response->assertSee(route('purchasing.edit', $detail), false);
+    }
+
+    public function test_cost_analysis_hides_flagged_section_when_all_records_are_classified(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        $category = CategoryCode::create(['code' => 3, 'major_category' => '部品', 'is_parts' => true]);
+        PurchaseDetail::create([
+            'item_code' => 'A1', 'category_id' => $category->id, 'item_name' => '部品X',
+            'supplier_name' => '大津屋', 'order_qty' => 1, 'unit_price' => 500,
+            'is_provisional' => false,
+        ]);
+
+        $response = $this->actingAs($manager)->get(route('purchasing.cost.index', ['order_no' => 'A1']));
+
+        $response->assertDontSee('分類誤りの疑いがあります');
+    }
+
     public function test_cost_analysis_cutoff_month_excludes_purchases_received_after_the_month_end(): void
     {
         $manager = Staff::factory()->procurementManager()->create();
