@@ -81,7 +81,11 @@ class CostAnalysisController extends Controller
         $cutoffDateEnd = null;
         if ($cutoffMonth !== '') {
             try {
-                $cutoffDate = Carbon::createFromFormat('Y-m', $cutoffMonth)->endOfMonth()->toDateString();
+                // createFromFormat('Y-m', ...)だと書式に含まれない「日」が実行時の当日の日にちで
+                // 補完されるため、対象月にその日が存在しないと翌月へ繰り上がってしまう
+                // (例:実行日が31日の時に'2026-06'を指定すると6月は30日までしかなく7月1日になり、
+                // endOfMonth()が6月末ではなく7月末を返す)。日を明示的に1日に固定して回避する。
+                $cutoffDate = Carbon::createFromFormat('Y-m-d', $cutoffMonth.'-01')->endOfMonth()->toDateString();
                 // arrival_date/work_dateはEloquentのdateキャスト経由だと"YYYY-MM-DD 00:00:00"形式で
                 // 保存されるため、純粋な日付文字列との<=比較だと締め日当日ちょうどの行が文字列比較上
                 // 弾かれてしまう。時刻部分まで含めた上限にして両方の保存形式を正しく含める。

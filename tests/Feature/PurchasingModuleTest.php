@@ -7,6 +7,7 @@ use App\Models\LaborCost;
 use App\Models\PurchaseDetail;
 use App\Models\Staff;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Tests\TestCase;
 
 class PurchasingModuleTest extends TestCase
@@ -1101,6 +1102,40 @@ class PurchasingModuleTest extends TestCase
         // 部品費は6月受入分の1,000のみ(7月受入分・未受入分は含まない)。比率雑費0(100円未満切り捨て)で総原価1,000。
         $response->assertSee('2026年6月末')->assertSee('1,000')
             ->assertSee('6月受入分')->assertDontSee('7月受入分')->assertDontSee('未受入分');
+    }
+
+    /**
+     * 実行日が31日の時にcutoff_month=2026-06(30日までしかない月)を指定すると、
+     * Carbon::createFromFormat('Y-m', ...)が書式に無い「日」を実行日の値で補完し、
+     * 6月31日が存在しないため7月へ繰り上がってendOfMonth()が7月末を返してしまうバグの回帰テスト。
+     */
+    public function test_cost_analysis_cutoff_month_resolves_correctly_when_today_is_the_31st(): void
+    {
+        Carbon::setTestNow('2026-07-31');
+
+        try {
+            $manager = Staff::factory()->procurementManager()->create();
+            $category = CategoryCode::create(['code' => 3, 'major_category' => '部品', 'is_parts' => true]);
+            PurchaseDetail::create([
+                'item_code' => 'A1', 'category_id' => $category->id, 'item_name' => '6月受入分',
+                'supplier_name' => '大津屋', 'order_qty' => 1, 'unit_price' => 1000, 'arrival_date' => '2026-06-30',
+                'is_provisional' => false,
+            ]);
+            PurchaseDetail::create([
+                'item_code' => 'A1', 'category_id' => $category->id, 'item_name' => '7月受入分',
+                'supplier_name' => '大津屋', 'order_qty' => 1, 'unit_price' => 2000, 'arrival_date' => '2026-07-31',
+                'is_provisional' => false,
+            ]);
+
+            $response = $this->actingAs($manager)->get(route('purchasing.cost.index', [
+                'order_no' => 'A1', 'cutoff_month' => '2026-06',
+            ]));
+
+            $response->assertSee('2026年6月末')
+                ->assertSee('6月受入分')->assertDontSee('7月受入分');
+        } finally {
+            Carbon::setTestNow();
+        }
     }
 
     public function test_cost_analysis_cutoff_month_excludes_labor_after_the_month_end(): void
