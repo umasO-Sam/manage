@@ -6,8 +6,12 @@
         </h2>
     </x-slot>
 
-    <div class="py-8">
+    <div class="py-8" x-data="bulkEditor()">
         <div class="max-w-6xl mx-auto sm:px-6 lg:px-8 space-y-6">
+
+            @if (session('status') === 'bulk-update-success')
+                <div class="p-3 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-800 text-sm">変更を保存しました。</div>
+            @endif
 
             <form method="GET" action="{{ route('purchasing.orders.index') }}" class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
                 <div>
@@ -25,6 +29,60 @@
                 </div>
                 <button type="submit" class="text-sm font-semibold bg-slate-800 hover:bg-slate-900 text-white rounded-lg py-2 px-6 transition-colors">データを抽出</button>
             </form>
+
+            @if ($details->isNotEmpty())
+                <div class="flex justify-end">
+                    <button type="button" @click="editMode = ! editMode"
+                            class="text-xs font-semibold rounded-lg py-1.5 px-4 transition-colors border"
+                            :class="editMode ? 'bg-amber-100 border-amber-300 text-amber-800' : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-50'">
+                        <span x-text="editMode ? '直接編集を終了' : '直接編集'"></span>
+                    </button>
+                </div>
+
+                <div x-show="editMode" x-cloak class="sticky top-2 z-10 bg-white border border-amber-200 rounded-xl p-3 shadow-sm flex flex-wrap justify-between items-center gap-2">
+                    <span class="text-xs text-amber-700 font-semibold">直接編集モード: セルを編集し、「変更を保存」を押してください。</span>
+                    <div class="flex gap-2">
+                        <button type="button" @click="editMode = false" class="text-xs font-semibold px-3 py-1.5 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50">編集をやめる</button>
+                        <button type="button" @click="reviewChanges()" class="text-xs font-bold px-4 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white">変更を保存</button>
+                    </div>
+                </div>
+
+                <div x-show="showConfirm" x-cloak class="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+                    <div class="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[80vh] flex flex-col">
+                        <div class="p-4 border-b border-slate-100">
+                            <h3 class="font-bold text-slate-800">変更内容の確認</h3>
+                            <p class="text-xs text-slate-500 mt-1">以下の内容で保存します。よろしいですか？</p>
+                        </div>
+                        <div class="p-4 overflow-y-auto space-y-3 text-xs">
+                            <template x-for="row in changes" :key="row.id">
+                                <div class="border border-slate-100 rounded-lg p-2">
+                                    <div class="font-mono font-bold text-blue-900 mb-1" x-text="row.itemCode"></div>
+                                    <template x-for="field in row.fields" :key="field.label">
+                                        <div class="flex justify-between gap-4 py-0.5">
+                                            <span class="text-slate-500 shrink-0" x-text="field.label"></span>
+                                            <span class="text-right">
+                                                <span class="text-slate-400 line-through" x-text="field.oldValue"></span>
+                                                <span class="mx-1">→</span>
+                                                <span class="font-bold text-emerald-700" x-text="field.newValue"></span>
+                                            </span>
+                                        </div>
+                                    </template>
+                                </div>
+                            </template>
+                        </div>
+                        <div class="p-4 border-t border-slate-100 flex justify-end gap-2">
+                            <button type="button" @click="showConfirm = false" class="text-xs font-semibold px-4 py-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50">キャンセル</button>
+                            <button type="button" @click="confirmSave()" class="text-xs font-bold px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white">保存する</button>
+                        </div>
+                    </div>
+                </div>
+
+                <form id="bulk-edit-form" method="POST" action="{{ route('purchasing.bulk-update') }}">
+                    @csrf
+                    <input type="hidden" name="return_to" value="orders">
+                    <input type="hidden" name="return_query" value="{{ request()->getQueryString() }}">
+                </form>
+            @endif
 
             <form method="POST" action="{{ route('purchasing.orders.print') }}" target="_blank" x-data="{ checked: [] }">
                 @csrf
@@ -44,15 +102,46 @@
                             </thead>
                             <tbody class="divide-y divide-slate-100">
                                 @forelse ($details as $detail)
-                                    <tr class="hover:bg-slate-50">
+                                    <tr class="hover:bg-slate-50" data-row-id="{{ $detail->id }}" data-row-item-code="{{ $detail->item_code }}">
                                         <td class="p-2.5 text-center">
                                             <input type="checkbox" name="target_ids[]" value="{{ $detail->id }}" x-model="checked" class="w-4 h-4">
+                                            <input type="hidden" form="bulk-edit-form" name="updates[{{ $detail->id }}][item_code]" value="{{ $detail->item_code }}">
                                         </td>
-                                        <td class="p-2.5">{{ $detail->order_date?->format('Y/m/d') ?? '-' }}</td>
-                                        <td class="p-2.5 font-bold">{{ $detail->supplier_name }}</td>
-                                        <td class="p-2.5">{{ $detail->item_name }} <span class="text-slate-400">{{ $detail->dimensions }}</span></td>
-                                        <td class="p-2.5 text-right">{{ $detail->order_qty }}</td>
-                                        <td class="p-2.5 text-right">¥{{ number_format((float) $detail->unit_price) }}</td>
+                                        <td class="p-2.5">
+                                            <span x-show="!editMode">{{ $detail->order_date?->format('Y/m/d') ?? '-' }}</span>
+                                            <input x-show="editMode" x-cloak type="date" form="bulk-edit-form" name="updates[{{ $detail->id }}][order_date]"
+                                                   value="{{ $detail->order_date?->format('Y-m-d') }}" data-original="{{ $detail->order_date?->format('Y-m-d') }}" data-label="注文日付"
+                                                   class="w-full text-xs border rounded px-1.5 py-1 border-slate-300">
+                                        </td>
+                                        <td class="p-2.5 font-bold">
+                                            <span x-show="!editMode">{{ $detail->supplier_name }}</span>
+                                            <input x-show="editMode" x-cloak type="text" form="bulk-edit-form" name="updates[{{ $detail->id }}][supplier_name]"
+                                                   value="{{ $detail->supplier_name }}" data-original="{{ $detail->supplier_name }}" data-label="商社名"
+                                                   class="w-full min-w-[120px] text-xs border rounded px-1.5 py-1 border-slate-300">
+                                        </td>
+                                        <td class="p-2.5">
+                                            <span x-show="!editMode">{{ $detail->item_name }} <span class="text-slate-400">{{ $detail->dimensions }}</span></span>
+                                            <div x-show="editMode" x-cloak class="flex flex-col gap-1">
+                                                <input type="text" form="bulk-edit-form" name="updates[{{ $detail->id }}][item_name]"
+                                                       value="{{ $detail->item_name }}" data-original="{{ $detail->item_name }}" data-label="品名"
+                                                       placeholder="品名" class="w-full min-w-[140px] text-xs border rounded px-1.5 py-1 border-slate-300">
+                                                <input type="text" form="bulk-edit-form" name="updates[{{ $detail->id }}][dimensions]"
+                                                       value="{{ $detail->dimensions }}" data-original="{{ $detail->dimensions }}" data-label="形式/寸法"
+                                                       placeholder="形式/寸法" class="w-full min-w-[140px] text-xs border rounded px-1.5 py-1 border-slate-300">
+                                            </div>
+                                        </td>
+                                        <td class="p-2.5 text-right">
+                                            <span x-show="!editMode">{{ $detail->order_qty }}</span>
+                                            <input x-show="editMode" x-cloak type="number" step="0.01" form="bulk-edit-form" name="updates[{{ $detail->id }}][order_qty]"
+                                                   value="{{ $detail->order_qty }}" data-original="{{ $detail->order_qty }}" data-label="数量"
+                                                   class="w-full text-xs text-right border rounded px-1.5 py-1 border-slate-300">
+                                        </td>
+                                        <td class="p-2.5 text-right">
+                                            <span x-show="!editMode">¥{{ number_format((float) $detail->unit_price) }}</span>
+                                            <input x-show="editMode" x-cloak type="number" step="0.01" form="bulk-edit-form" name="updates[{{ $detail->id }}][unit_price]"
+                                                   value="{{ $detail->unit_price }}" data-original="{{ $detail->unit_price }}" data-label="単価"
+                                                   class="w-full text-xs text-right border rounded px-1.5 py-1 border-slate-300">
+                                        </td>
                                     </tr>
                                 @empty
                                     <tr>

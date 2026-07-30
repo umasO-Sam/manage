@@ -15,9 +15,9 @@ class PurchaseDetailController extends Controller
 {
     /**
      * @var array<string, array<int, string>> 検索画面の「直接編集」で1行ずつ更新可能な項目とバリデーションルール。
-     * 単一レコード編集(update)と異なり、一部項目だけを変更する運用のため「必須」は課さない
-     * (項目自体には既存値が入っているため、空欄で送信された場合のみ意図的にクリアされる)。
-     * ただしitem_code(注番)はレコードの識別に使われるため必須のままにする。
+     *                                        単一レコード編集(update)と異なり、一部項目だけを変更する運用のため「必須」は課さない
+     *                                        (項目自体には既存値が入っているため、空欄で送信された場合のみ意図的にクリアされる)。
+     *                                        ただしitem_code(注番)はレコードの識別に使われるため必須のままにする。
      */
     private const BULK_EDITABLE_FIELDS = [
         'item_code' => ['required', 'string', 'max:255'],
@@ -243,6 +243,16 @@ class PurchaseDetailController extends Controller
      * 画面側で変更点の確認を済ませた上で送信される想定のため、ここでは
      * 型のバリデーションのみ行い、1件ずつ更新する。
      */
+    /**
+     * @var array<string, string> 「直接編集」の保存後にどの画面へ戻るか(return_to)のホワイトリスト。
+     *                            任意のURLへリダイレクトできてしまわないよう、ルート名を直接受け取らずキー経由でのみ許可する。
+     */
+    private const RETURN_ROUTES = [
+        'search' => 'purchasing.index',
+        'orders' => 'purchasing.orders.index',
+        'invoices' => 'purchasing.invoices.index',
+    ];
+
     public function bulkUpdate(Request $request): RedirectResponse
     {
         $updates = (array) $request->input('updates', []);
@@ -263,8 +273,9 @@ class PurchaseDetailController extends Controller
             }
         });
 
+        $returnRouteName = self::RETURN_ROUTES[$request->input('return_to')] ?? self::RETURN_ROUTES['search'];
         $returnQuery = (string) $request->input('return_query', '');
-        $redirectUrl = route('purchasing.index').($returnQuery !== '' ? "?{$returnQuery}" : '');
+        $redirectUrl = route($returnRouteName).($returnQuery !== '' ? "?{$returnQuery}" : '');
 
         return redirect()->to($redirectUrl)->with('status', 'bulk-update-success');
     }

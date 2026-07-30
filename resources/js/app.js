@@ -11,6 +11,111 @@ window.Alpine = Alpine;
 window.refreshIcons = () => createIcons({ icons });
 
 /**
+ * 仕入管理データの「直接編集」「まとめて削除」(検索・注文書発行・買掛明細書発行画面で共用)。
+ * 以前は検索画面(purchasing/index.blade.php)のインラインscriptにしか定義されておらず、
+ * 他の画面でx-data="bulkEditor()"を使うと"bulkEditor is not defined"で表示が壊れる不具合が
+ * あったため、共通のapp.jsへ移動した。
+ */
+Alpine.data('bulkEditor', () => ({
+    editMode: false,
+    showConfirm: false,
+    changes: [],
+    deleteMode: false,
+    selectedIds: [],
+    showDeleteConfirm: false,
+    deleteTargets: [],
+
+    toggleEditMode() {
+        this.editMode = ! this.editMode;
+        if (this.editMode) {
+            this.deleteMode = false;
+            this.selectedIds = [];
+        }
+    },
+
+    toggleDeleteMode() {
+        this.deleteMode = ! this.deleteMode;
+        if (this.deleteMode) {
+            this.editMode = false;
+        } else {
+            this.selectedIds = [];
+        }
+    },
+
+    toggleSelect(id, checked) {
+        if (checked) {
+            if (! this.selectedIds.includes(id)) {
+                this.selectedIds.push(id);
+            }
+        } else {
+            this.selectedIds = this.selectedIds.filter((existingId) => existingId !== id);
+        }
+    },
+
+    reviewDelete() {
+        if (this.selectedIds.length === 0) return;
+
+        this.deleteTargets = this.selectedIds.map((id) => {
+            const checkbox = document.querySelector(`.delete-target-checkbox[data-id="${id}"]`);
+            return {
+                id,
+                itemCode: checkbox?.dataset.rowItemCode ?? '',
+                itemName: checkbox?.dataset.rowItemName ?? '',
+            };
+        });
+        this.showDeleteConfirm = true;
+    },
+
+    confirmDelete() {
+        document.getElementById('bulk-delete-form').submit();
+    },
+
+    reviewChanges() {
+        const rows = {};
+        document.querySelectorAll('#bulk-edit-form [data-original]').forEach((el) => {
+            const isCheckbox = el.type === 'checkbox';
+            const current = isCheckbox ? (el.checked ? '1' : '0') : el.value;
+            const original = el.dataset.original ?? '';
+            if (current === original) return;
+
+            const tr = el.closest('tr');
+            const id = tr.dataset.rowId;
+            if (!rows[id]) {
+                rows[id] = { id, itemCode: tr.dataset.rowItemCode, fields: [] };
+            }
+
+            let oldValue = original;
+            let newValue = current;
+            if (isCheckbox) {
+                oldValue = original === '1' ? 'はい' : 'いいえ';
+                newValue = current === '1' ? 'はい' : 'いいえ';
+            } else if (el.tagName === 'SELECT') {
+                const originalOption = Array.from(el.options).find((o) => o.value === original);
+                oldValue = originalOption ? originalOption.text : '(未設定)';
+                newValue = el.options[el.selectedIndex]?.text ?? '(未設定)';
+            }
+
+            rows[id].fields.push({
+                label: el.dataset.label,
+                oldValue: oldValue === '' ? '(空欄)' : oldValue,
+                newValue: newValue === '' ? '(空欄)' : newValue,
+            });
+        });
+
+        this.changes = Object.values(rows);
+        if (this.changes.length === 0) {
+            alert('変更はありません。');
+            return;
+        }
+        this.showConfirm = true;
+    },
+
+    confirmSave() {
+        document.getElementById('bulk-edit-form').submit();
+    },
+}));
+
+/**
  * 一括登録画面の貼り付け欄(仕入管理データ入力・社内人工日報入力で共用)。
  * エクセルからのコピー&ペーストをセル単位のテーブルとして受け取り、
  * 送信時にタブ区切りテキスト(隠しtextarea)へ直列化してサーバーへ渡す。

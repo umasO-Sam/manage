@@ -290,6 +290,7 @@
 
             <form id="bulk-edit-form" method="POST" action="{{ route('purchasing.bulk-update') }}">
                 @csrf
+                <input type="hidden" name="return_to" value="search">
                 <input type="hidden" name="return_query" value="{{ request()->getQueryString() }}">
 
             <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
@@ -563,107 +564,6 @@
     </div>
 
     <script>
-        document.addEventListener('alpine:init', () => {
-            Alpine.data('bulkEditor', () => ({
-                editMode: false,
-                showConfirm: false,
-                changes: [],
-                deleteMode: false,
-                selectedIds: [],
-                showDeleteConfirm: false,
-                deleteTargets: [],
-
-                toggleEditMode() {
-                    this.editMode = ! this.editMode;
-                    if (this.editMode) {
-                        this.deleteMode = false;
-                        this.selectedIds = [];
-                    }
-                },
-
-                toggleDeleteMode() {
-                    this.deleteMode = ! this.deleteMode;
-                    if (this.deleteMode) {
-                        this.editMode = false;
-                    } else {
-                        this.selectedIds = [];
-                    }
-                },
-
-                toggleSelect(id, checked) {
-                    if (checked) {
-                        if (! this.selectedIds.includes(id)) {
-                            this.selectedIds.push(id);
-                        }
-                    } else {
-                        this.selectedIds = this.selectedIds.filter((existingId) => existingId !== id);
-                    }
-                },
-
-                reviewDelete() {
-                    if (this.selectedIds.length === 0) return;
-
-                    this.deleteTargets = this.selectedIds.map((id) => {
-                        const checkbox = document.querySelector(`.delete-target-checkbox[data-id="${id}"]`);
-                        return {
-                            id,
-                            itemCode: checkbox?.dataset.rowItemCode ?? '',
-                            itemName: checkbox?.dataset.rowItemName ?? '',
-                        };
-                    });
-                    this.showDeleteConfirm = true;
-                },
-
-                confirmDelete() {
-                    document.getElementById('bulk-delete-form').submit();
-                },
-
-                reviewChanges() {
-                    const rows = {};
-                    document.querySelectorAll('#bulk-edit-form [data-original]').forEach((el) => {
-                        const isCheckbox = el.type === 'checkbox';
-                        const current = isCheckbox ? (el.checked ? '1' : '0') : el.value;
-                        const original = el.dataset.original ?? '';
-                        if (current === original) return;
-
-                        const tr = el.closest('tr');
-                        const id = tr.dataset.rowId;
-                        if (!rows[id]) {
-                            rows[id] = { id, itemCode: tr.dataset.rowItemCode, fields: [] };
-                        }
-
-                        let oldValue = original;
-                        let newValue = current;
-                        if (isCheckbox) {
-                            oldValue = original === '1' ? 'はい' : 'いいえ';
-                            newValue = current === '1' ? 'はい' : 'いいえ';
-                        } else if (el.tagName === 'SELECT') {
-                            const originalOption = Array.from(el.options).find((o) => o.value === original);
-                            oldValue = originalOption ? originalOption.text : '(未設定)';
-                            newValue = el.options[el.selectedIndex]?.text ?? '(未設定)';
-                        }
-
-                        rows[id].fields.push({
-                            label: el.dataset.label,
-                            oldValue: oldValue === '' ? '(空欄)' : oldValue,
-                            newValue: newValue === '' ? '(空欄)' : newValue,
-                        });
-                    });
-
-                    this.changes = Object.values(rows);
-                    if (this.changes.length === 0) {
-                        alert('変更はありません。');
-                        return;
-                    }
-                    this.showConfirm = true;
-                },
-
-                confirmSave() {
-                    document.getElementById('bulk-edit-form').submit();
-                },
-            }));
-        });
-
         (function () {
             const allCheckbox = document.querySelector('[data-category-all]');
             const itemCheckboxes = Array.from(document.querySelectorAll('[data-category-item]'));

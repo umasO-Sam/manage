@@ -700,6 +700,41 @@ class PurchasingModuleTest extends TestCase
         $response->assertOk()->assertSee('テスト部品')->assertSee('3,000');
     }
 
+    public function test_order_screen_shows_direct_edit_inputs_that_post_to_bulk_update(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        $detail = PurchaseDetail::create([
+            'item_code' => 'A1', 'supplier_name' => '大津屋', 'item_name' => 'テスト部品',
+            'order_date' => '2026-06-01', 'order_qty' => 3, 'unit_price' => 1000,
+        ]);
+
+        $response = $this->actingAs($manager)->get(route('purchasing.orders.index', ['supplier_name' => '大津屋']));
+
+        $response->assertSee('form="bulk-edit-form"', false);
+        $response->assertSee("updates[{$detail->id}][supplier_name]", false);
+        $response->assertSee("updates[{$detail->id}][item_code]", false);
+    }
+
+    public function test_order_screen_direct_edit_returns_to_orders_screen_with_filters(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        $detail = PurchaseDetail::create([
+            'item_code' => 'A1', 'supplier_name' => '大津屋', 'item_name' => 'テスト部品',
+            'order_qty' => 3, 'unit_price' => 1000,
+        ]);
+
+        $response = $this->actingAs($manager)->post(route('purchasing.bulk-update'), [
+            'updates' => [
+                $detail->id => ['item_code' => 'A1', 'item_name' => '更新後', 'supplier_name' => '大津屋'],
+            ],
+            'return_to' => 'orders',
+            'return_query' => 'supplier_name=大津屋',
+        ]);
+
+        $response->assertRedirect(route('purchasing.orders.index').'?supplier_name=大津屋');
+        $this->assertSame('更新後', $detail->fresh()->item_name);
+    }
+
     public function test_invoice_search_lists_suppliers_within_date_range(): void
     {
         $manager = Staff::factory()->procurementManager()->create();
@@ -732,6 +767,44 @@ class PurchasingModuleTest extends TestCase
         ]);
 
         $response->assertOk()->assertSee('1,000')->assertSee('100')->assertSee('1,100');
+    }
+
+    public function test_invoice_screen_shows_direct_edit_inputs_targeting_the_filtered_date_field(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        $detail = PurchaseDetail::create([
+            'item_code' => 'A1', 'supplier_name' => '大津屋', 'invoice_date' => '2024-03-15',
+            'item_name' => 'テスト部品', 'order_qty' => 1, 'unit_price' => 1000,
+        ]);
+
+        $response = $this->actingAs($manager)->get(route('purchasing.invoices.index', [
+            'date_from' => '2024-03-01', 'date_to' => '2024-03-31', 'date_type' => 'invoice_date', 'supplier_name' => '大津屋',
+        ]));
+
+        $response->assertSee('form="bulk-edit-form"', false);
+        $response->assertSee("updates[{$detail->id}][invoice_date]", false);
+        $response->assertSee("updates[{$detail->id}][item_code]", false);
+    }
+
+    public function test_invoice_screen_direct_edit_returns_to_invoices_screen_with_filters(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        $detail = PurchaseDetail::create([
+            'item_code' => 'A1', 'supplier_name' => '大津屋', 'invoice_date' => '2024-03-15',
+            'item_name' => 'テスト部品', 'order_qty' => 1, 'unit_price' => 1000,
+        ]);
+
+        $response = $this->actingAs($manager)->post(route('purchasing.bulk-update'), [
+            'updates' => [
+                $detail->id => ['item_code' => 'A1', 'item_name' => '更新後', 'unit_price' => 1200],
+            ],
+            'return_to' => 'invoices',
+            'return_query' => 'supplier_name=大津屋',
+        ]);
+
+        $response->assertRedirect(route('purchasing.invoices.index').'?supplier_name=大津屋');
+        $this->assertSame('更新後', $detail->fresh()->item_name);
+        $this->assertSame('1200.00', $detail->fresh()->unit_price);
     }
 
     public function test_labor_summary_aggregates_hours_and_cost(): void
