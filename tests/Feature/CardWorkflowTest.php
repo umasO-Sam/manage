@@ -80,6 +80,30 @@ class CardWorkflowTest extends TestCase
         ]);
     }
 
+    public function test_card_can_be_created_without_manufacturer(): void
+    {
+        $workflowType = $this->purchaseWorkflow();
+        $orderNumber = $this->orderNumber();
+        $staff = Staff::factory()->create();
+
+        $response = $this->actingAs($staff)->post(route('cards.store', $workflowType), [
+            'order_number_id' => $orderNumber->id,
+            'item_name' => 'テスト部品',
+            'model_number' => 'ABC-123',
+            'quantity' => 2,
+            'unit' => '個',
+            'due_date_type' => 'asap',
+        ]);
+
+        $response->assertSessionDoesntHaveErrors('manufacturer');
+        $response->assertRedirect();
+        $this->assertDatabaseHas('cards', [
+            'order_number_id' => $orderNumber->id,
+            'model_number' => 'ABC-123',
+            'manufacturer' => null,
+        ]);
+    }
+
     public function test_estimate_request_accepts_machine_number_and_requires_model_number(): void
     {
         $workflowType = $this->estimateWorkflow();
@@ -220,11 +244,11 @@ class CardWorkflowTest extends TestCase
             'order_number_id' => $orderNumber->id, 'quantity' => 2, 'unit' => '個', 'due_date_type' => 'asap',
         ]);
 
-        $response->assertSessionHasErrors(['item_name', 'model_number', 'manufacturer']);
+        $response->assertSessionHasErrors(['item_name', 'model_number']);
+        $response->assertSessionDoesntHaveErrors('manufacturer');
         $errors = session('errors')->getBag('default');
         $this->assertStringContainsString('品名を入力してください。', $errors->first('item_name'));
         $this->assertStringContainsString('型式を入力してください。', $errors->first('model_number'));
-        $this->assertStringContainsString('メーカーを入力してください。', $errors->first('manufacturer'));
     }
 
     public function test_due_date_type_asap_does_not_require_a_specific_date(): void

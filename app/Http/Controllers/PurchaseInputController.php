@@ -39,7 +39,7 @@ class PurchaseInputController extends Controller
             'machine_no' => ['nullable', 'string', 'max:255'],
             'product_name' => ['nullable', 'string', 'max:255'],
             'category_id' => [$isProvisional ? 'nullable' : 'required', 'integer', 'exists:category_codes,id'],
-            'manufacturer' => [$isProvisional ? 'nullable' : 'required', 'string', 'max:255'],
+            'manufacturer' => ['nullable', 'string', 'max:255'],
             'item_name' => [$isProvisional ? 'nullable' : 'required', 'string', 'max:255'],
             'dimensions' => ['nullable', 'string', 'max:255'],
             'remarks' => ['nullable', 'string'],

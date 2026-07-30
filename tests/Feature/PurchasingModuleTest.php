@@ -60,6 +60,31 @@ class PurchasingModuleTest extends TestCase
         ]);
     }
 
+    public function test_purchase_detail_can_be_registered_without_manufacturer(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        $category = CategoryCode::create(['code' => 1, 'major_category' => '部品', 'is_parts' => true]);
+
+        $response = $this->actingAs($manager)->post(route('purchasing.input.store'), [
+            'form_type' => 'purchase',
+            'is_provisional' => '0',
+            'item_code' => 'AB123-C45',
+            'category_id' => $category->id,
+            'item_name' => '近接センサ',
+            'order_qty' => 5,
+            'unit' => '個',
+            'unit_price' => 1000,
+            'supplier_name' => '大津屋',
+        ]);
+
+        $response->assertSessionDoesntHaveErrors('manufacturer');
+        $response->assertRedirect(route('purchasing.input'));
+        $this->assertDatabaseHas('purchase_details', [
+            'item_code' => 'AB123-C45',
+            'manufacturer' => null,
+        ]);
+    }
+
     public function test_procurement_manager_can_register_a_sales_date(): void
     {
         $manager = Staff::factory()->procurementManager()->create();
@@ -110,10 +135,10 @@ class PurchasingModuleTest extends TestCase
             'item_code' => 'AB123-C45',
         ]);
 
-        $response->assertSessionHasErrors(['category_id', 'manufacturer', 'item_name', 'order_qty', 'unit_price', 'supplier_name']);
+        $response->assertSessionHasErrors(['category_id', 'item_name', 'order_qty', 'unit_price', 'supplier_name']);
+        $response->assertSessionDoesntHaveErrors('manufacturer');
         $errors = session('errors')->getBag('default');
         $this->assertStringContainsString('分類を入力してください。', $errors->first('category_id'));
-        $this->assertStringContainsString('メーカーを入力してください。', $errors->first('manufacturer'));
         $this->assertStringContainsString('数量を入力してください。', $errors->first('order_qty'));
         $this->assertStringContainsString('単価を入力してください。', $errors->first('unit_price'));
         $this->assertStringContainsString('商社名を入力してください。', $errors->first('supplier_name'));

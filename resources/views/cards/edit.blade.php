@@ -58,7 +58,7 @@
 
                     <div>
                         <x-input-label for="manufacturer" value="メーカー" />
-                        <x-text-input id="manufacturer" name="manufacturer" type="text" class="mt-1 block w-full" :value="old('manufacturer', $card->manufacturer)" required />
+                        <x-text-input id="manufacturer" name="manufacturer" type="text" class="mt-1 block w-full" :value="old('manufacturer', $card->manufacturer)" />
                         <x-input-error class="mt-2" :messages="$errors->get('manufacturer')" />
                     </div>
 

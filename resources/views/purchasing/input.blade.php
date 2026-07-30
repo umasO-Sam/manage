@@ -78,7 +78,7 @@
                         </select>
                     </div>
                     <div>
-                        <x-input-label for="manufacturer" value="メーカー *" />
+                        <x-input-label for="manufacturer" value="メーカー" />
                         <x-text-input id="manufacturer" name="manufacturer" type="text" class="mt-1 block w-full" :value="old('manufacturer')" />
                     </div>
                     <div>

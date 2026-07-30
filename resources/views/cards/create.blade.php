@@ -62,7 +62,7 @@
 
                     <div>
                         <x-input-label for="manufacturer" value="メーカー" />
-                        <x-text-input id="manufacturer" name="manufacturer" type="text" class="mt-1 block w-full" :value="old('manufacturer')" required placeholder="例: オムロン" />
+                        <x-text-input id="manufacturer" name="manufacturer" type="text" class="mt-1 block w-full" :value="old('manufacturer')" placeholder="例: オムロン" />
                         <x-input-error class="mt-2" :messages="$errors->get('manufacturer')" />
                     </div>
 

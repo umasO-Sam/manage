@@ -164,6 +164,25 @@ class PurchaseDetailSearchTest extends TestCase
         $response->assertRedirect(route('purchasing.index'));
     }
 
+    public function test_purchase_detail_can_be_updated_without_manufacturer(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        $category = \App\Models\CategoryCode::create(['code' => 1, 'major_category' => '部品']);
+        $detail = PurchaseDetail::create([
+            'item_code' => 'AAA111-X01', 'item_name' => '対象品', 'manufacturer' => 'メーカーA',
+            'category_id' => $category->id, 'order_qty' => 1, 'unit_price' => 100, 'supplier_name' => '商社A',
+        ]);
+
+        $response = $this->actingAs($manager)->put(route('purchasing.update', $detail), [
+            'item_code' => 'AAA111-X01', 'item_name' => '更新後品名', 'manufacturer' => '',
+            'category_id' => $category->id, 'order_qty' => 1, 'unit_price' => 100, 'supplier_name' => '商社A',
+        ]);
+
+        $response->assertSessionDoesntHaveErrors('manufacturer');
+        $response->assertRedirect(route('purchasing.index'));
+        $this->assertNull($detail->fresh()->manufacturer);
+    }
+
     public function test_direct_edit_button_is_only_shown_to_procurement_managers(): void
     {
         $manager = Staff::factory()->procurementManager()->create();

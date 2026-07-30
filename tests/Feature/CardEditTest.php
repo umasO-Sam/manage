@@ -80,6 +80,35 @@ class CardEditTest extends TestCase
         $this->assertArrayNotHasKey('メーカー', $log->changes);
     }
 
+    public function test_card_can_be_updated_without_manufacturer(): void
+    {
+        $workflowType = $this->purchaseWorkflow();
+        $orderNumber = $this->orderNumber();
+        $requester = Staff::factory()->create();
+        $manager = Staff::factory()->procurementManager()->create();
+
+        $card = $workflowType->cards()->create([
+            'order_number_id' => $orderNumber->id, 'item_name' => 'テスト部品', 'model_number' => 'ABC-123', 'manufacturer' => 'メーカーA',
+            'quantity' => 1, 'unit' => '個', 'due_date_type' => 'specific', 'due_date' => now()->addWeek(), 'created_by' => $requester->id, 'current_stage' => 0,
+        ]);
+
+        $response = $this->actingAs($manager)->put(route('cards.update', $card), [
+            'order_number_id' => $orderNumber->id,
+            'item_name' => 'テスト部品',
+            'model_number' => 'ABC-123',
+            'manufacturer' => '',
+            'quantity' => 1,
+            'unit' => '個',
+            'due_date_type' => 'specific',
+            'due_date' => $card->due_date->toDateString(),
+        ]);
+
+        $response->assertSessionDoesntHaveErrors('manufacturer');
+        $response->assertRedirect(route('cards.show', $card));
+        $card->refresh();
+        $this->assertNull($card->manufacturer);
+    }
+
     public function test_requester_cannot_edit_a_card(): void
     {
         $workflowType = $this->purchaseWorkflow();
