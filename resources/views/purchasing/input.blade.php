@@ -193,7 +193,7 @@
                         <select id="staff_id" name="staff_id" class="mt-1 block w-full text-sm rounded-lg shadow-sm {{ $errors->has('staff_id') ? 'bg-red-50 border-red-300 focus:border-red-400 focus:ring-red-400' : 'border-slate-300 focus:border-green-500 focus:ring-green-500' }}">
                             <option value="">選択してください</option>
                             @foreach ($laborStaff as $person)
-                                <option value="{{ $person->id }}" @selected((string) old('staff_id') === (string) $person->id)>{{ $person->name }}</option>
+                                <option value="{{ $person->id }}" @selected((string) old('staff_id') === (string) $person->id)>{{ $person->sid }}：{{ $person->name }}</option>
                             @endforeach
                         </select>
                     </div>

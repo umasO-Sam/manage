@@ -208,6 +208,19 @@ class PurchasingModuleTest extends TestCase
         ]);
     }
 
+    public function test_labor_staff_dropdown_lists_staff_with_sid_ordered_by_sid_as_sid_colon_name(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        Staff::factory()->create(['name' => '後番の担当者', 'sid' => 20]);
+        Staff::factory()->create(['name' => '先番の担当者', 'sid' => 5]);
+        Staff::factory()->create(['name' => 'SID未設定の担当者', 'sid' => null]);
+
+        $response = $this->actingAs($manager)->get(route('purchasing.input'));
+
+        $response->assertSeeInOrder(['5：先番の担当者', '20：後番の担当者']);
+        $response->assertDontSee('SID未設定の担当者');
+    }
+
     public function test_purchase_detail_category_is_saved_correctly(): void
     {
         $manager = Staff::factory()->procurementManager()->create();

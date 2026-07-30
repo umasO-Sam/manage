@@ -23,7 +23,7 @@ class PurchaseInputController extends Controller
     {
         return view('purchasing.input', [
             'categories' => CategoryCode::orderBy('code')->get(),
-            'laborStaff' => Staff::where('is_labor_target', true)->orderBy('name')->get(),
+            'laborStaff' => Staff::whereNotNull('sid')->orderBy('sid')->get(),
             'provisionalCount' => PurchaseDetail::where('is_provisional', true)->count(),
             'bulkPasteMaxRows' => self::BULK_PASTE_MAX_ROWS,
         ]);

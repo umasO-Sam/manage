@@ -24,7 +24,7 @@
                         <select name="staff_id" class="w-full border rounded-lg p-2 border-slate-300 font-normal">
                             <option value="">全員</option>
                             @foreach ($laborStaff as $person)
-                                <option value="{{ $person->id }}" @selected((string) $filters['staffId'] === (string) $person->id)>{{ $person->name }}</option>
+                                <option value="{{ $person->id }}" @selected((string) $filters['staffId'] === (string) $person->id)>{{ $person->sid }}：{{ $person->name }}</option>
                             @endforeach
                         </select>
                     </div>

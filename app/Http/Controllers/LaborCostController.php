@@ -20,7 +20,7 @@ class LaborCostController extends Controller
         $orderNoMatch = $request->query('order_no_match') === 'perfect' ? 'perfect' : 'partial';
         $excludedOrderNos = array_values(array_filter((array) $request->query('excluded_order_nos', [])));
 
-        $laborStaff = Staff::where('is_labor_target', true)->orderBy('name')->get();
+        $laborStaff = Staff::whereNotNull('sid')->orderBy('sid')->get();
         $filters = compact('dateFrom', 'dateTo', 'staffId', 'orderNo', 'orderNoMatch');
 
         // 絞り込み条件が何も指定されていない状態(ナビゲーションからの初回遷移など)で
