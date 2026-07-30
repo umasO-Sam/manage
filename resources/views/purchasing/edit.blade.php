@@ -146,6 +146,16 @@
                     </button>
                 </div>
             </form>
+
+            <form method="POST" action="{{ route('purchasing.destroy', $detail) }}"
+                  onsubmit="return confirm('この明細(注番: {{ $detail->item_code }})を削除します。この操作は取り消せません。よろしいですか？');">
+                @csrf
+                @method('DELETE')
+                <input type="hidden" name="return_query" value="{{ $returnQuery }}">
+                <button type="submit" class="inline-flex items-center px-4 py-2 bg-white hover:bg-red-50 border border-red-200 rounded-xl font-semibold text-sm text-red-700 shadow-sm transition-all">
+                    このレコードを削除する
+                </button>
+            </form>
         </div>
     </div>
 </x-app-layout>

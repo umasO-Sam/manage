@@ -170,6 +170,32 @@ class PurchaseDetailController extends Controller
         ]);
     }
 
+    public function destroy(Request $request, PurchaseDetail $purchaseDetail): RedirectResponse
+    {
+        $purchaseDetail->delete();
+
+        $returnQuery = (string) $request->input('return_query', '');
+        $redirectUrl = route('purchasing.index').($returnQuery !== '' ? "?{$returnQuery}" : '');
+
+        return redirect()->to($redirectUrl)->with('status', 'delete-success');
+    }
+
+    /**
+     * 検索画面の「まとめて削除」から、チェックボックスで選択した複数レコードを削除する。
+     * 削除確認は画面側(削除実行ボタン押下時の確認モーダル)で行う前提のため、ここでは実行のみ。
+     */
+    public function bulkDestroy(Request $request): RedirectResponse
+    {
+        $ids = array_values(array_filter((array) $request->input('ids', []), fn ($id) => is_numeric($id)));
+        $count = PurchaseDetail::whereIn('id', $ids)->count();
+        PurchaseDetail::whereIn('id', $ids)->delete();
+
+        $returnQuery = (string) $request->input('return_query', '');
+        $redirectUrl = route('purchasing.index').($returnQuery !== '' ? "?{$returnQuery}" : '');
+
+        return redirect()->to($redirectUrl)->with('status', 'bulk-delete-success')->with('bulk_delete_count', $count);
+    }
+
     public function update(Request $request, PurchaseDetail $purchaseDetail): RedirectResponse
     {
         $isProvisional = $request->boolean('is_provisional');

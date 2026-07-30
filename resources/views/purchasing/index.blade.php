@@ -55,6 +55,12 @@
             @if (session('status') === 'bulk-update-success')
                 <div class="p-3 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-800 text-sm">変更を保存しました。</div>
             @endif
+            @if (session('status') === 'delete-success')
+                <div class="p-3 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-800 text-sm">削除しました。</div>
+            @endif
+            @if (session('status') === 'bulk-delete-success')
+                <div class="p-3 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-800 text-sm">{{ session('bulk_delete_count') }}件を削除しました。</div>
+            @endif
 
             <form method="GET" action="{{ route('purchasing.index') }}" class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4">
                 <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
@@ -195,10 +201,15 @@
                             検索
                         </button>
                         @if (Auth::user()->is_procurement_manager)
-                            <button type="button" @click="editMode = ! editMode"
+                            <button type="button" @click="toggleEditMode()"
                                     class="text-sm font-semibold rounded-lg py-2 px-6 transition-colors border"
                                     :class="editMode ? 'bg-amber-100 border-amber-300 text-amber-800' : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-50'">
                                 <span x-text="editMode ? '直接編集を終了' : '直接編集'"></span>
+                            </button>
+                            <button type="button" @click="toggleDeleteMode()"
+                                    class="text-sm font-semibold rounded-lg py-2 px-6 transition-colors border"
+                                    :class="deleteMode ? 'bg-red-100 border-red-300 text-red-800' : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-50'">
+                                <span x-text="deleteMode ? 'まとめて削除を終了' : 'まとめて削除'"></span>
                             </button>
                         @endif
                     </div>
@@ -243,6 +254,38 @@
                         </div>
                     </div>
                 </div>
+
+                <div x-show="deleteMode" x-cloak class="sticky top-2 z-10 bg-white border border-red-200 rounded-xl p-3 shadow-sm flex flex-wrap justify-between items-center gap-2">
+                    <span class="text-xs text-red-700 font-semibold">まとめて削除モード: チェックボックスで削除対象を選択し、「削除実行」を押してください。</span>
+                    <div class="flex gap-2">
+                        <button type="button" @click="deleteMode = false" class="text-xs font-semibold px-3 py-1.5 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50">削除をやめる</button>
+                        <button type="button" @click="reviewDelete()" :disabled="selectedIds.length === 0"
+                                class="text-xs font-bold px-4 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white">
+                            削除実行 (<span x-text="selectedIds.length"></span>件)
+                        </button>
+                    </div>
+                </div>
+
+                <div x-show="showDeleteConfirm" x-cloak class="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+                    <div class="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[80vh] flex flex-col">
+                        <div class="p-4 border-b border-slate-100">
+                            <h3 class="font-bold text-slate-800">削除内容の確認</h3>
+                            <p class="text-xs text-slate-500 mt-1">以下の<span x-text="deleteTargets.length"></span>件を削除します。この操作は取り消せません。よろしいですか？</p>
+                        </div>
+                        <div class="p-4 overflow-y-auto space-y-2 text-xs">
+                            <template x-for="row in deleteTargets" :key="row.id">
+                                <div class="border border-red-100 rounded-lg p-2 flex justify-between gap-4">
+                                    <span class="font-mono font-bold text-blue-900" x-text="row.itemCode"></span>
+                                    <span class="text-slate-600" x-text="row.itemName"></span>
+                                </div>
+                            </template>
+                        </div>
+                        <div class="p-4 border-t border-slate-100 flex justify-end gap-2">
+                            <button type="button" @click="showDeleteConfirm = false" class="text-xs font-semibold px-4 py-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50">キャンセル</button>
+                            <button type="button" @click="confirmDelete()" class="text-xs font-bold px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white">削除実行</button>
+                        </div>
+                    </div>
+                </div>
             @endif
 
             <form id="bulk-edit-form" method="POST" action="{{ route('purchasing.bulk-update') }}">
@@ -258,6 +301,7 @@
                         <thead>
                             <tr class="bg-slate-50 border-b border-slate-200 font-semibold text-slate-600">
                                 @if (Auth::user()->is_procurement_manager)
+                                    <th class="p-2.5"></th>
                                     <th class="p-2.5"></th>
                                 @endif
                                 <th class="p-2.5">仮</th>
@@ -294,6 +338,12 @@
                                 <tr class="hover:bg-slate-50 {{ $detail->hasSalesOrder() ? 'bg-blue-50/50' : '' }}"
                                     data-row-id="{{ $detail->id }}" data-row-item-code="{{ $detail->item_code }}">
                                     @if (Auth::user()->is_procurement_manager)
+                                        <td class="p-2.5">
+                                            <input x-show="deleteMode" x-cloak type="checkbox"
+                                                   class="delete-target-checkbox rounded border-slate-300 text-red-600 focus:ring-red-500"
+                                                   data-id="{{ $detail->id }}" data-row-item-code="{{ $detail->item_code }}" data-row-item-name="{{ $detail->item_name }}"
+                                                   @change="toggleSelect({{ $detail->id }}, $event.target.checked)">
+                                        </td>
                                         <td class="p-2.5">
                                             <a href="{{ route('purchasing.edit', [$detail, 'return_query' => request()->getQueryString()]) }}" class="text-blue-700 hover:text-blue-900 font-semibold">編集</a>
                                         </td>
@@ -484,7 +534,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="{{ Auth::user()->is_procurement_manager ? 28 : 27 }}" class="p-8 text-center text-slate-400">
+                                    <td colspan="{{ Auth::user()->is_procurement_manager ? 29 : 27 }}" class="p-8 text-center text-slate-400">
                                         <i data-lucide="search-x" class="w-10 h-10 mx-auto mb-2 text-slate-300"></i>
                                         条件に一致するデータがありません。
                                     </td>
@@ -495,6 +545,16 @@
                 </div>
             </div>
             </form>
+
+            @if (Auth::user()->is_procurement_manager)
+                <form id="bulk-delete-form" method="POST" action="{{ route('purchasing.bulk-delete') }}">
+                    @csrf
+                    <input type="hidden" name="return_query" value="{{ request()->getQueryString() }}">
+                    <template x-for="id in selectedIds" :key="id">
+                        <input type="hidden" name="ids[]" :value="id">
+                    </template>
+                </form>
+            @endif
 
             @if ($details->hasPages())
                 <div>{{ $details->links() }}</div>
@@ -508,6 +568,55 @@
                 editMode: false,
                 showConfirm: false,
                 changes: [],
+                deleteMode: false,
+                selectedIds: [],
+                showDeleteConfirm: false,
+                deleteTargets: [],
+
+                toggleEditMode() {
+                    this.editMode = ! this.editMode;
+                    if (this.editMode) {
+                        this.deleteMode = false;
+                        this.selectedIds = [];
+                    }
+                },
+
+                toggleDeleteMode() {
+                    this.deleteMode = ! this.deleteMode;
+                    if (this.deleteMode) {
+                        this.editMode = false;
+                    } else {
+                        this.selectedIds = [];
+                    }
+                },
+
+                toggleSelect(id, checked) {
+                    if (checked) {
+                        if (! this.selectedIds.includes(id)) {
+                            this.selectedIds.push(id);
+                        }
+                    } else {
+                        this.selectedIds = this.selectedIds.filter((existingId) => existingId !== id);
+                    }
+                },
+
+                reviewDelete() {
+                    if (this.selectedIds.length === 0) return;
+
+                    this.deleteTargets = this.selectedIds.map((id) => {
+                        const checkbox = document.querySelector(`.delete-target-checkbox[data-id="${id}"]`);
+                        return {
+                            id,
+                            itemCode: checkbox?.dataset.rowItemCode ?? '',
+                            itemName: checkbox?.dataset.rowItemName ?? '',
+                        };
+                    });
+                    this.showDeleteConfirm = true;
+                },
+
+                confirmDelete() {
+                    document.getElementById('bulk-delete-form').submit();
+                },
 
                 reviewChanges() {
                     const rows = {};

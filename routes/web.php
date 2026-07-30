@@ -72,7 +72,9 @@ Route::middleware('auth')->group(function () {
 
         Route::get('/purchasing/{purchaseDetail}/edit', [PurchaseDetailController::class, 'edit'])->name('purchasing.edit');
         Route::put('/purchasing/{purchaseDetail}', [PurchaseDetailController::class, 'update'])->name('purchasing.update');
+        Route::delete('/purchasing/{purchaseDetail}', [PurchaseDetailController::class, 'destroy'])->name('purchasing.destroy');
         Route::post('/purchasing/bulk-update', [PurchaseDetailController::class, 'bulkUpdate'])->name('purchasing.bulk-update');
+        Route::post('/purchasing/bulk-delete', [PurchaseDetailController::class, 'bulkDestroy'])->name('purchasing.bulk-delete');
 
         Route::get('/purchasing/orders', [PurchaseOrderController::class, 'index'])->name('purchasing.orders.index');
         Route::post('/purchasing/orders/print', [PurchaseOrderController::class, 'print'])->name('purchasing.orders.print');

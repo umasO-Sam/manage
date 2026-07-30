@@ -265,4 +265,96 @@ class PurchaseDetailSearchTest extends TestCase
 
         $this->assertSame('対象', $detail->fresh()->item_name);
     }
+
+    public function test_procurement_manager_can_delete_a_record_from_the_edit_screen(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        $detail = PurchaseDetail::create(['item_code' => 'DEL001-N01', 'item_name' => '削除対象']);
+
+        $response = $this->actingAs($manager)->delete(route('purchasing.destroy', $detail));
+
+        $response->assertRedirect(route('purchasing.index'));
+        $this->assertDatabaseMissing('purchase_details', ['id' => $detail->id]);
+    }
+
+    public function test_delete_redirects_back_to_the_search_with_filters_preserved(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        $detail = PurchaseDetail::create(['item_code' => 'DEL002-N01', 'item_name' => '削除対象']);
+
+        $response = $this->actingAs($manager)->delete(route('purchasing.destroy', $detail), [
+            'return_query' => 'item_code=DEL002&item_code_match=partial',
+        ]);
+
+        $response->assertRedirect(route('purchasing.index').'?item_code=DEL002&item_code_match=partial');
+    }
+
+    public function test_sales_role_cannot_delete_a_record(): void
+    {
+        $sales = Staff::factory()->sales()->create();
+        $detail = PurchaseDetail::create(['item_code' => 'DEL003-N01', 'item_name' => '対象']);
+
+        $this->actingAs($sales)->delete(route('purchasing.destroy', $detail))->assertForbidden();
+
+        $this->assertDatabaseHas('purchase_details', ['id' => $detail->id]);
+    }
+
+    public function test_procurement_manager_can_bulk_delete_selected_records(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        $target1 = PurchaseDetail::create(['item_code' => 'BDEL01-N01', 'item_name' => '削除対象1']);
+        $target2 = PurchaseDetail::create(['item_code' => 'BDEL02-N01', 'item_name' => '削除対象2']);
+        $kept = PurchaseDetail::create(['item_code' => 'BDEL03-N01', 'item_name' => '残す']);
+
+        $response = $this->actingAs($manager)->post(route('purchasing.bulk-delete'), [
+            'ids' => [$target1->id, $target2->id],
+        ]);
+
+        $response->assertRedirect(route('purchasing.index'));
+        $this->assertDatabaseMissing('purchase_details', ['id' => $target1->id]);
+        $this->assertDatabaseMissing('purchase_details', ['id' => $target2->id]);
+        $this->assertDatabaseHas('purchase_details', ['id' => $kept->id]);
+    }
+
+    public function test_bulk_delete_redirects_back_to_the_search_with_filters_preserved(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        $target = PurchaseDetail::create(['item_code' => 'BDEL04-N01', 'item_name' => '削除対象']);
+
+        $response = $this->actingAs($manager)->post(route('purchasing.bulk-delete'), [
+            'ids' => [$target->id],
+            'return_query' => 'item_code=BDEL04&item_code_match=partial',
+        ]);
+
+        $response->assertRedirect(route('purchasing.index').'?item_code=BDEL04&item_code_match=partial');
+    }
+
+    public function test_sales_role_cannot_bulk_delete(): void
+    {
+        $sales = Staff::factory()->sales()->create();
+        $detail = PurchaseDetail::create(['item_code' => 'BDEL05-N01', 'item_name' => '対象']);
+
+        $this->actingAs($sales)->post(route('purchasing.bulk-delete'), [
+            'ids' => [$detail->id],
+        ])->assertForbidden();
+
+        $this->assertDatabaseHas('purchase_details', ['id' => $detail->id]);
+    }
+
+    public function test_delete_button_is_only_shown_to_procurement_managers_on_edit_screen(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        $detail = PurchaseDetail::create(['item_code' => 'DEL006-N01', 'item_name' => '対象']);
+
+        $this->actingAs($manager)->get(route('purchasing.edit', $detail))->assertSee('このレコードを削除する');
+    }
+
+    public function test_bulk_delete_button_is_only_shown_to_procurement_managers(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        $sales = Staff::factory()->sales()->create();
+
+        $this->actingAs($manager)->get(route('purchasing.index'))->assertSee('まとめて削除');
+        $this->actingAs($sales)->get(route('purchasing.index'))->assertDontSee('まとめて削除');
+    }
 }
