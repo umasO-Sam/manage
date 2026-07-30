@@ -80,7 +80,7 @@
                     </div>
                     <div>
                         <x-input-label for="category_id" value="分類 *" />
-                        <select id="category_id" name="category_id" class="mt-1 block w-full text-sm border-slate-300 focus:border-blue-500 focus:ring-blue-500 rounded-lg shadow-sm">
+                        <select id="category_id" name="category_id" class="mt-1 block w-full text-sm rounded-lg shadow-sm {{ $errors->has('category_id') ? 'bg-red-50 border-red-300 focus:border-red-400 focus:ring-red-400' : 'border-slate-300 focus:border-blue-500 focus:ring-blue-500' }}">
                             <option value="">選択してください</option>
                             @foreach ($categories as $category)
                                 <option value="{{ $category->id }}" @selected((string) old('category_id') === (string) $category->id)>
@@ -183,7 +183,7 @@
                     </div>
                     <div>
                         <x-input-label for="staff_id" value="担当者 *" />
-                        <select id="staff_id" name="staff_id" class="mt-1 block w-full text-sm border-slate-300 focus:border-green-500 focus:ring-green-500 rounded-lg shadow-sm">
+                        <select id="staff_id" name="staff_id" class="mt-1 block w-full text-sm rounded-lg shadow-sm {{ $errors->has('staff_id') ? 'bg-red-50 border-red-300 focus:border-red-400 focus:ring-red-400' : 'border-slate-300 focus:border-green-500 focus:ring-green-500' }}">
                             <option value="">選択してください</option>
                             @foreach ($laborStaff as $person)
                                 <option value="{{ $person->id }}" @selected((string) old('staff_id') === (string) $person->id)>{{ $person->name }}</option>
@@ -200,7 +200,7 @@
                     </div>
                     <div>
                         <x-input-label for="labor_category_id" value="作業分類 *" />
-                        <select id="labor_category_id" name="labor_category_id" class="mt-1 block w-full text-sm border-slate-300 focus:border-green-500 focus:ring-green-500 rounded-lg shadow-sm">
+                        <select id="labor_category_id" name="labor_category_id" class="mt-1 block w-full text-sm rounded-lg shadow-sm {{ $errors->has('labor_category_id') ? 'bg-red-50 border-red-300 focus:border-red-400 focus:ring-red-400' : 'border-slate-300 focus:border-green-500 focus:ring-green-500' }}">
                             <option value="">選択してください</option>
                             @foreach ($categories as $category)
                                 <option value="{{ $category->id }}" @selected((string) old('labor_category_id') === (string) $category->id)>
@@ -259,12 +259,12 @@
                     <x-input-label for="paste_data" value="貼り付け欄 *" />
                     <textarea id="paste_data" name="paste_data" rows="12"
                               placeholder="品名&#9;機械装置No&#9;分類&#9;型式&#9;数量&#9;単価&#9;商社名&#9;メーカー&#10;バタフライ弁（キッツ）&#9;1&#9;1&#9;G-10BJUE-50A&#9;1&#9;1&#9;㈱モノタロウ&#9;キッツ"
-                              class="mt-1 block w-full font-mono text-xs border-slate-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-lg shadow-sm">{{ old('paste_data') }}</textarea>
+                              class="mt-1 block w-full font-mono text-xs rounded-lg shadow-sm {{ $errors->has('paste_data') ? 'bg-red-50 border-red-300 focus:border-red-400 focus:ring-red-400' : 'border-slate-300 focus:border-indigo-500 focus:ring-indigo-500' }}">{{ old('paste_data') }}</textarea>
                 </div>
 
                 <div class="flex justify-end pt-4 border-t border-slate-100">
                     <button type="submit" class="inline-flex items-center px-6 py-2 bg-indigo-600 hover:bg-indigo-700 border border-transparent rounded-xl font-semibold text-sm text-white shadow-sm transition-all">
-                        一括登録する
+                        確認する
                     </button>
                 </div>
             </form>

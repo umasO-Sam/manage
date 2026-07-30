@@ -52,7 +52,7 @@ class PurchaseInputController extends Controller
             'required_qty' => ['nullable', 'numeric'],
             'usage_purpose' => ['nullable', 'string', 'max:255'],
             'order_qty' => [$isProvisional ? 'nullable' : 'required', 'numeric'],
-            'unit' => ['nullable', 'string', 'max:50'],
+            'unit' => ['nullable', 'string', 'max:50', 'regex:/^[^\d０-９]+$/u'],
             'unit_price' => [$isProvisional ? 'nullable' : 'required', 'numeric'],
             'stock_qty' => ['nullable', 'numeric'],
             'supplier_name' => [$isProvisional ? 'nullable' : 'required', 'string', 'max:255'],
@@ -65,6 +65,8 @@ class PurchaseInputController extends Controller
             'order_amount' => ['nullable', 'numeric'],
             'sales_date' => ['nullable', 'date'],
             'supplier_invoice_no' => ['nullable', 'string', 'max:255'],
+        ], [
+            'unit.regex' => '単位に数字は使用できません。',
         ]);
         $data['is_provisional'] = $isProvisional;
 
@@ -106,8 +108,12 @@ class PurchaseInputController extends Controller
      * エクセル等の表(タブ区切り)をコピー&ペーストして仕入明細を一括登録する。
      * 列順は固定: 品名, 機械装置No, 分類(コード), 型式, 数量, 単価, 商社名, メーカー。
      * 注番・注文日付は全行共通としてフォーム上部で1回だけ入力する。
+     *
+     * confirmedが未送信の場合は登録を実行せず、内容確認画面を表示する。
+     * confirmed=1で再送信された時のみ実際に登録する(この時点で貼り付け内容は
+     * 確認画面から変更されない前提のため、パース処理をもう一度そのまま通す)。
      */
-    public function storeBulkPaste(Request $request): RedirectResponse
+    public function storeBulkPaste(Request $request): RedirectResponse|View
     {
         $request->validate([
             'item_code' => ['required', 'string', 'max:255'],
@@ -133,7 +139,11 @@ class PurchaseInputController extends Controller
             ]);
         }
 
-        $categoryIdsByCode = CategoryCode::pluck('id', 'code');
+        $categories = CategoryCode::all();
+        $categoryIdsByCode = $categories->pluck('id', 'code');
+        $categoryLabelsById = $categories->mapWithKeys(
+            fn ($c) => [$c->id => $c->code.':'.$c->major_category.($c->sub_category ? '／'.$c->sub_category : '')]
+        );
         $itemCode = $request->string('item_code')->value();
         $orderDate = $request->input('order_date');
 
@@ -171,6 +181,7 @@ class PurchaseInputController extends Controller
                 'item_code' => $itemCode,
                 'machine_no' => $machineNo !== '' ? $machineNo : null,
                 'category_id' => $categoryId,
+                'category_display' => $isUnclassified ? '(分類未定・仮登録)' : ($categoryLabelsById[$categoryId] ?? ''),
                 'manufacturer' => $manufacturer !== '' ? $manufacturer : null,
                 'item_name' => $itemName,
                 'dimensions' => $dimensions !== '' ? $dimensions : null,
@@ -184,6 +195,15 @@ class PurchaseInputController extends Controller
 
         if (count($errors) > 0) {
             return back()->withInput()->withErrors(['paste_data' => $errors]);
+        }
+
+        if (! $request->boolean('confirmed')) {
+            return view('purchasing.bulk-paste-confirm', [
+                'rows' => $rows,
+                'itemCode' => $itemCode,
+                'orderDateRaw' => (string) $request->input('order_date'),
+                'pasteData' => $request->input('paste_data'),
+            ]);
         }
 
         DB::transaction(function () use ($rows) {

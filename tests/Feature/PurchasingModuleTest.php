@@ -60,6 +60,29 @@ class PurchasingModuleTest extends TestCase
         ]);
     }
 
+    public function test_purchase_detail_unit_cannot_contain_digits(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        $category = CategoryCode::create(['code' => 1, 'major_category' => '部品', 'is_parts' => true]);
+
+        $response = $this->actingAs($manager)->post(route('purchasing.input.store'), [
+            'form_type' => 'purchase',
+            'is_provisional' => '0',
+            'item_code' => 'AB123-C45',
+            'category_id' => $category->id,
+            'manufacturer' => 'オムロン',
+            'item_name' => '近接センサ',
+            'order_qty' => 5,
+            'unit' => '個5',
+            'unit_price' => 1000,
+            'supplier_name' => '大津屋',
+        ]);
+
+        $response->assertSessionHasErrors('unit');
+        $errors = session('errors')->getBag('default');
+        $this->assertStringContainsString('単位に数字は使用できません。', $errors->first('unit'));
+    }
+
     public function test_purchase_detail_can_be_registered_without_manufacturer(): void
     {
         $manager = Staff::factory()->procurementManager()->create();
@@ -142,6 +165,21 @@ class PurchasingModuleTest extends TestCase
         $this->assertStringContainsString('数量を入力してください。', $errors->first('order_qty'));
         $this->assertStringContainsString('単価を入力してください。', $errors->first('unit_price'));
         $this->assertStringContainsString('商社名を入力してください。', $errors->first('supplier_name'));
+    }
+
+    public function test_missing_required_category_select_is_highlighted_with_a_light_red_background(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+
+        $this->actingAs($manager)->post(route('purchasing.input.store'), [
+            'form_type' => 'purchase',
+            'is_provisional' => '0',
+            'item_code' => 'AB123-C45',
+        ]);
+
+        $response = $this->actingAs($manager)->get(route('purchasing.input'));
+
+        $response->assertSee('id="category_id" name="category_id" class="mt-1 block w-full text-sm rounded-lg shadow-sm bg-red-50', false);
     }
 
     public function test_procurement_manager_can_register_labor(): void
@@ -242,6 +280,45 @@ class PurchasingModuleTest extends TestCase
         $this->assertStringContainsString('注文日には有効な日付を指定してください。', $errors->first('order_date'));
     }
 
+    public function test_bulk_paste_shows_a_confirmation_screen_without_saving_when_not_yet_confirmed(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        CategoryCode::create(['code' => 3, 'major_category' => '機械', 'sub_category' => 'バルブ']);
+
+        $pasteData = "バタフライ弁（キッツ）\t1\t3\tG-10BJUE-50A\t1\t1500\t㈱モノタロウ\tキッツ";
+
+        $response = $this->actingAs($manager)->post(route('purchasing.input.bulk-paste'), [
+            'item_code' => 'AB123-C45',
+            'order_date' => '2026/07/30',
+            'paste_data' => $pasteData,
+        ]);
+
+        $response->assertOk();
+        $response->assertSee('一括登録の確認');
+        $response->assertSee('バタフライ弁（キッツ）');
+        $response->assertSee('登録する');
+        $this->assertSame(0, PurchaseDetail::count());
+    }
+
+    public function test_bulk_paste_saves_only_after_confirmation(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        CategoryCode::create(['code' => 3, 'major_category' => '機械', 'sub_category' => 'バルブ']);
+
+        $pasteData = "バタフライ弁（キッツ）\t1\t3\tG-10BJUE-50A\t1\t1500\t㈱モノタロウ\tキッツ";
+
+        $response = $this->actingAs($manager)->post(route('purchasing.input.bulk-paste'), [
+            'item_code' => 'AB123-C45',
+            'order_date' => '2026/07/30',
+            'paste_data' => $pasteData,
+            'confirmed' => '1',
+        ]);
+
+        $response->assertSessionDoesntHaveErrors();
+        $response->assertRedirect(route('purchasing.input'));
+        $this->assertSame(1, PurchaseDetail::where('item_code', 'AB123-C45')->count());
+    }
+
     public function test_bulk_paste_registers_multiple_rows_with_shared_item_code_and_date(): void
     {
         $manager = Staff::factory()->procurementManager()->create();
@@ -254,6 +331,7 @@ class PurchasingModuleTest extends TestCase
             'item_code' => 'AB123-C45',
             'order_date' => '2026/07/30',
             'paste_data' => $pasteData,
+            'confirmed' => '1',
         ]);
 
         $response->assertSessionDoesntHaveErrors();
@@ -286,6 +364,7 @@ class PurchasingModuleTest extends TestCase
         $response = $this->actingAs($manager)->post(route('purchasing.input.bulk-paste'), [
             'item_code' => 'AB123-C45',
             'paste_data' => $pasteData,
+            'confirmed' => '1',
         ]);
 
         $response->assertSessionDoesntHaveErrors();
@@ -303,6 +382,7 @@ class PurchasingModuleTest extends TestCase
         $this->actingAs($manager)->post(route('purchasing.input.bulk-paste'), [
             'item_code' => 'AB123-C45',
             'paste_data' => $pasteData,
+            'confirmed' => '1',
         ]);
 
         $expectedUrl = route('purchasing.index', ['item_code' => 'AB123-C45', 'item_code_match' => 'perfect']);
@@ -335,6 +415,7 @@ class PurchasingModuleTest extends TestCase
         $response = $this->actingAs($manager)->post(route('purchasing.input.bulk-paste'), [
             'item_code' => 'AB123-C45',
             'paste_data' => $pasteData,
+            'confirmed' => '1',
         ]);
 
         $response->assertSessionDoesntHaveErrors();
@@ -393,6 +474,7 @@ class PurchasingModuleTest extends TestCase
         $response = $this->actingAs($manager)->post(route('purchasing.input.bulk-paste'), [
             'item_code' => 'AB123-C45',
             'paste_data' => $pasteData,
+            'confirmed' => '1',
         ]);
 
         $response->assertSessionDoesntHaveErrors();
