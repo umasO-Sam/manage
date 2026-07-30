@@ -185,6 +185,48 @@ class CardWorkflowTest extends TestCase
         $response->assertSessionHasErrors('machine_number');
     }
 
+    public function test_unit_cannot_contain_digits(): void
+    {
+        $workflowType = $this->purchaseWorkflow();
+        $orderNumber = $this->orderNumber();
+        $staff = Staff::factory()->create();
+
+        $halfWidth = $this->actingAs($staff)->post(route('cards.store', $workflowType), [
+            'order_number_id' => $orderNumber->id, 'item_name' => 'テスト部品', 'model_number' => 'ABC-123',
+            'manufacturer' => 'テストメーカー', 'quantity' => 2, 'unit' => '個5', 'due_date_type' => 'asap',
+        ]);
+        $halfWidth->assertSessionHasErrors('unit');
+
+        $fullWidth = $this->actingAs($staff)->post(route('cards.store', $workflowType), [
+            'order_number_id' => $orderNumber->id, 'item_name' => 'テスト部品', 'model_number' => 'ABC-123',
+            'manufacturer' => 'テストメーカー', 'quantity' => 2, 'unit' => '個５', 'due_date_type' => 'asap',
+        ]);
+        $fullWidth->assertSessionHasErrors('unit');
+
+        $valid = $this->actingAs($staff)->post(route('cards.store', $workflowType), [
+            'order_number_id' => $orderNumber->id, 'item_name' => 'テスト部品', 'model_number' => 'ABC-123',
+            'manufacturer' => 'テストメーカー', 'quantity' => 2, 'unit' => '個', 'due_date_type' => 'asap',
+        ]);
+        $valid->assertSessionDoesntHaveErrors('unit');
+    }
+
+    public function test_validation_error_shows_the_japanese_field_label_not_the_raw_key(): void
+    {
+        $workflowType = $this->purchaseWorkflow();
+        $orderNumber = $this->orderNumber();
+        $staff = Staff::factory()->create();
+
+        $response = $this->actingAs($staff)->post(route('cards.store', $workflowType), [
+            'order_number_id' => $orderNumber->id, 'quantity' => 2, 'unit' => '個', 'due_date_type' => 'asap',
+        ]);
+
+        $response->assertSessionHasErrors(['item_name', 'model_number', 'manufacturer']);
+        $errors = session('errors')->getBag('default');
+        $this->assertStringContainsString('品名を入力してください。', $errors->first('item_name'));
+        $this->assertStringContainsString('型式を入力してください。', $errors->first('model_number'));
+        $this->assertStringContainsString('メーカーを入力してください。', $errors->first('manufacturer'));
+    }
+
     public function test_due_date_type_asap_does_not_require_a_specific_date(): void
     {
         $workflowType = $this->purchaseWorkflow();

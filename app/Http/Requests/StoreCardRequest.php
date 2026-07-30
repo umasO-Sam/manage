@@ -31,7 +31,7 @@ class StoreCardRequest extends FormRequest
             'model_number' => ['required', 'string', 'max:255'],
             'manufacturer' => ['required', 'string', 'max:255'],
             'quantity' => ['required', 'integer', 'min:1'],
-            'unit' => ['required', 'string', 'max:20'],
+            'unit' => ['required', 'string', 'max:20', 'regex:/^[^\d０-９]+$/u'],
             'due_date_type' => $isPurchase ? ['required', 'in:asap,normal,specific'] : ['nullable', 'in:asap,normal,specific'],
             'due_date' => $isPurchase
                 ? ['nullable', 'required_if:due_date_type,specific', 'date', 'after_or_equal:today']
@@ -48,6 +48,7 @@ class StoreCardRequest extends FormRequest
             'order_number_id.required' => '注番を選択してください。',
             'order_number_id.exists' => '選択された注番が見つかりません。',
             'machine_number.regex' => '機械装置番号は半角英数字とハイフン(-)で入力してください。',
+            'unit.regex' => '単位に数字は使用できません。',
             'model_number.required' => '型式を入力してください。',
             'due_date_type.required' => '希望納期を選択してください。',
             'due_date.required_if' => '日付指定の場合は希望納期の日付を入力してください。',

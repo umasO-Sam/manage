@@ -100,6 +100,25 @@ class PurchasingModuleTest extends TestCase
         ]);
     }
 
+    public function test_purchase_detail_validation_error_shows_the_japanese_field_label(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+
+        $response = $this->actingAs($manager)->post(route('purchasing.input.store'), [
+            'form_type' => 'purchase',
+            'is_provisional' => '0',
+            'item_code' => 'AB123-C45',
+        ]);
+
+        $response->assertSessionHasErrors(['category_id', 'manufacturer', 'item_name', 'order_qty', 'unit_price', 'supplier_name']);
+        $errors = session('errors')->getBag('default');
+        $this->assertStringContainsString('分類を入力してください。', $errors->first('category_id'));
+        $this->assertStringContainsString('メーカーを入力してください。', $errors->first('manufacturer'));
+        $this->assertStringContainsString('数量を入力してください。', $errors->first('order_qty'));
+        $this->assertStringContainsString('単価を入力してください。', $errors->first('unit_price'));
+        $this->assertStringContainsString('商社名を入力してください。', $errors->first('supplier_name'));
+    }
+
     public function test_procurement_manager_can_register_labor(): void
     {
         $manager = Staff::factory()->procurementManager()->create();

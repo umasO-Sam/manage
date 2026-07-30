@@ -188,7 +188,60 @@ return [
         'password_confirmation' => 'パスワード（確認）',
         'current_password' => '現在のパスワード',
         'email' => 'メールアドレス',
-        'name' => '名前',
+        'name' => '氏名',
+
+        // 担当者管理
+        'department' => '部署',
+        'login_id' => 'ログインID',
+        'role' => '権限',
+
+        // 注番管理
+        'code' => '注番',
+
+        // カード(購入部品手配・見積り依頼)
+        'order_number_id' => '注番',
+        'machine_number' => '機械装置番号',
+        'model_number' => '型式',
+        'quantity' => '数量',
+        'due_date_type' => '希望納期の種別',
+        'due_date' => '希望納期',
+
+        // 仕入管理データ入力・編集・検索(purchase_details)
+        'item_code' => '注番',
+        'machine_no' => '機械装置No',
+        'product_name' => '製品名',
+        'category_id' => '分類',
+        'manufacturer' => 'メーカー',
+        'item_name' => '品名',
+        'dimensions' => '形式/寸法',
+        'remarks' => '備考',
+        'required_qty' => '必要数量',
+        'usage_purpose' => '使用用途',
+        'order_qty' => '数量',
+        'unit' => '単位',
+        'unit_price' => '単価',
+        'stock_qty' => '在庫',
+        'supplier_name' => '商社名',
+        'order_date' => '注文日',
+        'arrival_date' => '受入日',
+        'invoice_date' => '納品書日',
+        'recipient' => '受注先',
+        'order_received_date' => '受注日',
+        'delivery_dest' => '納入先',
+        'order_amount' => '受注金額',
+        'sales_date' => '売上日',
+        'supplier_invoice_no' => '商社納品書No',
+
+        // 人工計算・日報入力(labor_costs)
+        'work_date' => '作業日',
+        'staff_id' => '担当者',
+        'order_no' => '注番',
+        'work_hours' => '時間',
+        'work_minutes' => '分',
+        'note' => '補足',
+
+        // カードコメント
+        'body' => 'コメント内容',
     ],
 
 ];
