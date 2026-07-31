@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\PurchaseDetail;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class PurchaseOrderController extends Controller
@@ -13,17 +14,21 @@ class PurchaseOrderController extends Controller
         $supplier = trim((string) $request->query('supplier_name', ''));
         $dateFrom = $request->query('date_from', '');
         $dateTo = $request->query('date_to', '');
+        $includeProvisional = $request->boolean('include_provisional');
 
-        $query = PurchaseDetail::query()->where('is_provisional', false);
+        $query = PurchaseDetail::query();
+        if (! $includeProvisional) {
+            $query->where('is_provisional', false);
+        }
 
         if ($supplier !== '') {
             $query->where('supplier_name', 'like', "%{$supplier}%");
         }
         if ($dateFrom !== '') {
-            $query->where('order_date', '>=', $dateFrom);
+            $query->whereDate('order_date', '>=', $dateFrom);
         }
         if ($dateTo !== '') {
-            $query->where('order_date', '<=', $dateTo);
+            $query->whereDate('order_date', '<=', $dateTo);
         }
 
         $details = ($supplier !== '' || $dateFrom !== '' || $dateTo !== '')
@@ -32,7 +37,7 @@ class PurchaseOrderController extends Controller
 
         return view('purchasing.orders.index', [
             'details' => $details,
-            'filters' => compact('supplier', 'dateFrom', 'dateTo'),
+            'filters' => compact('supplier', 'dateFrom', 'dateTo', 'includeProvisional'),
         ]);
     }
 
@@ -47,11 +52,20 @@ class PurchaseOrderController extends Controller
         ]);
 
         $details = PurchaseDetail::whereIn('id', $data['target_ids'])->get();
-        $total = $details->sum(fn (PurchaseDetail $d) => $d->lineTotal());
+
+        if ($details->pluck('is_provisional')->unique()->count() > 1) {
+            throw ValidationException::withMessages([
+                'target_ids' => '仮登録と確定済みのレコードは同じ注文書にまとめて印刷できません。',
+            ]);
+        }
+
+        $isProvisional = (bool) $details->first()?->is_provisional;
+        $total = $isProvisional ? null : $details->sum(fn (PurchaseDetail $d) => $d->lineTotal());
 
         return view('purchasing.orders.print', [
             'details' => $details,
             'total' => $total,
+            'isProvisional' => $isProvisional,
             'staffName' => $data['staff_name'],
             'staffPhone' => $data['staff_phone'] ?? '',
             'remarks' => $data['remarks'] ?? '',

@@ -27,7 +27,13 @@
                     <label class="block text-xs font-semibold text-slate-600 mb-1">注文日(終了)</label>
                     <input type="date" name="date_to" value="{{ $filters['dateTo'] }}" class="w-full text-sm bg-slate-50 border border-slate-200 rounded-lg py-1.5 px-3">
                 </div>
-                <button type="submit" class="text-sm font-semibold bg-slate-800 hover:bg-slate-900 text-white rounded-lg py-2 px-6 transition-colors">データを抽出</button>
+                <div class="flex items-center gap-4">
+                    <label class="flex items-center gap-1.5 text-xs font-semibold text-slate-600 whitespace-nowrap">
+                        <input type="checkbox" name="include_provisional" value="1" @checked($filters['includeProvisional']) class="rounded border-slate-300">
+                        仮を対象に含む
+                    </label>
+                    <button type="submit" class="text-sm font-semibold bg-slate-800 hover:bg-slate-900 text-white rounded-lg py-2 px-6 transition-colors">データを抽出</button>
+                </div>
             </form>
 
             @if ($details->isNotEmpty())
@@ -84,7 +90,19 @@
                 </form>
             @endif
 
-            <form method="POST" action="{{ route('purchasing.orders.print') }}" target="_blank" x-data="{ checked: [] }">
+            @error('target_ids')
+                <div class="p-3 rounded-xl bg-red-50 border border-red-100 text-red-700 text-sm">{{ $message }}</div>
+            @enderror
+
+            <form method="POST" action="{{ route('purchasing.orders.print') }}" target="_blank"
+                  x-data="{
+                      checked: [],
+                      provisional: {{ \Illuminate\Support\Js::from($details->pluck('is_provisional', 'id')) }},
+                      get mixedSelection() {
+                          const types = new Set(this.checked.map(id => this.provisional[id]));
+                          return types.size > 1;
+                      },
+                  }">
                 @csrf
 
                 <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden mb-6">
@@ -114,7 +132,12 @@
                                                    class="w-full text-xs border rounded px-1.5 py-1 border-slate-300">
                                         </td>
                                         <td class="p-2.5 font-bold">
-                                            <span x-show="!editMode">{{ $detail->supplier_name }}</span>
+                                            <span x-show="!editMode">
+                                                {{ $detail->supplier_name }}
+                                                @if ($detail->is_provisional)
+                                                    <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-yellow-100 text-yellow-800 border border-yellow-300 ml-1">仮</span>
+                                                @endif
+                                            </span>
                                             <input x-show="editMode" x-cloak type="text" form="bulk-edit-form" name="updates[{{ $detail->id }}][supplier_name]"
                                                    value="{{ $detail->supplier_name }}" data-original="{{ $detail->supplier_name }}" data-label="商社名"
                                                    class="w-full min-w-[120px] text-xs border rounded px-1.5 py-1 border-slate-300">
@@ -158,6 +181,9 @@
                         <h2 class="text-base font-bold text-slate-800">注文書 発行設定</h2>
                         <span class="text-sm text-blue-700 font-semibold">選択: <span x-text="checked.length"></span> 件</span>
                     </div>
+                    <div x-show="mixedSelection" x-cloak class="mb-4 p-3 rounded-lg bg-red-50 border border-red-100 text-red-700 text-xs font-semibold">
+                        仮登録と確定済みのレコードは同じ注文書にまとめて選択できません。どちらか一方だけ選択してください。
+                    </div>
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-6 text-xs">
                         <div class="space-y-3">
                             <div>
@@ -175,7 +201,7 @@
                         </div>
                     </div>
                     <div class="mt-6 flex justify-end border-t border-slate-100 pt-4">
-                        <button type="submit" x-bind:disabled="checked.length === 0" class="bg-emerald-600 disabled:opacity-40 text-white px-10 py-3 rounded-lg font-bold shadow hover:bg-emerald-700 transition text-sm">
+                        <button type="submit" x-bind:disabled="checked.length === 0 || mixedSelection" class="bg-emerald-600 disabled:opacity-40 text-white px-10 py-3 rounded-lg font-bold shadow hover:bg-emerald-700 transition text-sm">
                             注文書を発行(印刷)
                         </button>
                     </div>

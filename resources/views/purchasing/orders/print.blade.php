@@ -60,14 +60,14 @@
                         <td>{{ $detail->item_name }}<br><span style="font-size: 8pt; color: #555;">{{ $detail->dimensions }}</span></td>
                         <td class="text-right">{{ number_format((float) $detail->order_qty) }}</td>
                         <td style="text-align: center;">{{ $detail->unit }}</td>
-                        <td class="text-right">¥{{ number_format((float) $detail->unit_price) }}</td>
-                        <td class="text-right">¥{{ number_format($detail->lineTotal()) }}</td>
+                        <td class="text-right">{{ $isProvisional ? '-' : '¥' . number_format((float) $detail->unit_price) }}</td>
+                        <td class="text-right">{{ $isProvisional ? '-' : '¥' . number_format($detail->lineTotal()) }}</td>
                     </tr>
                 @endforeach
             </tbody>
         </table>
 
-        <div style="text-align: right; font-weight: bold; margin-top: 10px; font-size: 12pt;">合計: ¥{{ number_format($total) }}</div>
+        <div style="text-align: right; font-weight: bold; margin-top: 10px; font-size: 12pt;">合計: {{ $isProvisional ? '-' : '¥' . number_format($total) }}</div>
 
         <div class="remarks">
             <strong>備考欄:</strong><br>
