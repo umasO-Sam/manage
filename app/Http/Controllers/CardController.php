@@ -413,9 +413,15 @@ class CardController extends Controller
     {
         $this->authorize('view', $attachment->card);
 
-        abort_unless($attachment->isImage(), 404);
+        $mimeType = $attachment->previewMimeType();
+        abort_unless($mimeType !== null, 404);
 
-        return Storage::disk('local')->response($attachment->path);
+        // Content-Typeはファイル内容の自動判定に頼らず拡張子から決め打ちする。
+        // 自動判定に任せると、画像拡張子を偽装したHTML/スクリプトファイルが
+        // text/htmlとしてinline表示されXSSになり得るため。
+        return Storage::disk('local')->response($attachment->path, null, [
+            'Content-Type' => $mimeType,
+        ]);
     }
 
     private function notifyProcurementManagers(Card $card, string $headline): void

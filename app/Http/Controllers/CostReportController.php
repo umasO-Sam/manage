@@ -90,7 +90,7 @@ class CostReportController extends Controller
         $miscLaborRow = ($dateFrom !== '' || $dateTo !== '') ? $this->buildMiscLaborRow($dateFrom, $dateTo) : null;
 
         $headers = [
-            '注番', '納入先', '製品名', '受注額', '原価', '損益', '利益率(%)',
+            '注番', '受注先', '納入先', '製品名', '受注額', '原価', '損益', '利益率(%)',
             '部品材料費', '材料費計', '部品費計', 'スイッチセンサ計',
             '機械等外注費', '電気関係外注費',
             '機械人工', '機械製造人工', '機械設計人工', '現地工事人工', '社内費その他計',
@@ -99,7 +99,7 @@ class CostReportController extends Controller
         ];
 
         $csvRows = $rows->concat($miscLaborRow ? [$miscLaborRow] : [])->map(fn (array $r) => [
-            $r['item_code'], $r['delivery_dest'], $r['product_name'], $r['order_amount'], $r['total_cost'], $r['profit'], $r['profit_margin'],
+            $r['item_code'], $r['recipient'], $r['delivery_dest'], $r['product_name'], $r['order_amount'], $r['total_cost'], $r['profit'], $r['profit_margin'],
             $r['parts_material_total'], $r['material_cost'], $r['parts_cost'], $r['switch_sensor_cost'],
             $r['machine_outsourcing_cost'], $r['electrical_outsourcing_cost'],
             $r['machine_labor_total'], $r['machine_manufacturing_labor'], $r['machine_design_labor'], $r['machine_onsite_labor'], $r['machine_other_labor'],
@@ -217,6 +217,7 @@ class CostReportController extends Controller
 
             return $this->buildRow(
                 itemCode: $itemCode,
+                recipient: $salesRow?->recipient ?? '',
                 deliveryDest: $salesRow?->delivery_dest ?? '',
                 productName: $salesRow?->product_name ?? '',
                 orderAmount: (float) ($orderAmounts[$itemCode] ?? 0),
@@ -263,7 +264,7 @@ class CostReportController extends Controller
         $total = (int) round($laborRows->sum('amount'));
 
         return [
-            'item_code' => '雑人工', 'delivery_dest' => '', 'product_name' => '期間中の雑人工合計',
+            'item_code' => '雑人工', 'recipient' => '', 'delivery_dest' => '', 'product_name' => '期間中の雑人工合計',
             'order_amount' => 0, 'total_cost' => $total, 'profit' => -$total, 'profit_margin' => null,
             'parts_material_total' => 0, 'material_cost' => 0, 'parts_cost' => 0, 'switch_sensor_cost' => 0,
             'machine_outsourcing_cost' => 0, 'electrical_outsourcing_cost' => 0,
@@ -278,7 +279,7 @@ class CostReportController extends Controller
      * @param  \Illuminate\Support\Collection<int, object>  $rows
      * @return array<string, mixed>
      */
-    private function buildRow(string $itemCode, string $deliveryDest, string $productName, float $orderAmount, Collection $rows): array
+    private function buildRow(string $itemCode, string $recipient, string $deliveryDest, string $productName, float $orderAmount, Collection $rows): array
     {
         $sumMajor = fn (string $major) => (float) $rows->filter(fn ($r) => $r->major_category === $major)->sum('amount');
         $sumCodes = fn (array $codes) => (float) $rows->filter(fn ($r) => in_array((int) $r->category_code, $codes, true))->sum('amount');
@@ -313,6 +314,7 @@ class CostReportController extends Controller
 
         return [
             'item_code' => $itemCode,
+            'recipient' => $recipient,
             'delivery_dest' => $deliveryDest,
             'product_name' => $productName,
             'order_amount' => (int) $orderAmount,

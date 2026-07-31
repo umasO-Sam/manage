@@ -80,7 +80,7 @@ class CostReportTest extends TestCase
 
         PurchaseDetail::create([
             'item_code' => 'RPT001-N01', 'category_id' => null, 'item_name' => '受注行',
-            'order_qty' => 0, 'unit_price' => 0, 'delivery_dest' => 'テスト工場', 'product_name' => 'テスト製品',
+            'order_qty' => 0, 'unit_price' => 0, 'recipient' => 'テスト受注先', 'delivery_dest' => 'テスト工場', 'product_name' => 'テスト製品',
             'order_received_date' => '2024-06-15', 'order_amount' => 100000, 'is_provisional' => false,
         ]);
         PurchaseDetail::create(['item_code' => 'RPT001-N01', 'category_id' => $cat['material']->id, 'order_qty' => 1, 'unit_price' => 1000, 'is_provisional' => false]);
@@ -112,7 +112,7 @@ class CostReportTest extends TestCase
         ]));
 
         $response->assertOk()
-            ->assertSee('RPT001-N01')->assertSee('テスト工場')->assertSee('テスト製品')
+            ->assertSee('RPT001-N01')->assertSee('テスト受注先')->assertSee('テスト工場')->assertSee('テスト製品')
             ->assertSee('100,000')->assertSee('127,300')->assertSee('-27,300')->assertSee('-27.3%')
             ->assertSee('75,000')->assertSee('30,000')
             ->assertDontSee('選択しない注番');
@@ -156,7 +156,7 @@ class CostReportTest extends TestCase
     {
         $manager = Staff::factory()->procurementManager()->create();
         PurchaseDetail::create([
-            'item_code' => 'RPT004-N01', 'item_name' => '対象',
+            'item_code' => 'RPT004-N01', 'item_name' => '対象', 'recipient' => 'CSV受注先',
             'order_qty' => 1, 'unit_price' => 1000,
             'order_received_date' => '2024-06-15', 'order_amount' => 5000, 'is_provisional' => false,
         ]);
@@ -168,7 +168,9 @@ class CostReportTest extends TestCase
         $response->assertOk();
         $this->assertStringContainsString('text/csv', $response->headers->get('Content-Type'));
         $content = $response->streamedContent();
+        $this->assertStringContainsString('受注先', $content);
         $this->assertStringContainsString('RPT004-N01', $content);
+        $this->assertStringContainsString('CSV受注先', $content);
         $this->assertStringContainsString('5000', $content);
     }
 }

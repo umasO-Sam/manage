@@ -76,4 +76,21 @@ class AttachmentPreviewTest extends TestCase
 
         $this->assertTrue($attachment->isImage());
     }
+
+    public function test_preview_content_type_is_fixed_by_extension_not_sniffed_from_file_content(): void
+    {
+        Storage::fake('local');
+        $staff = Staff::factory()->create();
+        $attachment = $this->makeCardWithAttachment($staff, 'photo.png');
+
+        // 過去にアップロードされ既にディスク上にある不正ファイル（実体はHTML）を模した回帰テスト。
+        // previewAttachmentがファイル内容の自動判定に頼っていれば、ここでtext/htmlが
+        // 返ってしまいXSSにつながる。
+        Storage::disk('local')->put($attachment->path, '<script>alert(document.cookie)</script>');
+
+        $response = $this->actingAs($staff)->get(route('attachments.preview', $attachment));
+
+        $response->assertOk();
+        $this->assertSame('image/png', $response->headers->get('Content-Type'));
+    }
 }

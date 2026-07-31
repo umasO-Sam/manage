@@ -44,6 +44,7 @@
                         <thead>
                             <tr class="bg-slate-50 border-b border-slate-200 font-semibold text-slate-600">
                                 <th class="p-2" rowspan="2">注番</th>
+                                <th class="p-2" rowspan="2">受注先</th>
                                 <th class="p-2" rowspan="2">納入先</th>
                                 <th class="p-2" rowspan="2">製品名</th>
                                 <th class="p-2 text-right" rowspan="2">受注額</th>
@@ -77,6 +78,7 @@
                             @forelse ($rows as $row)
                                 <tr class="hover:bg-slate-50">
                                     <td class="p-2 font-mono font-bold text-blue-900">{{ $row['item_code'] }}</td>
+                                    <td class="p-2">{{ $row['recipient'] }}</td>
                                     <td class="p-2">{{ $row['delivery_dest'] }}</td>
                                     <td class="p-2 font-semibold">{{ $row['product_name'] }}</td>
                                     <td class="p-2 text-right text-blue-800 font-bold">¥{{ number_format($row['order_amount']) }}</td>
@@ -101,12 +103,13 @@
                                     <td class="p-2 text-right bg-slate-100/70">¥{{ number_format($row['misc_ratio_cost']) }}</td>
                                 </tr>
                             @empty
-                                <tr><td colspan="21" class="p-8 text-center text-slate-400">該当する受注データがありません。</td></tr>
+                                <tr><td colspan="22" class="p-8 text-center text-slate-400">該当する受注データがありません。</td></tr>
                             @endforelse
 
                             @if ($miscLaborRow)
                                 <tr class="bg-amber-50/60 font-bold">
                                     <td class="p-2 font-mono text-amber-800">{{ $miscLaborRow['item_code'] }}</td>
+                                    <td class="p-2"></td>
                                     <td class="p-2"></td>
                                     <td class="p-2 text-amber-800">{{ $miscLaborRow['product_name'] }}</td>
                                     <td class="p-2 text-right">-</td>

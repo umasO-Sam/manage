@@ -22,14 +22,32 @@ class Attachment extends Model
         return $this->belongsTo(Staff::class, 'uploaded_by');
     }
 
+    private const IMAGE_MIME_TYPES = [
+        'jpg' => 'image/jpeg',
+        'jpeg' => 'image/jpeg',
+        'png' => 'image/png',
+        'gif' => 'image/gif',
+        'webp' => 'image/webp',
+    ];
+
     /**
      * サムネイル表示可能な画像かどうか。アップロード時に許可している拡張子
      * （StoreCardRequest/UpdateCardRequestのattachments.*ルール）のうち画像分のみ。
      */
     public function isImage(): bool
     {
+        return $this->previewMimeType() !== null;
+    }
+
+    /**
+     * プレビュー表示で使う固定Content-Type。ファイル内容の自動判定（finfoスニッフィング）
+     * に頼ると、拡張子を画像に偽装したHTML/スクリプトファイルがtext/html等として
+     * 解釈されXSSにつながるため、拡張子から決め打ちした値のみを返す。
+     */
+    public function previewMimeType(): ?string
+    {
         $extension = strtolower(pathinfo($this->file_name, PATHINFO_EXTENSION));
 
-        return in_array($extension, ['jpg', 'jpeg', 'png', 'gif', 'webp'], true);
+        return self::IMAGE_MIME_TYPES[$extension] ?? null;
     }
 }

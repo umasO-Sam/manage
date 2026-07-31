@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Rules\UploadedFileMatchesImageExtension;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 
@@ -38,7 +39,7 @@ class StoreCardRequest extends FormRequest
                 : ['required', 'date', 'after_or_equal:today'],
             'attachments' => ['array'],
             // FDC(CAD等の独自拡張子)はMIMEタイプの自動判定に乗らないため、拡張子ベースのextensionsルールを使う
-            'attachments.*' => ['file', 'max:10240', 'extensions:pdf,jpg,jpeg,png,gif,webp,doc,docx,xls,xlsx,fdc'], // 10MB (KB単位)
+            'attachments.*' => ['file', 'max:10240', 'extensions:pdf,jpg,jpeg,png,gif,webp,doc,docx,xls,xlsx,fdc', new UploadedFileMatchesImageExtension], // 10MB (KB単位)
         ];
     }
 

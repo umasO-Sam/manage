@@ -490,6 +490,65 @@ class CardWorkflowTest extends TestCase
         $this->assertDatabaseCount('cards', 0);
     }
 
+    public function test_fdc_attachment_upload_is_unaffected_by_image_content_check(): void
+    {
+        $workflowType = $this->purchaseWorkflow();
+        $orderNumber = $this->orderNumber();
+        $staff = Staff::factory()->create();
+
+        // FDC(CAD等の独自バイナリ)は画像ではないため、追加した画像コンテンツ検証の対象外であることを確認。
+        $fdcFile = \Illuminate\Http\UploadedFile::fake()->create('drawing.fdc', 10);
+
+        $response = $this->actingAs($staff)->post(route('cards.store', $workflowType), [
+            'order_number_id' => $orderNumber->id,
+            'item_name' => 'テスト部品',
+            'model_number' => 'ABC-123',
+            'manufacturer' => 'テストメーカー',
+            'quantity' => 1,
+            'unit' => '個',
+            'due_date_type' => 'specific',
+            'due_date' => now()->addWeek()->toDateString(),
+            'attachments' => [$fdcFile],
+        ]);
+
+        $response->assertSessionDoesntHaveErrors('attachments.0');
+        $this->assertDatabaseCount('cards', 1);
+
+        $card = \App\Models\Card::first();
+        $attachment = $card->attachments()->first();
+        $this->assertSame('drawing.fdc', $attachment->file_name);
+        $this->assertFalse($attachment->isImage());
+
+        $this->actingAs($staff)
+            ->get(route('attachments.download', $attachment))
+            ->assertOk();
+    }
+
+    public function test_attachment_with_html_content_disguised_as_image_extension_is_rejected(): void
+    {
+        $workflowType = $this->purchaseWorkflow();
+        $orderNumber = $this->orderNumber();
+        $staff = Staff::factory()->create();
+
+        $fakeHtmlFile = \Illuminate\Http\UploadedFile::fake()
+            ->createWithContent('photo.png', '<script>alert(document.cookie)</script>');
+
+        $response = $this->actingAs($staff)->post(route('cards.store', $workflowType), [
+            'order_number_id' => $orderNumber->id,
+            'item_name' => 'テスト部品',
+            'model_number' => 'ABC-123',
+            'manufacturer' => 'テストメーカー',
+            'quantity' => 1,
+            'unit' => '個',
+            'due_date_type' => 'specific',
+            'due_date' => now()->addWeek()->toDateString(),
+            'attachments' => [$fakeHtmlFile],
+        ]);
+
+        $response->assertSessionHasErrors('attachments.0');
+        $this->assertDatabaseCount('cards', 0);
+    }
+
     public function test_procurement_manager_can_revert_a_card_and_it_is_logged(): void
     {
         Mail::fake();
