@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\CategoryCode;
 use App\Models\DailyReport;
 use App\Models\LaborCost;
+use App\Models\OrderNumber;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -29,12 +30,15 @@ class DailyReportController extends Controller
                 'label' => $c->code.':'.$c->major_category.($c->sub_category ? '／'.$c->sub_category : ''),
             ])->values();
 
+        $orderNumbers = OrderNumber::orderBy('code')->pluck('code');
+
         return view('daily-reports.show', [
             'report' => $report,
             'workDate' => $workDate,
             'prevDate' => Carbon::parse($workDate)->subDay()->format('Y-m-d'),
             'nextDate' => Carbon::parse($workDate)->addDay()->format('Y-m-d'),
             'categories' => $categories,
+            'orderNumbers' => $orderNumbers,
         ]);
     }
 

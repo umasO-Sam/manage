@@ -19,6 +19,7 @@
                 'is_break' => $e->is_break,
             ])) }},
             categories: {{ \Illuminate\Support\Js::from($categories) }},
+            orderNumbers: {{ \Illuminate\Support\Js::from($orderNumbers) }},
         })">
         <div class="max-w-4xl mx-auto sm:px-6 lg:px-8 space-y-6">
 
@@ -70,8 +71,12 @@
                 <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
                     <div>
                         <label class="block mb-1 text-xs font-bold text-slate-700">注番</label>
-                        <input type="text" x-model="selection.orderNo" placeholder="注番を入力（任意）"
-                               class="w-full border rounded-lg p-2 border-slate-300 text-sm font-mono">
+                        <select x-model="selection.orderNo" class="w-full border rounded-lg p-2 border-slate-300 text-sm font-mono">
+                            <option value="">（注番なし）</option>
+                            <template x-for="no in orderNumbers" :key="no">
+                                <option :value="no" x-text="no"></option>
+                            </template>
+                        </select>
                     </div>
 
                     <div class="flex flex-wrap gap-1.5">
@@ -135,10 +140,10 @@
                              @mouseup.window="dragging = false" @mouseleave="dragging = false">
                             <template x-for="i in slotIndexes" :key="i">
                                 <div @mousedown.prevent="startDrag(i)" @mouseenter="dragOver(i)" @mouseup="dragging = false"
-                                     :class="slotClass(i)"
+                                     :class="slotClass(i)" :style="slotBackgroundStyle(i)"
                                      class="flex items-center h-6 border-b border-slate-100 cursor-pointer text-[11px] px-1 gap-2">
                                     <span class="w-12 shrink-0 font-mono text-slate-400" x-text="showTimeLabel(i) ? formatMinute(slotStart(i)) : ''"></span>
-                                    <span class="truncate" x-text="entryLabel(coveredEntry(i))"></span>
+                                    <span class="truncate" x-text="isSlotFullyCovered(i) ? entryLabel(coveredEntry(i)) : partialLabel(i)"></span>
                                 </div>
                             </template>
                         </div>
@@ -209,6 +214,7 @@
             Alpine.data('dailyReportForm', (config) => ({
                 workDate: config.workDate,
                 categories: config.categories,
+                orderNumbers: config.orderNumbers,
                 entries: config.initialEntries,
                 nextId: Math.max(0, ...config.initialEntries.map((e) => e.id)) + 1,
                 mode: 'drag',
@@ -317,23 +323,83 @@
                     return this.categoryLabel(entry.category_id);
                 },
 
-                coveredEntry(i) {
+                // 一つのスロット(なぞって選択の1行)に、複数のエントリがまたがって
+                // 部分的にしか重ならないことがある(例: 30分表示の行に10分だけの休憩)。
+                // その場合にスロット全体を単一エントリの色・ラベルで塗ってしまうと、
+                // 実際は空いている残り時間まで「入力済み」に見えてしまうため、
+                // 重なりを区間ごとに求めて後段でグラデーション表示に使う。
+                slotSegments(i) {
                     const start = this.slotStart(i);
                     const end = this.slotEnd(i);
-                    return this.entries.find((e) => e.start_minute !== null && e.end_minute !== null && e.start_minute < end && e.end_minute > start) || null;
+                    return this.entries
+                        .filter((e) => e.start_minute !== null && e.end_minute !== null && e.start_minute < end && e.end_minute > start)
+                        .map((e) => ({ entry: e, from: Math.max(e.start_minute, start), to: Math.min(e.end_minute, end) }))
+                        .sort((a, b) => a.from - b.from);
+                },
+
+                entryColor(entry) {
+                    if (!entry) return '#ffffff';
+                    if (entry.is_break) return '#cbd5e1';
+                    if (entry.is_other) return '#fde68a';
+                    return '#a7f3d0';
+                },
+
+                isSlotFullyCovered(i) {
+                    const segments = this.slotSegments(i);
+                    return segments.length === 1 && segments[0].from <= this.slotStart(i) && segments[0].to >= this.slotEnd(i);
+                },
+
+                // スロットを完全に埋めている1エントリがある時だけラベル表示に使う。
+                // 部分的な重なりはpartialLabel()/slotBackgroundStyle()側で表現する。
+                coveredEntry(i) {
+                    return this.isSlotFullyCovered(i) ? this.slotSegments(i)[0].entry : null;
+                },
+
+                partialLabel(i) {
+                    const segments = this.slotSegments(i);
+                    if (segments.length === 0) return '';
+                    return [...new Set(segments.map((s) => this.entryLabel(s.entry)))].join('・');
+                },
+
+                isDragging(i) {
+                    if (this.dragStartIndex === null) return false;
+                    const lo = Math.min(this.dragStartIndex, this.dragCurrentIndex);
+                    const hi = Math.max(this.dragStartIndex, this.dragCurrentIndex);
+                    return i >= lo && i <= hi;
                 },
 
                 slotClass(i) {
-                    if (this.dragStartIndex !== null) {
-                        const lo = Math.min(this.dragStartIndex, this.dragCurrentIndex);
-                        const hi = Math.max(this.dragStartIndex, this.dragCurrentIndex);
-                        if (i >= lo && i <= hi) return 'bg-blue-200';
-                    }
+                    if (this.isDragging(i)) return 'bg-blue-300 ring-2 ring-inset ring-blue-600';
                     const entry = this.coveredEntry(i);
                     if (!entry) return 'bg-white hover:bg-slate-50';
                     if (entry.is_break) return 'bg-slate-300';
                     if (entry.is_other) return 'bg-amber-200';
                     return 'bg-emerald-200';
+                },
+
+                // 部分的にしか重ならないスロットだけ、実際に埋まっている範囲に比例した
+                // グラデーションを描画する(完全に埋まっている・何も無い・ドラッグ中は
+                // slotClass側の単色で表現するのでここでは何もしない)。
+                slotBackgroundStyle(i) {
+                    if (this.isDragging(i)) return {};
+                    const segments = this.slotSegments(i);
+                    if (segments.length === 0 || this.isSlotFullyCovered(i)) return {};
+
+                    const start = this.slotStart(i);
+                    const width = this.slotEnd(i) - start;
+                    const stops = [];
+                    let cursor = 0;
+                    segments.forEach((seg) => {
+                        const fromPct = ((seg.from - start) / width) * 100;
+                        const toPct = ((seg.to - start) / width) * 100;
+                        if (fromPct > cursor) stops.push(`#ffffff ${cursor}%`, `#ffffff ${fromPct}%`);
+                        const color = this.entryColor(seg.entry);
+                        stops.push(`${color} ${fromPct}%`, `${color} ${toPct}%`);
+                        cursor = toPct;
+                    });
+                    if (cursor < 100) stops.push(`#ffffff ${cursor}%`, `#ffffff 100%`);
+
+                    return { backgroundImage: `linear-gradient(to right, ${stops.join(', ')})` };
                 },
 
                 startDrag(i) {
