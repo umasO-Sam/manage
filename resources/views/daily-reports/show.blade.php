@@ -146,6 +146,10 @@
                                     <span class="truncate" x-text="isSlotFullyCovered(i) ? entryLabel(coveredEntry(i)) : partialLabel(i)"></span>
                                 </div>
                             </template>
+                            <div class="flex items-center h-6 px-1 gap-2 text-[11px] bg-slate-50">
+                                <span class="w-12 shrink-0 font-mono text-slate-400" x-text="formatMinute(gridEnd)"></span>
+                                <span class="text-slate-400">終業</span>
+                            </div>
                         </div>
                     </div>
                 </template>
@@ -219,8 +223,13 @@
                 nextId: Math.max(0, ...config.initialEntries.map((e) => e.id)) + 1,
                 mode: 'drag',
                 granularity: 30,
-                gridStart: 7 * 60,
-                gridEnd: 23 * 60 + 30,
+                gridStart: 8 * 60,
+                gridEnd: 17 * 60 + 10,
+                // 休憩の開始・終了時刻は表示単位に関わらず必ずスロットの境目にする。
+                // これが無いと、例えば30分単位表示のとき10分だけの休憩(10:00〜10:10)が
+                // 10:00〜10:30のスロットの一部にしか重ならず、境目の時刻(10:10等)が
+                // ラベルとしても出てこない。
+                fixedBoundaries: [10 * 60, 10 * 60 + 10, 12 * 60 + 10, 13 * 60, 15 * 60, 15 * 60 + 10],
                 dragging: false,
                 dragStartIndex: null,
                 dragCurrentIndex: null,
@@ -250,22 +259,43 @@
                     };
                 },
 
+                // gridStart〜gridEndを表示単位(granularity)で区切りつつ、fixedBoundariesの
+                // 時刻は必ず区切り目として残す(区間をまたいで割らない)ことで、休憩の境目が
+                // どの表示単位でも欠けずに出てくるようにする。
+                get gridBoundaries() {
+                    const segments = [...new Set([
+                        this.gridStart,
+                        ...this.fixedBoundaries.filter((t) => t > this.gridStart && t < this.gridEnd),
+                        this.gridEnd,
+                    ])].sort((a, b) => a - b);
+
+                    const bounds = new Set([this.gridStart]);
+                    for (let s = 0; s < segments.length - 1; s++) {
+                        let t = segments[s];
+                        while (t < segments[s + 1]) {
+                            t = Math.min(t + this.granularity, segments[s + 1]);
+                            bounds.add(t);
+                        }
+                    }
+                    return [...bounds].sort((a, b) => a - b);
+                },
+
                 get slotIndexes() {
-                    const count = Math.floor((this.gridEnd - this.gridStart) / this.granularity);
-                    return Array.from({ length: count }, (_, i) => i);
+                    return Array.from({ length: this.gridBoundaries.length - 1 }, (_, i) => i);
                 },
 
                 slotStart(i) {
-                    return this.gridStart + i * this.granularity;
+                    return this.gridBoundaries[i];
                 },
 
                 slotEnd(i) {
-                    return this.slotStart(i) + this.granularity;
+                    return this.gridBoundaries[i + 1];
                 },
 
                 showTimeLabel(i) {
-                    const stepsPerHour = 60 / this.granularity;
-                    return i % stepsPerHour === 0;
+                    const t = this.slotStart(i);
+                    if (t % 60 === 0) return true;
+                    return this.fixedBoundaries.includes(t);
                 },
 
                 formatMinute(m) {
