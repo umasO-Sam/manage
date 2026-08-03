@@ -104,6 +104,7 @@
                     <div class="p-2.5 rounded-lg bg-slate-50 border border-slate-200 text-xs">
                         <span class="text-slate-400">選択中：</span>
                         <span class="font-bold text-slate-800" x-text="selectionSummary()"></span>
+                        <span class="block text-slate-500 mt-0.5" x-show="selectionItemName()" x-text="selectionItemName()"></span>
                     </div>
                 </div>
 
@@ -118,16 +119,19 @@
 
                 <template x-if="mode === 'drag'">
                     <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
-                        <div class="flex items-center justify-between">
-                            <label class="text-xs font-bold text-slate-700">表示単位
-                                <select x-model.number="granularity" @change="dragStartIndex = null; dragCurrentIndex = null"
-                                        class="ml-1 border rounded-lg p-1 border-slate-300 text-xs">
-                                    <option value="30">30分</option>
-                                    <option value="15">15分</option>
-                                    <option value="5">5分</option>
-                                    <option value="1">1分</option>
-                                </select>
-                            </label>
+                        <div class="flex items-center justify-between flex-wrap gap-2">
+                            <div class="flex items-center gap-2">
+                                <label class="text-xs font-bold text-slate-700">表示単位
+                                    <select x-model.number="granularity" @change="dragStartIndex = null; dragCurrentIndex = null"
+                                            class="ml-1 border rounded-lg p-1 border-slate-300 text-xs">
+                                        <option value="60">1時間</option>
+                                        <option value="10">10分</option>
+                                        <option value="1">1分</option>
+                                    </select>
+                                </label>
+                                <button type="button" @click="fillFullDay()" :disabled="!isSelectionValid()"
+                                        class="text-xs font-bold px-3 py-1.5 rounded-lg border border-blue-300 text-blue-700 hover:bg-blue-50 disabled:opacity-40">終日</button>
+                            </div>
                             <div class="flex items-center gap-2" x-show="dragStartIndex !== null" x-cloak>
                                 <span class="text-xs font-bold text-blue-700" x-text="pendingRangeLabel()"></span>
                                 <button type="button" @click="applyDrag()" :disabled="!isSelectionValid()"
@@ -136,20 +140,19 @@
                                         class="text-xs font-bold px-3 py-1.5 rounded-lg border border-slate-300 text-slate-600">選択解除</button>
                             </div>
                         </div>
-                        <div class="border border-slate-200 rounded-lg overflow-hidden select-none max-h-[60vh] overflow-y-auto"
+                        <p class="text-[11px] text-slate-400">「終日」は8:00〜17:10を選択中の内容で埋めます（休憩はそのまま残ります）。ドラッグ選択が休憩をまたいだ場合も休憩部分は上書きされません。</p>
+                        <div x-ref="grid" class="border border-slate-200 rounded-lg overflow-hidden select-none max-h-[60vh] overflow-y-auto"
                              @mouseup.window="dragging = false" @mouseleave="dragging = false">
                             <template x-for="i in slotIndexes" :key="i">
                                 <div @mousedown.prevent="startDrag(i)" @mouseenter="dragOver(i)" @mouseup="dragging = false"
                                      :class="slotClass(i)" :style="slotBackgroundStyle(i)"
                                      class="flex items-center h-6 border-b border-slate-100 cursor-pointer text-[11px] px-1 gap-2">
-                                    <span class="w-12 shrink-0 font-mono text-slate-400" x-text="showTimeLabel(i) ? formatMinute(slotStart(i)) : ''"></span>
+                                    <span class="w-24 shrink-0 font-mono text-slate-400"
+                                          x-text="showTimeLabel(i) ? formatMinute(slotStart(i)) + '〜' + formatMinute(slotEnd(i)) : ''"></span>
+                                    <span class="shrink-0 text-slate-400 font-bold" x-show="boundaryNote(i)" x-text="boundaryNote(i)"></span>
                                     <span class="truncate" x-text="isSlotFullyCovered(i) ? entryLabel(coveredEntry(i)) : partialLabel(i)"></span>
                                 </div>
                             </template>
-                            <div class="flex items-center h-6 px-1 gap-2 text-[11px] bg-slate-50">
-                                <span class="w-12 shrink-0 font-mono text-slate-400" x-text="formatMinute(gridEnd)"></span>
-                                <span class="text-slate-400">終業</span>
-                            </div>
                         </div>
                     </div>
                 </template>
@@ -222,14 +225,17 @@
                 entries: config.initialEntries,
                 nextId: Math.max(0, ...config.initialEntries.map((e) => e.id)) + 1,
                 mode: 'drag',
-                granularity: 30,
-                gridStart: 8 * 60,
-                gridEnd: 17 * 60 + 10,
-                // 休憩の開始・終了時刻は表示単位に関わらず必ずスロットの境目にする。
-                // これが無いと、例えば30分単位表示のとき10分だけの休憩(10:00〜10:10)が
-                // 10:00〜10:30のスロットの一部にしか重ならず、境目の時刻(10:10等)が
+                granularity: 60,
+                gridStart: 0,
+                gridEnd: 24 * 60,
+                workStart: 8 * 60,
+                workEnd: 17 * 60 + 10,
+                defaultScrollMinute: 7 * 60 + 30,
+                // 休憩の開始・終了時刻・始業・終業は表示単位に関わらず必ずスロットの境目にする。
+                // これが無いと、例えば1時間単位表示のとき10分だけの休憩(10:00〜10:10)が
+                // 10:00〜11:00のスロットの一部にしか重ならず、境目の時刻(10:10等)が
                 // ラベルとしても出てこない。
-                fixedBoundaries: [10 * 60, 10 * 60 + 10, 12 * 60 + 10, 13 * 60, 15 * 60, 15 * 60 + 10],
+                fixedBoundaries: [8 * 60, 10 * 60, 10 * 60 + 10, 12 * 60 + 10, 13 * 60, 15 * 60, 15 * 60 + 10, 17 * 60 + 10],
                 dragging: false,
                 dragStartIndex: null,
                 dragCurrentIndex: null,
@@ -244,6 +250,19 @@
                         ];
                         this.nextId = 4;
                     }
+                    this.$nextTick(() => this.scrollToDefaultStart());
+                },
+
+                scrollToDefaultStart() {
+                    const idx = this.slotIndexes.find((i) => this.slotStart(i) >= this.defaultScrollMinute) ?? 0;
+                    if (this.$refs.grid) this.$refs.grid.scrollTop = idx * 24;
+                },
+
+                boundaryNote(i) {
+                    const t = this.slotStart(i);
+                    if (t === this.workStart) return '始業';
+                    if (t === this.workEnd) return '終業';
+                    return '';
                 },
 
                 makeBreak(start, end) {
@@ -293,9 +312,11 @@
                 },
 
                 showTimeLabel(i) {
+                    // 1時間・10分単位は行数が少ないので毎行ラベルを出す。1分単位は
+                    // 1440行になり毎行だと読みにくいので、時報・休憩境界の行だけ出す。
+                    if (this.granularity >= 10) return true;
                     const t = this.slotStart(i);
-                    if (t % 60 === 0) return true;
-                    return this.fixedBoundaries.includes(t);
+                    return t % 60 === 0 || this.fixedBoundaries.includes(t);
                 },
 
                 formatMinute(m) {
@@ -332,6 +353,11 @@
                     return cat ? cat.label : '未分類';
                 },
 
+                categoryItemName(id) {
+                    const cat = this.categories.find((c) => c.id === id);
+                    return cat ? cat.itemName : '';
+                },
+
                 isSelectionValid() {
                     if (this.selection.type === 'category') return this.selection.categoryId !== null;
                     if (this.selection.type === 'other') return this.selection.freeText.trim() !== '';
@@ -344,6 +370,11 @@
                     if (this.selection.type === 'category') return orderPart + this.categoryLabel(this.selection.categoryId);
                     if (this.selection.type === 'other') return orderPart + 'その他：' + this.selection.freeText;
                     return '休憩';
+                },
+
+                selectionItemName() {
+                    if (this.selection.type !== 'category' || this.selection.categoryId === null) return '';
+                    return this.categoryItemName(this.selection.categoryId);
                 },
 
                 entryLabel(entry) {
@@ -458,8 +489,26 @@
                     this.dragCurrentIndex = null;
                 },
 
+                // 既存の休憩(is_break)エントリは、なぞって選択・終日ボタンのどちらで
+                // 上書きしようとしても一切変更しない。休憩をまたいで範囲を反映した場合は、
+                // 休憩を除いた残りの区間だけを選択中の内容で埋める。休憩そのものを
+                // 編集・削除したい場合は時刻入力モードで直接操作する。
                 commitRange(startMinute, endMinute) {
+                    const breaksInRange = this.entries
+                        .filter((e) => e.is_break && e.start_minute !== null && e.end_minute !== null
+                            && e.start_minute < endMinute && e.end_minute > startMinute)
+                        .sort((a, b) => a.start_minute - b.start_minute);
+
+                    const gaps = [];
+                    let cursor = startMinute;
+                    breaksInRange.forEach((b) => {
+                        if (b.start_minute > cursor) gaps.push([cursor, b.start_minute]);
+                        cursor = Math.max(cursor, b.end_minute);
+                    });
+                    if (cursor < endMinute) gaps.push([cursor, endMinute]);
+
                     this.entries = this.entries.flatMap((e) => {
+                        if (e.is_break) return [e];
                         if (e.start_minute === null || e.end_minute === null) return [e];
                         if (e.end_minute <= startMinute || e.start_minute >= endMinute) return [e];
                         const pieces = [];
@@ -467,16 +516,25 @@
                         if (e.end_minute > endMinute) pieces.push({ ...e, id: this.nextId++, start_minute: endMinute });
                         return pieces;
                     });
-                    this.entries.push({
-                        id: this.nextId++,
-                        start_minute: startMinute,
-                        end_minute: endMinute,
-                        order_no: this.selection.type === 'break' ? null : (this.selection.orderNo || null),
-                        category_id: this.selection.type === 'category' ? this.selection.categoryId : null,
-                        is_other: this.selection.type === 'other',
-                        free_text: this.selection.type === 'other' ? this.selection.freeText : null,
-                        is_break: this.selection.type === 'break',
+
+                    gaps.forEach(([gapStart, gapEnd]) => {
+                        if (gapEnd <= gapStart) return;
+                        this.entries.push({
+                            id: this.nextId++,
+                            start_minute: gapStart,
+                            end_minute: gapEnd,
+                            order_no: this.selection.type === 'break' ? null : (this.selection.orderNo || null),
+                            category_id: this.selection.type === 'category' ? this.selection.categoryId : null,
+                            is_other: this.selection.type === 'other',
+                            free_text: this.selection.type === 'other' ? this.selection.freeText : null,
+                            is_break: this.selection.type === 'break',
+                        });
                     });
+                },
+
+                fillFullDay() {
+                    if (!this.isSelectionValid()) return;
+                    this.commitRange(this.workStart, this.workEnd);
                 },
 
                 addTimeRow() {

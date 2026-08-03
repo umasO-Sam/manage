@@ -24,10 +24,14 @@ class DailyReportController extends Controller
         $report = $this->findReport(Auth::id(), $workDate)
             ?? new DailyReport(['staff_id' => Auth::id(), 'work_date' => $workDate]);
 
-        $categories = CategoryCode::whereBetween('code', [59, 71])->orderBy('code')->get()
+        // コード範囲(59〜71)だけで絞ると、たまたま範囲に入る材料側のコード(66:事務消耗品)まで
+        // 拾ってしまうため、社内人工/雑人工の大分類で絞り込む。
+        $categories = CategoryCode::whereIn('major_category', ['社内人工', '雑人工'])
+            ->whereBetween('code', [59, 71])->orderBy('code')->get()
             ->map(fn (CategoryCode $c) => [
                 'id' => $c->id,
-                'label' => $c->code.':'.$c->major_category.($c->sub_category ? '／'.$c->sub_category : ''),
+                'label' => $c->code.':'.($c->sub_category ?: $c->major_category),
+                'itemName' => $c->item_name,
             ])->values();
 
         $orderNumbers = OrderNumber::orderBy('code')->pluck('code');
