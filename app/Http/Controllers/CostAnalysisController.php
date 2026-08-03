@@ -275,8 +275,8 @@ class CostAnalysisController extends Controller
 
     /**
      * 「人工等」小計(LABOR_CODES)を、分類コードの細分(sub_category)ごとに分けて集計する。
-     * コード60は「人工」「機械組付」の2つの細分が同じコード値を共有しているため、
-     * コードだけでなくsub_category名も合わせてグルーピングキーにする。
+     * コードだけでなくsub_category名も合わせてグルーピングキーにすることで、
+     * 同じコードに複数の細分が紐づく分類マスタ上の例外にも対応できるようにしている。
      *
      * @param  Collection<int, object>  $rows
      * @return Collection<int, array{code: int, label: string, amount: float}>
