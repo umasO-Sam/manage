@@ -135,11 +135,6 @@
                                                @change="dragStartIndex = null; dragCurrentIndex = null">
                                         10分
                                     </label>
-                                    <label class="flex items-center gap-1 text-xs text-slate-600 cursor-pointer">
-                                        <input type="radio" name="granularity" value="1" x-model.number="granularity"
-                                               @change="dragStartIndex = null; dragCurrentIndex = null">
-                                        1分
-                                    </label>
                                 </div>
                             </div>
                             <div class="flex items-center gap-2" x-show="dragStartIndex !== null" x-cloak>
@@ -152,7 +147,8 @@
                         </div>
                         <p class="text-[11px] text-slate-400">
                             「終日」は8:00〜17:10を選択中の内容で埋めます（休憩はそのまま残ります）。ドラッグ選択が休憩をまたいだ場合も休憩部分は上書きされません。<br>
-                            休憩時間を変更する場合、下部（本日の入力内容）の対象となる休憩時間を「×」で削除してから入力してください。
+                            休憩時間を変更する場合、下部（本日の入力内容）の対象となる休憩時間を「×」で削除してから入力してください。<br>
+                            10分未満の作業登録は「時刻入力」から行ってください。
                         </p>
                         <div x-ref="grid" class="border border-slate-200 rounded-lg overflow-hidden select-none max-h-[60vh] overflow-y-auto"
                              @mouseup.window="dragging = false" @mouseleave="dragging = false">
@@ -331,11 +327,7 @@
                 },
 
                 showTimeLabel(i) {
-                    // 1時間・10分単位は行数が少ないので毎行ラベルを出す。1分単位は
-                    // 1440行になり毎行だと読みにくいので、時報・休憩境界の行だけ出す。
-                    if (this.granularity >= 10) return true;
-                    const t = this.slotStart(i);
-                    return t % 60 === 0 || this.fixedBoundaries.includes(t);
+                    return true;
                 },
 
                 formatMinute(m) {
