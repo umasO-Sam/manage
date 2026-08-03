@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['staff_id', 'work_date', 'submitted_at'])]
+#[Fillable(['staff_id', 'work_date', 'submitted_at', 'remarks'])]
 class DailyReport extends Model
 {
     use HasFactory;

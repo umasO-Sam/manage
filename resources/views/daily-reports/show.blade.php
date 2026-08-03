@@ -209,6 +209,12 @@
                     </div>
                 </div>
 
+                <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                    <label class="block mb-1 text-xs font-bold text-slate-700">備考</label>
+                    <textarea name="remarks" rows="3" placeholder="連絡事項など自由に記入してください"
+                              class="w-full border rounded-lg p-2 border-slate-300 text-sm">{{ old('remarks', $report->remarks) }}</textarea>
+                </div>
+
                 <template x-for="(entry, idx) in validEntries()" :key="'hidden-' + entry.id">
                     <span>
                         <input type="hidden" :name="`entries[${idx}][start_minute]`" :value="entry.start_minute">

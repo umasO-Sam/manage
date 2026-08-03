@@ -50,6 +50,7 @@ class DailyReportController extends Controller
     {
         $validated = $request->validate([
             'work_date' => ['required', 'date'],
+            'remarks' => ['nullable', 'string', 'max:2000'],
             'entries' => ['array'],
             'entries.*.start_minute' => ['required', 'integer', 'min:0', 'max:1439'],
             'entries.*.end_minute' => ['required', 'integer', 'min:1', 'max:1440'],
@@ -66,6 +67,7 @@ class DailyReportController extends Controller
             ?? DailyReport::create(['staff_id' => Auth::id(), 'work_date' => $validated['work_date']]);
 
         DB::transaction(function () use ($report, $validated, $isSubmit) {
+            $report->remarks = $validated['remarks'] ?? null;
             $report->entries()->delete();
 
             foreach ($validated['entries'] ?? [] as $entry) {
