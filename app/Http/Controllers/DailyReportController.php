@@ -34,7 +34,9 @@ class DailyReportController extends Controller
                 'itemName' => $c->item_name,
             ])->values();
 
-        $orderNumbers = OrderNumber::orderBy('code')->pluck('code');
+        $orderNumbers = OrderNumber::orderBy('code')->get()
+            ->map(fn (OrderNumber $o) => ['code' => $o->code, 'label' => $o->displayLabel()])
+            ->values();
 
         return view('daily-reports.show', [
             'report' => $report,

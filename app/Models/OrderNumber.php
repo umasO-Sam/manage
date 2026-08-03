@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['code', 'is_protected'])]
+#[Fillable(['code', 'is_protected', 'project_name'])]
 class OrderNumber extends Model
 {
     /** 標準形式: 「英数1〜8文字」-「英数2〜12文字」。OrderNumberControllerの登録バリデーションと共有する。 */
@@ -31,5 +31,11 @@ class OrderNumber extends Model
     public function matchesStandardFormat(): bool
     {
         return (bool) preg_match(self::FORMAT_REGEX, $this->code);
+    }
+
+    /** 注番選択プルダウン等での表示用ラベル(工事名があれば併記)。 */
+    public function displayLabel(): string
+    {
+        return $this->project_name ? "{$this->code}（{$this->project_name}）" : $this->code;
     }
 }

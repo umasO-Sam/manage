@@ -24,6 +24,9 @@
             @if (session('status') === 'order-number-deleted')
                 <div class="mb-4 p-3 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-800 text-sm">注番を削除しました。</div>
             @endif
+            @if (session('status') === 'order-number-updated')
+                <div class="mb-4 p-3 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-800 text-sm">工事名を更新しました。</div>
+            @endif
             @if ($errors->any())
                 <div class="mb-4 p-3 rounded-xl bg-red-50 border border-red-100 text-red-800 text-sm">
                     @foreach ($errors->all() as $error)
@@ -37,6 +40,7 @@
                     <thead>
                         <tr class="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-600">
                             <th class="p-4">注番</th>
+                            <th class="p-4">工事名</th>
                             <th class="p-4">種別</th>
                             <th class="p-4">利用件数</th>
                             <th class="p-4 text-center">操作</th>
@@ -46,6 +50,15 @@
                         @foreach ($orderNumbers as $orderNumber)
                             <tr class="hover:bg-slate-50">
                                 <td class="p-4 font-semibold text-slate-800 {{ $orderNumber->matchesStandardFormat() ? 'font-mono' : '' }}">{{ $orderNumber->code }}</td>
+                                <td class="p-4">
+                                    <form method="POST" action="{{ route('order-numbers.update', $orderNumber) }}" class="flex items-center gap-1.5">
+                                        @csrf
+                                        @method('PUT')
+                                        <input type="text" name="project_name" value="{{ $orderNumber->project_name }}" placeholder="未設定"
+                                               class="text-xs border rounded-lg px-2 py-1 border-slate-300 w-40">
+                                        <button type="submit" class="text-[11px] font-semibold px-2 py-1 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-50">保存</button>
+                                    </form>
+                                </td>
                                 <td class="p-4">
                                     @if ($orderNumber->is_protected)
                                         <span class="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600">既定（削除不可）</span>

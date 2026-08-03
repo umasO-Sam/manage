@@ -26,6 +26,13 @@
                         <x-input-error class="mt-2" :messages="$errors->get('code')" />
                     </div>
 
+                    <div>
+                        <x-input-label for="project_name" value="工事名（任意）" />
+                        <x-text-input id="project_name" name="project_name" type="text" class="mt-1 block w-full"
+                            :value="old('project_name')" />
+                        <x-input-error class="mt-2" :messages="$errors->get('project_name')" />
+                    </div>
+
                     <div class="flex items-start gap-2 bg-amber-50 border border-amber-100 rounded-lg p-3">
                         <input id="bypass_format_check" name="bypass_format_check" type="checkbox" value="1"
                             class="mt-0.5 rounded border-slate-300 text-amber-600 shadow-sm focus:ring-amber-500"

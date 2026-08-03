@@ -31,7 +31,7 @@
                             <option value="" disabled selected>選択してください</option>
                             @foreach ($orderNumbers as $orderNumber)
                                 <option value="{{ $orderNumber->id }}" @selected((string) old('order_number_id') === (string) $orderNumber->id)>
-                                    {{ $orderNumber->code }}
+                                    {{ $orderNumber->displayLabel() }}
                                 </option>
                             @endforeach
                         </select>

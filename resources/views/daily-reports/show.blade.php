@@ -73,8 +73,8 @@
                         <label class="block mb-1 text-xs font-bold text-slate-700">注番</label>
                         <select x-model="selection.orderNo" class="w-full border rounded-lg p-2 border-slate-300 text-sm font-mono">
                             <option value="">（注番なし）</option>
-                            <template x-for="no in orderNumbers" :key="no">
-                                <option :value="no" x-text="no"></option>
+                            <template x-for="no in orderNumbers" :key="no.code">
+                                <option :value="no.code" x-text="no.label"></option>
                             </template>
                         </select>
                     </div>

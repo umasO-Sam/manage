@@ -64,6 +64,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/order-numbers', [OrderNumberController::class, 'index'])->name('order-numbers.index');
         Route::get('/order-numbers/create', [OrderNumberController::class, 'create'])->name('order-numbers.create');
         Route::post('/order-numbers', [OrderNumberController::class, 'store'])->name('order-numbers.store');
+        Route::put('/order-numbers/{orderNumber}', [OrderNumberController::class, 'update'])->name('order-numbers.update');
         Route::delete('/order-numbers/{orderNumber}', [OrderNumberController::class, 'destroy'])->name('order-numbers.destroy');
 
         Route::get('/cards/{card}/edit', [CardController::class, 'edit'])->name('cards.edit');

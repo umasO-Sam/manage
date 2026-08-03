@@ -41,6 +41,7 @@ class OrderNumberController extends Controller
 
         $data = $request->validate([
             'code' => $codeRules,
+            'project_name' => ['nullable', 'string', 'max:255'],
         ], [
             'code.regex' => '注番は「英数1〜8文字-英数2〜12文字」の形式で入力してください（例: ZZ999-N99T99）。形式に合わない注番を登録する場合は「形式チェックを解除する」にチェックしてください。',
             'code.unique' => 'この注番はすでに登録されています。',
@@ -50,12 +51,26 @@ class OrderNumberController extends Controller
         // （連打・複数タブでの同時登録）に備え、DB側の一意制約違反も
         // 500エラーにせず通常の入力エラーとして扱う。
         try {
-            OrderNumber::create(['code' => $data['code'], 'is_protected' => false]);
+            OrderNumber::create(['code' => $data['code'], 'is_protected' => false, 'project_name' => $data['project_name'] ?? null]);
         } catch (UniqueConstraintViolationException) {
             throw ValidationException::withMessages(['code' => 'この注番はすでに登録されています。']);
         }
 
         return redirect()->route('order-numbers.index')->with('status', 'order-number-created');
+    }
+
+    /**
+     * 工事名だけを更新する(注番コード自体は既存参照との整合性のため変更不可)。
+     */
+    public function update(Request $request, OrderNumber $orderNumber): RedirectResponse
+    {
+        $data = $request->validate([
+            'project_name' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $orderNumber->update(['project_name' => $data['project_name'] ?? null]);
+
+        return redirect()->route('order-numbers.index')->with('status', 'order-number-updated');
     }
 
     public function destroy(OrderNumber $orderNumber): RedirectResponse
