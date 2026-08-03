@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\LaborCost;
 use App\Models\Staff;
 use Illuminate\Contracts\Database\Eloquent\Builder;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
@@ -19,9 +20,12 @@ class LaborCostController extends Controller
         // 従来は部分一致のみだったため、後方互換のためデフォルトは部分一致のままとする。
         $orderNoMatch = $request->query('order_no_match') === 'perfect' ? 'perfect' : 'partial';
         $excludedOrderNos = array_values(array_filter((array) $request->query('excluded_order_nos', [])));
+        // 既定では従来通りis_provisional=falseのみを対象とする。作業日報から生成された
+        // 仮登録データを資材管理担当者が確認する時だけ、このチェックで含める。
+        $includeProvisional = $request->boolean('include_provisional');
 
         $laborStaff = Staff::whereNotNull('sid')->orderBy('sid')->get();
-        $filters = compact('dateFrom', 'dateTo', 'staffId', 'orderNo', 'orderNoMatch');
+        $filters = compact('dateFrom', 'dateTo', 'staffId', 'orderNo', 'orderNoMatch', 'includeProvisional');
 
         // 絞り込み条件が何も指定されていない状態(ナビゲーションからの初回遷移など)で
         // 全件(11万件超)を集計しにいくと非常に重いため、条件が1つもなければ
@@ -41,8 +45,11 @@ class LaborCostController extends Controller
         }
 
         /** @return Builder<LaborCost> */
-        $baseQuery = function () use ($dateFrom, $dateTo, $staffId) {
-            $q = LaborCost::query()->where('is_provisional', false);
+        $baseQuery = function () use ($dateFrom, $dateTo, $staffId, $includeProvisional) {
+            $q = LaborCost::query();
+            if (! $includeProvisional) {
+                $q->where('is_provisional', false);
+            }
             if ($dateFrom !== '') {
                 $q->where('work_date', '>=', $dateFrom);
             }
@@ -101,5 +108,24 @@ class LaborCostController extends Controller
                 'total_cost' => round($totalCost),
             ],
         ]);
+    }
+
+    /**
+     * 作業日報から生成された仮登録(is_provisional=true)のLaborCostを、資材管理担当者が
+     * 内容確認のうえ確定する。フィールドの編集は行わず確定のみ(内容を直したい場合は
+     * 本人に作業日報を再提出してもらう運用)。
+     */
+    public function bulkConfirm(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'ids' => ['required', 'array'],
+            'ids.*' => ['integer', 'exists:labor_costs,id'],
+        ]);
+
+        LaborCost::whereIn('id', $validated['ids'])
+            ->where('is_provisional', true)
+            ->update(['is_provisional' => false]);
+
+        return back()->with('status', 'labor-confirmed');
     }
 }

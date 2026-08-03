@@ -7,7 +7,10 @@
     </x-slot>
 
     <div class="py-8">
-        <div class="max-w-6xl mx-auto sm:px-6 lg:px-8">
+        <div class="max-w-6xl mx-auto sm:px-6 lg:px-8 space-y-4">
+            @if (session('status') === 'labor-confirmed')
+                <div class="p-3 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-800 text-sm">選択した人工データを確定しました。</div>
+            @endif
             <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
 
                 <form method="GET" action="{{ route('purchasing.labor.index') }}" class="lg:col-span-1 bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4 h-fit text-xs font-bold text-slate-700">
@@ -65,6 +68,11 @@
                         </div>
                     @endif
 
+                    <label class="flex items-center gap-2 cursor-pointer font-normal text-slate-600">
+                        <input type="checkbox" name="include_provisional" value="1" @checked($filters['includeProvisional']) class="rounded border-slate-300">
+                        仮登録（作業日報）を含める
+                    </label>
+
                     <button type="submit" class="w-full bg-green-600 text-white p-2 rounded-lg font-bold shadow hover:bg-green-700 transition">集計実行</button>
                 </form>
 
@@ -81,38 +89,65 @@
                         </div>
                     @endif
 
-                    <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-                        <div class="overflow-x-auto max-h-[55vh]">
-                            <table class="w-full text-left border-collapse text-xs">
-                                <thead>
-                                    <tr class="bg-slate-50 border-b border-slate-200 font-semibold text-slate-600">
-                                        <th class="p-2.5">作業日</th>
-                                        <th class="p-2.5">氏名</th>
-                                        <th class="p-2.5">注番</th>
-                                        <th class="p-2.5">作業内容</th>
-                                        <th class="p-2.5 text-right">時間</th>
-                                        <th class="p-2.5 text-right">人工</th>
-                                        <th class="p-2.5 text-right">概算額</th>
-                                    </tr>
-                                </thead>
-                                <tbody class="divide-y divide-slate-100">
-                                    @forelse ($rows as $row)
-                                        <tr class="hover:bg-green-50">
-                                            <td class="p-2.5">{{ $row->work_date?->format('Y/m/d') }}</td>
-                                            <td class="p-2.5 font-bold">{{ $row->staff?->name }}</td>
-                                            <td class="p-2.5 font-mono">{{ $row->order_no ?: '-' }}</td>
-                                            <td class="p-2.5">{{ $row->category?->item_name ?? '未分類' }}</td>
-                                            <td class="p-2.5 text-right">{{ $row->work_hours }}h {{ $row->work_minutes }}m</td>
-                                            <td class="p-2.5 text-right font-bold text-green-700">{{ round($row->totalMinutes() / 480, 3) }}</td>
-                                            <td class="p-2.5 text-right font-bold">¥{{ number_format($row->estimatedCost()) }}</td>
+                    @php
+                        $canConfirm = $filters['includeProvisional'] && Auth::user()->is_procurement_manager;
+                    @endphp
+
+                    <form method="POST" action="{{ route('purchasing.labor.bulk-confirm') }}">
+                        @csrf
+                        @if ($canConfirm)
+                            <div class="flex justify-end mb-2">
+                                <button type="submit" class="text-xs font-bold px-3 py-1.5 rounded-lg bg-blue-600 text-white hover:bg-blue-700">選択した行を確定</button>
+                            </div>
+                        @endif
+                        <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                            <div class="overflow-x-auto max-h-[55vh]">
+                                <table class="w-full text-left border-collapse text-xs">
+                                    <thead>
+                                        <tr class="bg-slate-50 border-b border-slate-200 font-semibold text-slate-600">
+                                            @if ($canConfirm)
+                                                <th class="p-2.5 w-8"></th>
+                                            @endif
+                                            <th class="p-2.5">作業日</th>
+                                            <th class="p-2.5">氏名</th>
+                                            <th class="p-2.5">注番</th>
+                                            <th class="p-2.5">作業内容</th>
+                                            <th class="p-2.5 text-right">時間</th>
+                                            <th class="p-2.5 text-right">人工</th>
+                                            <th class="p-2.5 text-right">概算額</th>
                                         </tr>
-                                    @empty
-                                        <tr><td colspan="7" class="p-8 text-center text-slate-400">条件を指定して集計を実行してください。</td></tr>
-                                    @endforelse
-                                </tbody>
-                            </table>
+                                    </thead>
+                                    <tbody class="divide-y divide-slate-100">
+                                        @forelse ($rows as $row)
+                                            <tr class="hover:bg-green-50">
+                                                @if ($canConfirm)
+                                                    <td class="p-2.5">
+                                                        @if ($row->is_provisional)
+                                                            <input type="checkbox" name="ids[]" value="{{ $row->id }}" class="rounded border-slate-300">
+                                                        @endif
+                                                    </td>
+                                                @endif
+                                                <td class="p-2.5">
+                                                    {{ $row->work_date?->format('Y/m/d') }}
+                                                    @if ($row->is_provisional)
+                                                        <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-yellow-100 text-yellow-800 border border-yellow-300">仮</span>
+                                                    @endif
+                                                </td>
+                                                <td class="p-2.5 font-bold">{{ $row->staff?->name }}</td>
+                                                <td class="p-2.5 font-mono">{{ $row->order_no ?: '-' }}</td>
+                                                <td class="p-2.5">{{ $row->category?->item_name ?? '未分類' }}</td>
+                                                <td class="p-2.5 text-right">{{ $row->work_hours }}h {{ $row->work_minutes }}m</td>
+                                                <td class="p-2.5 text-right font-bold text-green-700">{{ round($row->totalMinutes() / 480, 3) }}</td>
+                                                <td class="p-2.5 text-right font-bold">¥{{ number_format($row->estimatedCost()) }}</td>
+                                            </tr>
+                                        @empty
+                                            <tr><td colspan="{{ $canConfirm ? 8 : 7 }}" class="p-8 text-center text-slate-400">条件を指定して集計を実行してください。</td></tr>
+                                        @endforelse
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
-                    </div>
+                    </form>
                 </div>
             </div>
         </div>

@@ -30,6 +30,11 @@
                         <i data-lucide="archive" class="w-4 h-4"></i>
                         <span>履歴</span>
                     </a>
+                    <a href="{{ route('daily-reports.show') }}"
+                       class="px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors {{ request()->routeIs('daily-reports.*') ? 'bg-slate-200 text-slate-800' : 'text-slate-600 hover:bg-slate-50' }}">
+                        <i data-lucide="clipboard-list" class="w-4 h-4"></i>
+                        <span>作業日報</span>
+                    </a>
                     @if (Auth::user()->canAccessPurchasing())
                         <x-dropdown align="left" width="56">
                             <x-slot name="trigger">
@@ -143,6 +148,9 @@
             @endforeach
             <a href="{{ route('archive.index') }}" class="block px-3 py-2 rounded-lg text-sm font-medium {{ request()->routeIs('archive.*') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
                 履歴
+            </a>
+            <a href="{{ route('daily-reports.show') }}" class="block px-3 py-2 rounded-lg text-sm font-medium {{ request()->routeIs('daily-reports.*') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
+                作業日報
             </a>
             @if (Auth::user()->canAccessPurchasing())
                 <div class="px-3 py-2 text-xs font-bold text-slate-400 uppercase tracking-wider">仕入管理</div>

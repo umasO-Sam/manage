@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 #[Fillable([
     'work_date', 'staff_id', 'order_no', 'machine_no', 'category_id', 'work_hours',
-    'work_minutes', 'is_overtime', 'position_weight_cache', 'note', 'is_provisional',
+    'work_minutes', 'is_overtime', 'position_weight_cache', 'note', 'is_provisional', 'daily_report_id',
 ])]
 class LaborCost extends Model
 {
@@ -33,6 +33,11 @@ class LaborCost extends Model
     public function category(): BelongsTo
     {
         return $this->belongsTo(CategoryCode::class, 'category_id');
+    }
+
+    public function dailyReport(): BelongsTo
+    {
+        return $this->belongsTo(DailyReport::class);
     }
 
     /**

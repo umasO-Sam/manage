@@ -5,6 +5,7 @@ use App\Http\Controllers\CardCommentController;
 use App\Http\Controllers\CardController;
 use App\Http\Controllers\CostAnalysisController;
 use App\Http\Controllers\CostReportController;
+use App\Http\Controllers\DailyReportController;
 use App\Http\Controllers\EstimateAssistController;
 use App\Http\Controllers\LaborCostController;
 use App\Http\Controllers\OrderNumberController;
@@ -34,6 +35,9 @@ Route::middleware('auth')->group(function () {
     Route::get('/attachments/{attachment}/preview', [CardController::class, 'previewAttachment'])->name('attachments.preview');
 
     Route::get('/archive', [ArchiveController::class, 'index'])->name('archive.index');
+
+    Route::get('/daily-reports', [DailyReportController::class, 'show'])->name('daily-reports.show');
+    Route::post('/daily-reports', [DailyReportController::class, 'store'])->name('daily-reports.store');
 
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
@@ -75,6 +79,7 @@ Route::middleware('auth')->group(function () {
         Route::delete('/purchasing/{purchaseDetail}', [PurchaseDetailController::class, 'destroy'])->name('purchasing.destroy');
         Route::post('/purchasing/bulk-update', [PurchaseDetailController::class, 'bulkUpdate'])->name('purchasing.bulk-update');
         Route::post('/purchasing/bulk-delete', [PurchaseDetailController::class, 'bulkDestroy'])->name('purchasing.bulk-delete');
+        Route::post('/purchasing/labor/bulk-confirm', [LaborCostController::class, 'bulkConfirm'])->name('purchasing.labor.bulk-confirm');
 
         Route::get('/purchasing/orders', [PurchaseOrderController::class, 'index'])->name('purchasing.orders.index');
         Route::post('/purchasing/orders/print', [PurchaseOrderController::class, 'print'])->name('purchasing.orders.print');
