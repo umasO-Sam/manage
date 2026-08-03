@@ -120,17 +120,27 @@
                 <template x-if="mode === 'drag'">
                     <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
                         <div class="flex items-center justify-between flex-wrap gap-2">
-                            <div class="flex items-center gap-2">
-                                <label class="text-xs font-bold text-slate-700">表示単位
-                                    <select x-model.number="granularity" @change="dragStartIndex = null; dragCurrentIndex = null"
-                                            class="ml-1 border rounded-lg p-1 border-slate-300 text-xs">
-                                        <option value="60">1時間</option>
-                                        <option value="10">10分</option>
-                                        <option value="1">1分</option>
-                                    </select>
-                                </label>
+                            <div class="flex items-center gap-3">
                                 <button type="button" @click="fillFullDay()" :disabled="!isSelectionValid()"
                                         class="text-xs font-bold px-3 py-1.5 rounded-lg border border-blue-300 text-blue-700 hover:bg-blue-50 disabled:opacity-40">終日</button>
+                                <div class="flex items-center gap-2">
+                                    <span class="text-xs font-bold text-slate-700">表示単位</span>
+                                    <label class="flex items-center gap-1 text-xs text-slate-600 cursor-pointer">
+                                        <input type="radio" name="granularity" value="60" x-model.number="granularity"
+                                               @change="dragStartIndex = null; dragCurrentIndex = null">
+                                        1時間
+                                    </label>
+                                    <label class="flex items-center gap-1 text-xs text-slate-600 cursor-pointer">
+                                        <input type="radio" name="granularity" value="10" x-model.number="granularity"
+                                               @change="dragStartIndex = null; dragCurrentIndex = null">
+                                        10分
+                                    </label>
+                                    <label class="flex items-center gap-1 text-xs text-slate-600 cursor-pointer">
+                                        <input type="radio" name="granularity" value="1" x-model.number="granularity"
+                                               @change="dragStartIndex = null; dragCurrentIndex = null">
+                                        1分
+                                    </label>
+                                </div>
                             </div>
                             <div class="flex items-center gap-2" x-show="dragStartIndex !== null" x-cloak>
                                 <span class="text-xs font-bold text-blue-700" x-text="pendingRangeLabel()"></span>
@@ -140,7 +150,10 @@
                                         class="text-xs font-bold px-3 py-1.5 rounded-lg border border-slate-300 text-slate-600">選択解除</button>
                             </div>
                         </div>
-                        <p class="text-[11px] text-slate-400">「終日」は8:00〜17:10を選択中の内容で埋めます（休憩はそのまま残ります）。ドラッグ選択が休憩をまたいだ場合も休憩部分は上書きされません。</p>
+                        <p class="text-[11px] text-slate-400">
+                            「終日」は8:00〜17:10を選択中の内容で埋めます（休憩はそのまま残ります）。ドラッグ選択が休憩をまたいだ場合も休憩部分は上書きされません。<br>
+                            休憩時間を変更する場合、下部（本日の入力内容）の対象となる休憩時間を「×」で削除してから入力してください。
+                        </p>
                         <div x-ref="grid" class="border border-slate-200 rounded-lg overflow-hidden select-none max-h-[60vh] overflow-y-auto"
                              @mouseup.window="dragging = false" @mouseleave="dragging = false">
                             <template x-for="i in slotIndexes" :key="i">
