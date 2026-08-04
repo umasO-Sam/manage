@@ -12,7 +12,7 @@
         .page-label { text-align: center; font-size: 10px; color: #94a3b8; margin-bottom: 4px; }
         .sheet-title { text-align: center; margin-bottom: 3mm; }
         .sheet-title .title-text { font-size: 17pt; font-weight: bold; letter-spacing: 4px; padding-bottom: 0.8mm; border-bottom: 1.6pt solid #1e293b; }
-        .sheet-title .logo { font-size: 9pt; font-weight: normal; letter-spacing: 0; margin-left: 12px; color: #475569; }
+        .sheet-title .logo { height: 8mm; width: auto; vertical-align: middle; margin-left: 14px; }
         .months-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 4mm 7mm; }
         .month-block { page-break-inside: avoid; }
         .month-heading { font-weight: bold; font-size: 11.5pt; color: #1d4ed8; margin-bottom: 0.8mm; }
@@ -21,7 +21,6 @@
         table.month-table th { font-weight: bold; border-bottom: 1.1pt solid #1e293b; font-size: 10.5pt; }
         table.month-table th.sat { color: #1d4ed8; }
         table.month-table th.sun { color: #dc2626; }
-        table.month-table tr:last-child td { border-bottom: none; }
         td.out-of-month { color: transparent; }
         td.day-off { background-color: #fbd0d9; border: 1pt solid #dc2626; color: #dc2626; font-weight: bold; border-radius: 3px; }
         td.recommended { background-color: #fbd0d9; border: 1pt solid #dc2626; color: #2563eb; font-weight: bold; border-radius: 3px; }
@@ -84,7 +83,7 @@
     @foreach ($pages as $pageIndex => $pageMonths)
         <div class="page">
             <div class="page-label no-print">{{ $pageIndex + 1 }} / {{ $pages->count() }} ページ目</div>
-            <div class="sheet-title"><span class="title-text">{{ $year }}　休日表</span><span class="logo">㈱ サイトウ工研</span></div>
+            <div class="sheet-title"><span class="title-text">{{ $year }}　休日表</span><img src="{{ asset('images/logo-saito-koken.png') }}" alt="サイトウ工研" class="logo"></div>
 
             <div class="months-grid">
                 @foreach ($pageMonths as $month)
