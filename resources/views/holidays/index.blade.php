@@ -8,10 +8,16 @@
                 </h2>
                 <p class="text-xs text-slate-500 mt-1">祝日・会社独自の休日(夏季休暇等)・有給休暇取得推奨日を登録します。</p>
             </div>
-            <a href="{{ route('holidays.create') }}" class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-xl shadow-sm hover:shadow flex items-center gap-2 text-sm transition-all">
-                <i data-lucide="plus-circle" class="w-4 h-4"></i>
-                <span>休日を追加</span>
-            </a>
+            <div class="flex items-center gap-2">
+                <a href="{{ route('holidays.calendar') }}" class="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-medium py-2 px-4 rounded-xl shadow-sm flex items-center gap-2 text-sm transition-all">
+                    <i data-lucide="printer" class="w-4 h-4"></i>
+                    <span>休日表を見る・印刷</span>
+                </a>
+                <a href="{{ route('holidays.create') }}" class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-xl shadow-sm hover:shadow flex items-center gap-2 text-sm transition-all">
+                    <i data-lucide="plus-circle" class="w-4 h-4"></i>
+                    <span>休日を追加</span>
+                </a>
+            </div>
         </div>
     </x-slot>
 

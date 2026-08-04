@@ -107,4 +107,69 @@ class HolidayManagementTest extends TestCase
         $response->assertSee('こどもの日');
         $response->assertSeeInOrder(['元日', 'こどもの日']);
     }
+
+    public function test_only_procurement_managers_can_view_the_holiday_calendar(): void
+    {
+        $staff = Staff::factory()->create();
+
+        $this->actingAs($staff)->get(route('holidays.calendar'))->assertForbidden();
+    }
+
+    public function test_calendar_renders_for_the_requested_year(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+
+        $response = $this->actingAs($manager)->get(route('holidays.calendar', ['year' => 2026]));
+
+        $response->assertOk();
+        $response->assertSee('2026', false);
+        $response->assertViewHas('fiscalStart', fn ($date) => $date->format('Y-m-d') === '2026-04-21');
+        $response->assertViewHas('fiscalEnd', fn ($date) => $date->format('Y-m-d') === '2027-04-20');
+    }
+
+    public function test_weekday_company_holiday_increases_the_days_off_count(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+
+        $baseline = $this->actingAs($manager)
+            ->get(route('holidays.calendar', ['year' => 2026]))
+            ->viewData('daysOffCount');
+
+        Holiday::create(['date' => '2026-08-13', 'name' => '夏季休暇', 'type' => Holiday::TYPE_COMPANY_HOLIDAY]); // 木曜日
+
+        $withHoliday = $this->actingAs($manager)
+            ->get(route('holidays.calendar', ['year' => 2026]))
+            ->viewData('daysOffCount');
+
+        $this->assertSame($baseline + 1, $withHoliday);
+    }
+
+    public function test_holiday_falling_on_a_weekend_is_not_double_counted(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+
+        $baseline = $this->actingAs($manager)
+            ->get(route('holidays.calendar', ['year' => 2026]))
+            ->viewData('daysOffCount');
+
+        Holiday::create(['date' => '2026-08-15', 'name' => '休日', 'type' => Holiday::TYPE_COMPANY_HOLIDAY]); // 土曜日
+
+        $withHoliday = $this->actingAs($manager)
+            ->get(route('holidays.calendar', ['year' => 2026]))
+            ->viewData('daysOffCount');
+
+        $this->assertSame($baseline, $withHoliday);
+    }
+
+    public function test_recommended_paid_leave_days_are_counted_within_the_fiscal_window_only(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+
+        Holiday::create(['date' => '2026-05-01', 'name' => '推奨日', 'type' => Holiday::TYPE_RECOMMENDED_PAID_LEAVE]);
+        Holiday::create(['date' => '2026-04-20', 'name' => '推奨日(範囲外)', 'type' => Holiday::TYPE_RECOMMENDED_PAID_LEAVE]);
+
+        $response = $this->actingAs($manager)->get(route('holidays.calendar', ['year' => 2026]));
+
+        $response->assertViewHas('recommendedCount', 1);
+    }
 }

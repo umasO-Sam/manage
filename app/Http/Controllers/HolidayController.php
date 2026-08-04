@@ -6,6 +6,7 @@ use App\Models\Holiday;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
@@ -27,6 +28,101 @@ class HolidayController extends Controller
     public function create(): View
     {
         return view('holidays.create');
+    }
+
+    /**
+     * 休日表(印刷・PDF出力用プレビュー)。年間休日目標120日に対する
+     * 実際の休日日数(土日+休日マスタの祝日/会社休日)と、有給休暇取得推奨日の
+     * 設定日数(目標5日)を、年度(4/21〜翌年4/20)単位で集計して表示する。
+     */
+    public function calendar(Request $request): View
+    {
+        $year = (int) $request->query('year', $this->currentFiscalYear());
+
+        $displayStart = Carbon::create($year, 1, 1);
+        $displayEnd = Carbon::create($year + 1, 6, 30);
+
+        $holidaysByDate = Holiday::whereBetween('date', [$displayStart->toDateString(), $displayEnd->toDateString()])
+            ->get()
+            ->keyBy(fn (Holiday $h) => $h->date->format('Y-m-d'));
+
+        $months = [];
+        $cursor = $displayStart->copy();
+        while ($cursor->lte($displayEnd)) {
+            $months[] = $this->buildMonth($cursor->copy(), $holidaysByDate);
+            $cursor->addMonth();
+        }
+
+        $fiscalStart = Carbon::create($year, 4, 21);
+        $fiscalEnd = Carbon::create($year + 1, 4, 20);
+
+        $daysOffCount = 0;
+        for ($d = $fiscalStart->copy(); $d->lte($fiscalEnd); $d->addDay()) {
+            $holiday = $holidaysByDate->get($d->format('Y-m-d'));
+            $isWeekend = in_array($d->dayOfWeek, [Carbon::SATURDAY, Carbon::SUNDAY], true);
+            $isHoliday = $holiday && in_array($holiday->type, [Holiday::TYPE_PUBLIC_HOLIDAY, Holiday::TYPE_COMPANY_HOLIDAY], true);
+            if ($isWeekend || $isHoliday) {
+                $daysOffCount++;
+            }
+        }
+
+        $recommendedCount = $holidaysByDate->filter(
+            fn (Holiday $h) => $h->type === Holiday::TYPE_RECOMMENDED_PAID_LEAVE
+                && $h->date->betweenIncluded($fiscalStart, $fiscalEnd)
+        )->count();
+
+        return view('holidays.calendar', [
+            'year' => $year,
+            'months' => $months,
+            'fiscalStart' => $fiscalStart,
+            'fiscalEnd' => $fiscalEnd,
+            'daysOffCount' => $daysOffCount,
+            'daysOffTarget' => 120,
+            'recommendedCount' => $recommendedCount,
+            'recommendedTarget' => 5,
+        ]);
+    }
+
+    private function currentFiscalYear(): int
+    {
+        $today = Carbon::today();
+        $boundary = Carbon::create($today->year, 4, 21);
+
+        return $today->gte($boundary) ? $today->year : $today->year - 1;
+    }
+
+    /**
+     * @param  \Illuminate\Support\Collection<string, Holiday>  $holidaysByDate
+     * @return array{year: int, month: int, weeks: array<int, array<int, array{date: Carbon, inMonth: bool, holiday: ?Holiday}>>}
+     */
+    private function buildMonth(Carbon $monthStart, $holidaysByDate): array
+    {
+        $monthStart->startOfMonth();
+        $monthEnd = $monthStart->copy()->endOfMonth();
+
+        // 表を土曜始まりにするため、月初から直前の土曜日まで遡る。
+        $offsetFromSaturday = ($monthStart->dayOfWeek + 1) % 7;
+        $cursor = $monthStart->copy()->subDays($offsetFromSaturday);
+
+        $weeks = [];
+        while ($cursor->lte($monthEnd)) {
+            $week = [];
+            for ($i = 0; $i < 7; $i++) {
+                $week[] = [
+                    'date' => $cursor->copy(),
+                    'inMonth' => $cursor->month === $monthStart->month,
+                    'holiday' => $holidaysByDate->get($cursor->format('Y-m-d')),
+                ];
+                $cursor->addDay();
+            }
+            $weeks[] = $week;
+        }
+
+        return [
+            'year' => $monthStart->year,
+            'month' => $monthStart->month,
+            'weeks' => $weeks,
+        ];
     }
 
     public function store(Request $request): RedirectResponse

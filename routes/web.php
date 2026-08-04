@@ -78,6 +78,7 @@ Route::middleware('auth')->group(function () {
         Route::delete('/order-numbers/{orderNumber}', [OrderNumberController::class, 'destroy'])->name('order-numbers.destroy');
 
         Route::get('/holidays', [HolidayController::class, 'index'])->name('holidays.index');
+        Route::get('/holidays/calendar', [HolidayController::class, 'calendar'])->name('holidays.calendar');
         Route::get('/holidays/create', [HolidayController::class, 'create'])->name('holidays.create');
         Route::post('/holidays', [HolidayController::class, 'store'])->name('holidays.store');
         Route::get('/holidays/{holiday}/edit', [HolidayController::class, 'edit'])->name('holidays.edit');
