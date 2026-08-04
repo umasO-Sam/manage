@@ -23,7 +23,7 @@ class LeaveRequestController extends Controller
     public function create(): View
     {
         return view('leave-requests.create', [
-            'approvers' => Staff::where('id', '!=', Auth::id())->orderBy('name')->get(),
+            'approvers' => Staff::where('is_supervisor', true)->where('id', '!=', Auth::id())->orderBy('name')->get(),
         ]);
     }
 
@@ -38,6 +38,8 @@ class LeaveRequestController extends Controller
                 function ($attribute, $value, $fail) {
                     if ((int) $value === Auth::id()) {
                         $fail('承認者には自分以外を選択してください。');
+                    } elseif (! Staff::where('id', $value)->where('is_supervisor', true)->exists()) {
+                        $fail('承認者には上長フラグが設定された担当者を選択してください。');
                     }
                 },
             ],

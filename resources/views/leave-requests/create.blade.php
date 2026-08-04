@@ -77,7 +77,7 @@
                           class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
                     <div>
                         <x-input-label value="対象日" />
-                        <input type="date" name="start_date" value="{{ old('start_date') }}" class="mt-1 block w-full rounded-lg border-slate-300 text-sm">
+                        <x-date-text-input name="start_date" class="mt-1 block w-full" :value="old('start_date')" />
                     </div>
                     <div>
                         <x-input-label value="粒度" />
@@ -94,7 +94,7 @@
                           class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
                     <div>
                         <x-input-label value="開始日" />
-                        <input type="date" name="start_date" value="{{ old('start_date') }}" class="mt-1 block w-full rounded-lg border-slate-300 text-sm">
+                        <x-date-text-input name="start_date" class="mt-1 block w-full" :value="old('start_date')" />
                     </div>
                     <div>
                         <x-input-label value="事由" />
@@ -111,7 +111,7 @@
                         </div>
                         <div>
                             <x-input-label value="終了日" />
-                            <input type="date" name="end_date" value="{{ old('end_date') }}" class="mt-1 block w-full rounded-lg border-slate-300 text-sm">
+                            <x-date-text-input name="end_date" class="mt-1 block w-full" :value="old('end_date')" />
                         </div>
 
                         <div class="pt-2 border-t border-slate-100">
@@ -153,7 +153,7 @@
                           class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
                     <div>
                         <x-input-label value="開始日" />
-                        <input type="date" name="start_date" value="{{ old('start_date') }}" class="mt-1 block w-full rounded-lg border-slate-300 text-sm">
+                        <x-date-text-input name="start_date" class="mt-1 block w-full" :value="old('start_date')" />
                     </div>
                     <div>
                         <x-input-label value="事由" />
@@ -165,7 +165,7 @@
                     </div>
                     <div x-show="specialPaidReason === 'other'" x-cloak>
                         <x-input-label value="終了日" />
-                        <input type="date" name="end_date" value="{{ old('end_date') }}" class="mt-1 block w-full rounded-lg border-slate-300 text-sm">
+                        <x-date-text-input name="end_date" class="mt-1 block w-full" :value="old('end_date')" />
                         <x-input-label value="事由の詳細" class="mt-2" />
                         <input type="text" name="reason_detail" value="{{ old('reason_detail') }}" class="mt-1 block w-full rounded-lg border-slate-300 text-sm">
                     </div>
@@ -176,11 +176,11 @@
                           class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
                     <div>
                         <x-input-label value="開始日" />
-                        <input type="date" name="start_date" value="{{ old('start_date') }}" class="mt-1 block w-full rounded-lg border-slate-300 text-sm">
+                        <x-date-text-input name="start_date" class="mt-1 block w-full" :value="old('start_date')" />
                     </div>
                     <div>
                         <x-input-label value="終了日（任意、単日の場合は空欄）" />
-                        <input type="date" name="end_date" value="{{ old('end_date') }}" class="mt-1 block w-full rounded-lg border-slate-300 text-sm">
+                        <x-date-text-input name="end_date" class="mt-1 block w-full" :value="old('end_date')" />
                     </div>
                     <div>
                         <x-input-label value="事由" />
@@ -197,7 +197,7 @@
                           class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
                     <div>
                         <x-input-label value="勤務日" />
-                        <input type="date" name="start_date" value="{{ old('start_date') }}" class="mt-1 block w-full rounded-lg border-slate-300 text-sm">
+                        <x-date-text-input name="start_date" class="mt-1 block w-full" :value="old('start_date')" />
                     </div>
                     <div>
                         <x-input-label value="注番" />
@@ -215,7 +215,7 @@
                     </div>
                     <div x-show="! noSubstituteNeeded" x-cloak>
                         <x-input-label value="振替休日とする日" />
-                        <input type="date" name="substitute_holiday_date" value="{{ old('substitute_holiday_date') }}" class="mt-1 block w-full rounded-lg border-slate-300 text-sm">
+                        <x-date-text-input name="substitute_holiday_date" class="mt-1 block w-full" :value="old('substitute_holiday_date')" />
                     </div>
                 </fieldset>
 
@@ -224,7 +224,7 @@
                           class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
                     <div>
                         <x-input-label value="実際に勤務した日" />
-                        <input type="date" name="start_date" value="{{ old('start_date') }}" class="mt-1 block w-full rounded-lg border-slate-300 text-sm">
+                        <x-date-text-input name="start_date" class="mt-1 block w-full" :value="old('start_date')" />
                     </div>
                     <div>
                         <x-input-label value="注番" />
@@ -242,7 +242,7 @@
                     </div>
                     <div x-show="compensatoryEligible" x-cloak>
                         <x-input-label value="代休日" />
-                        <input type="date" name="compensatory_date" value="{{ old('compensatory_date') }}" class="mt-1 block w-full rounded-lg border-slate-300 text-sm">
+                        <x-date-text-input name="compensatory_date" class="mt-1 block w-full" :value="old('compensatory_date')" />
                     </div>
                 </fieldset>
 
@@ -251,11 +251,11 @@
                           class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
                     <div>
                         <x-input-label value="開始日" />
-                        <input type="date" name="start_date" value="{{ old('start_date') }}" class="mt-1 block w-full rounded-lg border-slate-300 text-sm">
+                        <x-date-text-input name="start_date" class="mt-1 block w-full" :value="old('start_date')" />
                     </div>
                     <div>
                         <x-input-label value="終了日（任意、単日の場合は空欄）" />
-                        <input type="date" name="end_date" value="{{ old('end_date') }}" class="mt-1 block w-full rounded-lg border-slate-300 text-sm">
+                        <x-date-text-input name="end_date" class="mt-1 block w-full" :value="old('end_date')" />
                     </div>
                 </fieldset>
 
@@ -264,11 +264,11 @@
                           class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
                     <div>
                         <x-input-label value="開始日" />
-                        <input type="date" name="start_date" value="{{ old('start_date') }}" class="mt-1 block w-full rounded-lg border-slate-300 text-sm">
+                        <x-date-text-input name="start_date" class="mt-1 block w-full" :value="old('start_date')" />
                     </div>
                     <div>
                         <x-input-label value="終了日（任意、単日の場合は空欄）" />
-                        <input type="date" name="end_date" value="{{ old('end_date') }}" class="mt-1 block w-full rounded-lg border-slate-300 text-sm">
+                        <x-date-text-input name="end_date" class="mt-1 block w-full" :value="old('end_date')" />
                     </div>
                 </fieldset>
 
@@ -277,11 +277,11 @@
                           class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
                     <div>
                         <x-input-label value="開始日" />
-                        <input type="date" name="start_date" value="{{ old('start_date') }}" class="mt-1 block w-full rounded-lg border-slate-300 text-sm">
+                        <x-date-text-input name="start_date" class="mt-1 block w-full" :value="old('start_date')" />
                     </div>
                     <div>
                         <x-input-label value="終了日（任意、単日の場合は空欄）" />
-                        <input type="date" name="end_date" value="{{ old('end_date') }}" class="mt-1 block w-full rounded-lg border-slate-300 text-sm">
+                        <x-date-text-input name="end_date" class="mt-1 block w-full" :value="old('end_date')" />
                     </div>
                     <div>
                         <x-input-label value="事由" />
@@ -297,11 +297,11 @@
                           class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
                     <div>
                         <x-input-label value="開始日" />
-                        <input type="date" name="start_date" value="{{ old('start_date') }}" class="mt-1 block w-full rounded-lg border-slate-300 text-sm">
+                        <x-date-text-input name="start_date" class="mt-1 block w-full" :value="old('start_date')" />
                     </div>
                     <div>
                         <x-input-label value="終了日（任意、単日の場合は空欄）" />
-                        <input type="date" name="end_date" value="{{ old('end_date') }}" class="mt-1 block w-full rounded-lg border-slate-300 text-sm">
+                        <x-date-text-input name="end_date" class="mt-1 block w-full" :value="old('end_date')" />
                     </div>
                     <div>
                         <x-input-label value="事由（本人の長期病気療養、または特別休暇(5)〜(7)相当の場合のみ利用可）" />
@@ -318,6 +318,9 @@
                                 <option value="{{ $approver->id }}" @selected((string) old('approver_id') === (string) $approver->id)>{{ $approver->name }}</option>
                             @endforeach
                         </select>
+                        @if ($approvers->isEmpty())
+                            <p class="mt-1 text-[11px] text-amber-600">上長フラグが設定された担当者がいません。ID管理でどなたかに上長フラグを設定してください。</p>
+                        @endif
                         <x-input-error class="mt-1" :messages="$errors->get('approver_id')" />
                     </div>
                     <div>

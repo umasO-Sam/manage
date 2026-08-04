@@ -21,7 +21,7 @@ class LeaveRequestTest extends TestCase
     public function test_paid_leave_full_day_is_created_with_day_count_one(): void
     {
         $applicant = Staff::factory()->create();
-        $approver = Staff::factory()->create();
+        $approver = Staff::factory()->create(['is_supervisor' => true]);
 
         $this->actingAs($applicant)->post(route('leave-requests.store'), [
             'type' => 'paid_leave',
@@ -40,7 +40,7 @@ class LeaveRequestTest extends TestCase
     public function test_paid_leave_hours_granularity_computes_quarter_day(): void
     {
         $applicant = Staff::factory()->create();
-        $approver = Staff::factory()->create();
+        $approver = Staff::factory()->create(['is_supervisor' => true]);
 
         $this->actingAs($applicant)->post(route('leave-requests.store'), [
             'type' => 'paid_leave',
@@ -57,7 +57,7 @@ class LeaveRequestTest extends TestCase
     public function test_ceremonial_leave_marriage_auto_fills_five_days(): void
     {
         $applicant = Staff::factory()->create();
-        $approver = Staff::factory()->create();
+        $approver = Staff::factory()->create(['is_supervisor' => true]);
 
         $this->actingAs($applicant)->post(route('leave-requests.store'), [
             'type' => 'ceremonial_leave',
@@ -74,7 +74,7 @@ class LeaveRequestTest extends TestCase
     public function test_ceremonial_leave_funeral_uses_date_range_for_day_count(): void
     {
         $applicant = Staff::factory()->create();
-        $approver = Staff::factory()->create();
+        $approver = Staff::factory()->create(['is_supervisor' => true]);
 
         $this->actingAs($applicant)->post(route('leave-requests.store'), [
             'type' => 'ceremonial_leave',
@@ -93,7 +93,7 @@ class LeaveRequestTest extends TestCase
     public function test_funeral_details_are_saved_when_provided(): void
     {
         $applicant = Staff::factory()->create();
-        $approver = Staff::factory()->create();
+        $approver = Staff::factory()->create(['is_supervisor' => true]);
 
         $this->actingAs($applicant)->post(route('leave-requests.store'), [
             'type' => 'ceremonial_leave',
@@ -122,7 +122,7 @@ class LeaveRequestTest extends TestCase
     public function test_funeral_fields_are_not_set_for_marriage_reason(): void
     {
         $applicant = Staff::factory()->create();
-        $approver = Staff::factory()->create();
+        $approver = Staff::factory()->create(['is_supervisor' => true]);
 
         $this->actingAs($applicant)->post(route('leave-requests.store'), [
             'type' => 'ceremonial_leave',
@@ -141,7 +141,7 @@ class LeaveRequestTest extends TestCase
     public function test_holiday_work_requires_substitute_date_unless_flagged(): void
     {
         $applicant = Staff::factory()->create();
-        $approver = Staff::factory()->create();
+        $approver = Staff::factory()->create(['is_supervisor' => true]);
 
         $this->actingAs($applicant)->post(route('leave-requests.store'), [
             'type' => 'holiday_work',
@@ -169,7 +169,7 @@ class LeaveRequestTest extends TestCase
     public function test_compensatory_leave_requires_six_hours_worked(): void
     {
         $applicant = Staff::factory()->create();
-        $approver = Staff::factory()->create();
+        $approver = Staff::factory()->create(['is_supervisor' => true]);
 
         $this->actingAs($applicant)->post(route('leave-requests.store'), [
             'type' => 'compensatory_leave',
@@ -198,7 +198,7 @@ class LeaveRequestTest extends TestCase
     public function test_approver_can_approve_pending_request(): void
     {
         $applicant = Staff::factory()->create();
-        $approver = Staff::factory()->create();
+        $approver = Staff::factory()->create(['is_supervisor' => true]);
         $leaveRequest = $this->createPendingPaidLeave($applicant, $approver);
 
         $this->actingAs($approver)->put(route('leave-requests.decide', $leaveRequest), [
@@ -212,7 +212,7 @@ class LeaveRequestTest extends TestCase
     public function test_approver_can_reject_with_reason(): void
     {
         $applicant = Staff::factory()->create();
-        $approver = Staff::factory()->create();
+        $approver = Staff::factory()->create(['is_supervisor' => true]);
         $leaveRequest = $this->createPendingPaidLeave($applicant, $approver);
 
         $this->actingAs($approver)->put(route('leave-requests.decide', $leaveRequest), [
@@ -228,7 +228,7 @@ class LeaveRequestTest extends TestCase
     public function test_non_approver_cannot_decide(): void
     {
         $applicant = Staff::factory()->create();
-        $approver = Staff::factory()->create();
+        $approver = Staff::factory()->create(['is_supervisor' => true]);
         $stranger = Staff::factory()->create();
         $leaveRequest = $this->createPendingPaidLeave($applicant, $approver);
 
@@ -242,7 +242,7 @@ class LeaveRequestTest extends TestCase
     public function test_applicant_can_withdraw_pending_request(): void
     {
         $applicant = Staff::factory()->create();
-        $approver = Staff::factory()->create();
+        $approver = Staff::factory()->create(['is_supervisor' => true]);
         $leaveRequest = $this->createPendingPaidLeave($applicant, $approver);
 
         $this->actingAs($applicant)->delete(route('leave-requests.withdraw', $leaveRequest))
@@ -254,7 +254,7 @@ class LeaveRequestTest extends TestCase
     public function test_stranger_cannot_withdraw_others_request(): void
     {
         $applicant = Staff::factory()->create();
-        $approver = Staff::factory()->create();
+        $approver = Staff::factory()->create(['is_supervisor' => true]);
         $stranger = Staff::factory()->create();
         $leaveRequest = $this->createPendingPaidLeave($applicant, $approver);
 
