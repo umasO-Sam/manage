@@ -16,6 +16,16 @@
 <div
     x-data="{
         text: @js($initial),
+        // 数字だけを取り出し、4桁(年)+2桁(月)+2桁(日)の位置に自動でスラッシュを
+        // 挿入する。スラッシュ無しで「20260405」のように連続入力しても、
+        // 入力の途中から「2026/04/05」の表示に自動整形されるようにする。
+        formatTyped(v) {
+            const digits = v.replace(/\D/g, '').slice(0, 8);
+            let out = digits.slice(0, 4);
+            if (digits.length > 4) out += '/' + digits.slice(4, 6);
+            if (digits.length > 6) out += '/' + digits.slice(6, 8);
+            return out;
+        },
         toISO(v) {
             const m = v.match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})$/);
             if (!m) return '';
@@ -33,7 +43,9 @@
         type="text"
         name="{{ $name }}"
         id="{{ $id }}"
-        x-model="text"
+        :value="text"
+        @input="text = formatTyped($event.target.value)"
+        inputmode="numeric"
         placeholder="YYYY/MM/DD (例: 2027/11/04)"
         class="rounded-lg shadow-sm text-sm w-full pr-8 {{ $hasError ? 'bg-red-50 border-red-300 focus:border-red-400 focus:ring-red-400' : 'border-slate-300 focus:border-blue-500 focus:ring-blue-500' }}"
     >
