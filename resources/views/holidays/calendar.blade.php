@@ -4,36 +4,34 @@
     <meta charset="UTF-8">
     <title>{{ $year }} 休日表</title>
     <style>
-        body { font-family: "Yu Gothic", "Meiryo", sans-serif; color: #1e293b; }
-        .page { width: 297mm; padding: 12mm; margin: 0 auto; box-sizing: border-box; }
-        .sheet-title { text-align: center; font-size: 22pt; font-weight: bold; text-decoration: underline; letter-spacing: 6px; margin-bottom: 4mm; }
-        .sheet-title .logo { font-size: 11pt; text-decoration: none; letter-spacing: 0; margin-left: 12px; }
-        .months-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4mm 8mm; }
-        .month-block { font-size: 8.5pt; }
-        .month-heading { font-weight: bold; font-size: 10pt; margin-bottom: 2px; }
-        table.month-table { width: 100%; border-collapse: collapse; }
-        table.month-table th, table.month-table td { text-align: center; padding: 1px 2px; width: 14.28%; }
-        table.month-table th { font-weight: bold; }
-        table.month-table th.sat { color: #2563eb; }
+        @page { size: A4 landscape; margin: 8mm; }
+        * { -webkit-print-color-adjust: exact; print-color-adjust: exact; box-sizing: border-box; }
+        body { font-family: "Yu Gothic", "Meiryo", sans-serif; color: #1e293b; margin: 0; }
+        .page { width: 297mm; padding: 8mm; margin: 0 auto; }
+        .sheet-title { text-align: center; margin-bottom: 1.8mm; }
+        .sheet-title .title-text { font-size: 14pt; font-weight: bold; letter-spacing: 4px; padding-bottom: 0.5mm; border-bottom: 1.2pt solid #1e293b; }
+        .sheet-title .logo { font-size: 8pt; font-weight: normal; letter-spacing: 0; margin-left: 10px; color: #475569; }
+        .months-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5mm 5mm; }
+        .month-block { page-break-inside: avoid; }
+        .month-heading { font-weight: bold; font-size: 7.5pt; margin-bottom: 0.3mm; color: #1e293b; }
+        table.month-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+        table.month-table th, table.month-table td { border: 0.4pt solid #94a3b8; text-align: center; padding: 0.15mm 0; line-height: 2.7mm; font-size: 6.5pt; width: 14.28%; }
+        table.month-table th { background-color: #eef2f7; font-weight: bold; }
+        table.month-table th.sat { color: #1d4ed8; }
         table.month-table th.sun { color: #dc2626; }
-        td.out-of-month { color: transparent; }
-        td.day-off { background-color: #fbd0d9; border: 1px solid #dc2626; color: #dc2626; border-radius: 3px; }
-        td.recommended { background-color: #fbd0d9; border: 1px solid #dc2626; color: #2563eb; border-radius: 3px; }
-        .legend { display: flex; gap: 16px; align-items: center; font-size: 9pt; margin-top: 4mm; }
-        .legend .swatch { display: inline-block; width: 16px; height: 16px; line-height: 14px; text-align: center; margin-right: 4px; vertical-align: middle; font-size: 8pt; }
-        /* 4週4休の区切り(黒い一点鎖線)。CSSのborder-styleに一点鎖線が無いため、破線と点の
-           繰り返しグラデーションで近似している。法改正等で不要になれば、このtr.period-start
-           関連のスタイルと、calendar()内のfourWeekPeriodBoundaries()の利用をまとめて削除する。 */
-        tr.period-start td { position: relative; }
-        tr.period-start td::before {
-            content: '';
-            position: absolute;
-            top: -2px; left: 0; right: 0; height: 2px;
-            background-image: repeating-linear-gradient(to right, #000 0, #000 4px, transparent 4px, transparent 6px, #000 6px, #000 7px, transparent 7px, transparent 10px);
-        }
+        td.out-of-month { color: transparent; background-color: #fafafa; }
+        td.day-off { background-color: #fbd0d9; border: 0.6pt solid #dc2626; color: #dc2626; font-weight: bold; }
+        td.recommended { background-color: #fbd0d9; border: 0.6pt solid #dc2626; color: #2563eb; font-weight: bold; }
+        /* 4週4休の区切り(5月第一土曜日起算、28日=常に土曜日ごと)。背景ではなくborderで表現しているのは、
+           ブラウザの「背景のグラフィック」印刷設定に関わらず必ず印刷されるようにするため。
+           CSSのborder-styleに一点鎖線が無いため破線で近似している。法改正等で不要になれば、
+           このtr.period-startのスタイルと、calendar()内のfourWeekPeriodBoundaries()の利用を
+           まとめて削除する。 */
+        tr.period-start td { border-top: 1.2pt dashed #000; }
+        .legend { display: flex; gap: 14px; align-items: center; font-size: 7.5pt; margin-top: 1.8mm; color: #334155; }
+        .legend .swatch { display: inline-block; width: 13px; height: 13px; line-height: 13px; text-align: center; margin-right: 4px; vertical-align: middle; font-size: 6.5pt; border-radius: 2px; }
         @media print {
             .no-print { display: none !important; }
-            body { margin: 0; }
             .page { padding: 0; width: 100%; }
         }
     </style>
@@ -47,7 +45,7 @@
                 <a href="{{ route('holidays.calendar', ['year' => $year + 1]) }}" style="font-size: 13px; font-weight: 600; color: #475569; background: #f1f5f9; padding: 6px 12px; border-radius: 8px; text-decoration: none;">{{ $year + 1 }}年度 →</a>
                 <a href="{{ route('holidays.index') }}" style="font-size: 13px; font-weight: 600; color: #1d4ed8; margin-left: 8px;">休日マスタへ戻る</a>
             </div>
-            <button onclick="window.print()" style="padding: 10px 20px; font-size: 16px; cursor: pointer;">このページを印刷・PDF保存</button>
+            <button onclick="window.print()" style="padding: 10px 20px; font-size: 16px; cursor: pointer;">このページを印刷・PDF保存(背景のグラフィックを含めるにチェック)</button>
         </div>
 
         @php
@@ -80,7 +78,7 @@
             </div>
         </div>
 
-        <div class="sheet-title">{{ $year }}　休日表<span class="logo">㈱ サイトウ工研</span></div>
+        <div class="sheet-title"><span class="title-text">{{ $year }}　休日表</span><span class="logo">㈱ サイトウ工研</span></div>
 
         <div class="months-grid">
             @foreach ($months as $month)
@@ -128,9 +126,9 @@
         </div>
 
         <div class="legend">
-            <span><span class="swatch day-off">1</span>土日・祝日・会社休日</span>
-            <span><span class="swatch recommended">1</span>有給休暇取得推奨日</span>
-            <span><span style="display: inline-block; width: 16px; border-top: 2px dashed #000; margin-right: 4px; vertical-align: middle;"></span>4週4休の区切り(5月第一土曜日起算)</span>
+            <span><span class="swatch" style="background-color: #fbd0d9; border: 0.8pt solid #dc2626; color: #dc2626;">1</span>土日・祝日・会社休日</span>
+            <span><span class="swatch" style="background-color: #fbd0d9; border: 0.8pt solid #dc2626; color: #2563eb;">1</span>有給休暇取得推奨日</span>
+            <span><span style="display: inline-block; width: 16px; border-top: 1.2pt dashed #000; margin-right: 4px; vertical-align: middle;"></span>4週4休の区切り(5月第一土曜日起算)</span>
         </div>
     </div>
 </body>
