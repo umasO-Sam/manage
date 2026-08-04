@@ -201,7 +201,12 @@
                     </div>
                     <div>
                         <x-input-label value="注番" />
-                        <input type="text" name="order_no" value="{{ old('order_no') }}" class="mt-1 block w-full rounded-lg border-slate-300 text-sm font-mono">
+                        <select name="order_no" class="mt-1 block w-full rounded-lg border-slate-300 text-sm font-mono">
+                            <option value="">選択してください</option>
+                            @foreach ($orderNumbers as $orderNumber)
+                                <option value="{{ $orderNumber['code'] }}" @selected(old('order_no') === $orderNumber['code'])>{{ $orderNumber['label'] }}</option>
+                            @endforeach
+                        </select>
                     </div>
                     <div>
                         <x-input-label value="勤務地" />
@@ -228,7 +233,12 @@
                     </div>
                     <div>
                         <x-input-label value="注番" />
-                        <input type="text" name="order_no" value="{{ old('order_no') }}" class="mt-1 block w-full rounded-lg border-slate-300 text-sm font-mono">
+                        <select name="order_no" class="mt-1 block w-full rounded-lg border-slate-300 text-sm font-mono">
+                            <option value="">選択してください</option>
+                            @foreach ($orderNumbers as $orderNumber)
+                                <option value="{{ $orderNumber['code'] }}" @selected(old('order_no') === $orderNumber['code'])>{{ $orderNumber['label'] }}</option>
+                            @endforeach
+                        </select>
                     </div>
                     <div>
                         <x-input-label value="勤務地" />

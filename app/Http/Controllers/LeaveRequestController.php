@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Mail\LeaveRequestNotificationMail;
 use App\Models\LeaveRequest;
+use App\Models\OrderNumber;
 use App\Models\Staff;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\RedirectResponse;
@@ -24,6 +25,9 @@ class LeaveRequestController extends Controller
     {
         return view('leave-requests.create', [
             'approvers' => Staff::where('is_supervisor', true)->where('id', '!=', Auth::id())->orderBy('name')->get(),
+            'orderNumbers' => OrderNumber::orderBy('code')->get()
+                ->map(fn (OrderNumber $o) => ['code' => $o->code, 'label' => $o->displayLabel()])
+                ->values(),
         ]);
     }
 
