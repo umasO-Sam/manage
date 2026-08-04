@@ -35,6 +35,11 @@
                         <i data-lucide="clipboard-list" class="w-4 h-4"></i>
                         <span>作業日報</span>
                     </a>
+                    <a href="{{ route('my-calendar.show') }}"
+                       class="px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors {{ request()->routeIs('my-calendar.*') ? 'bg-slate-200 text-slate-800' : 'text-slate-600 hover:bg-slate-50' }}">
+                        <i data-lucide="calendar" class="w-4 h-4"></i>
+                        <span>個人カレンダー</span>
+                    </a>
                     <a href="{{ route('leave-requests.index') }}"
                        class="px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors {{ request()->routeIs('leave-requests.*') ? 'bg-slate-200 text-slate-800' : 'text-slate-600 hover:bg-slate-50' }}">
                         <i data-lucide="calendar-check" class="w-4 h-4"></i>
@@ -161,6 +166,9 @@
             </a>
             <a href="{{ route('daily-reports.show') }}" class="block px-3 py-2 rounded-lg text-sm font-medium {{ request()->routeIs('daily-reports.*') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
                 作業日報
+            </a>
+            <a href="{{ route('my-calendar.show') }}" class="block px-3 py-2 rounded-lg text-sm font-medium {{ request()->routeIs('my-calendar.*') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
+                個人カレンダー
             </a>
             <a href="{{ route('leave-requests.index') }}" class="block px-3 py-2 rounded-lg text-sm font-medium {{ request()->routeIs('leave-requests.*') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
                 休暇・勤務申請

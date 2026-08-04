@@ -82,7 +82,7 @@
                     </div>
                     <div>
                         <x-input-label value="対象日" />
-                        <x-date-text-input name="start_date" class="mt-1 block w-full" :value="old('start_date')" />
+                        <x-date-text-input name="start_date" class="mt-1 block w-full" :value="old('start_date', $prefillDate ?? null)" />
                     </div>
                     <div>
                         <x-input-label value="粒度" />
@@ -99,7 +99,7 @@
                           class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
                     <div>
                         <x-input-label value="開始日" />
-                        <x-date-text-input name="start_date" class="mt-1 block w-full" :value="old('start_date')" />
+                        <x-date-text-input name="start_date" class="mt-1 block w-full" :value="old('start_date', $prefillDate ?? null)" />
                     </div>
                     <div>
                         <x-input-label value="事由" />
@@ -158,7 +158,7 @@
                           class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
                     <div>
                         <x-input-label value="開始日" />
-                        <x-date-text-input name="start_date" class="mt-1 block w-full" :value="old('start_date')" />
+                        <x-date-text-input name="start_date" class="mt-1 block w-full" :value="old('start_date', $prefillDate ?? null)" />
                     </div>
                     <div>
                         <x-input-label value="事由" />
@@ -181,7 +181,7 @@
                           class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
                     <div>
                         <x-input-label value="開始日" />
-                        <x-date-text-input name="start_date" class="mt-1 block w-full" :value="old('start_date')" />
+                        <x-date-text-input name="start_date" class="mt-1 block w-full" :value="old('start_date', $prefillDate ?? null)" />
                     </div>
                     <div>
                         <x-input-label value="終了日（任意、単日の場合は空欄）" />
@@ -202,7 +202,7 @@
                           class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
                     <div>
                         <x-input-label value="勤務日" />
-                        <x-date-text-input name="start_date" class="mt-1 block w-full" :value="old('start_date')" />
+                        <x-date-text-input name="start_date" class="mt-1 block w-full" :value="old('start_date', $prefillDate ?? null)" />
                     </div>
                     <div>
                         <x-input-label value="注番" />
@@ -234,7 +234,7 @@
                           class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
                     <div>
                         <x-input-label value="実際に勤務した日" />
-                        <x-date-text-input name="start_date" class="mt-1 block w-full" :value="old('start_date')" />
+                        <x-date-text-input name="start_date" class="mt-1 block w-full" :value="old('start_date', $prefillDate ?? null)" />
                     </div>
                     <div>
                         <x-input-label value="注番" />
@@ -266,7 +266,7 @@
                           class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
                     <div>
                         <x-input-label value="開始日" />
-                        <x-date-text-input name="start_date" class="mt-1 block w-full" :value="old('start_date')" />
+                        <x-date-text-input name="start_date" class="mt-1 block w-full" :value="old('start_date', $prefillDate ?? null)" />
                     </div>
                     <div>
                         <x-input-label value="終了日（任意、単日の場合は空欄）" />
@@ -279,7 +279,7 @@
                           class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
                     <div>
                         <x-input-label value="開始日" />
-                        <x-date-text-input name="start_date" class="mt-1 block w-full" :value="old('start_date')" />
+                        <x-date-text-input name="start_date" class="mt-1 block w-full" :value="old('start_date', $prefillDate ?? null)" />
                     </div>
                     <div>
                         <x-input-label value="終了日（任意、単日の場合は空欄）" />
@@ -292,7 +292,7 @@
                           class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
                     <div>
                         <x-input-label value="開始日" />
-                        <x-date-text-input name="start_date" class="mt-1 block w-full" :value="old('start_date')" />
+                        <x-date-text-input name="start_date" class="mt-1 block w-full" :value="old('start_date', $prefillDate ?? null)" />
                     </div>
                     <div>
                         <x-input-label value="終了日（任意、単日の場合は空欄）" />
@@ -312,7 +312,7 @@
                           class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
                     <div>
                         <x-input-label value="開始日" />
-                        <x-date-text-input name="start_date" class="mt-1 block w-full" :value="old('start_date')" />
+                        <x-date-text-input name="start_date" class="mt-1 block w-full" :value="old('start_date', $prefillDate ?? null)" />
                     </div>
                     <div>
                         <x-input-label value="終了日（任意、単日の場合は空欄）" />

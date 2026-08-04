@@ -11,6 +11,7 @@ use App\Http\Controllers\HolidayController;
 use App\Http\Controllers\LaborCostController;
 use App\Http\Controllers\LeaveRequestController;
 use App\Http\Controllers\OrderNumberController;
+use App\Http\Controllers\PersonalCalendarController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\PurchaseDetailController;
 use App\Http\Controllers\PurchaseInputController;
@@ -40,6 +41,8 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/daily-reports', [DailyReportController::class, 'show'])->name('daily-reports.show');
     Route::post('/daily-reports', [DailyReportController::class, 'store'])->name('daily-reports.store');
+
+    Route::get('/my-calendar', [PersonalCalendarController::class, 'show'])->name('my-calendar.show');
 
     Route::get('/leave-requests', [LeaveRequestController::class, 'index'])->name('leave-requests.index');
     Route::get('/leave-requests/create', [LeaveRequestController::class, 'create'])->name('leave-requests.create');

@@ -21,7 +21,7 @@ class LeaveRequestController extends Controller
 {
     use AuthorizesRequests;
 
-    public function create(): View
+    public function create(Request $request): View
     {
         return view('leave-requests.create', [
             'approvers' => Staff::where('is_supervisor', true)->where('id', '!=', Auth::id())->orderBy('name')->get(),
@@ -29,7 +29,24 @@ class LeaveRequestController extends Controller
                 ->map(fn (OrderNumber $o) => ['code' => $o->code, 'label' => $o->displayLabel()])
                 ->values(),
             'paidLeaveBalance' => Auth::user()->paidLeaveBalance(),
+            'prefillDate' => $this->parseDateQuery($request->query('date')),
         ]);
+    }
+
+    /**
+     * カレンダー画面からの日付クリック遷移(?date=)用。不正な値はプリフィルなしとして無視する。
+     */
+    private function parseDateQuery(?string $date): ?string
+    {
+        if (! $date) {
+            return null;
+        }
+
+        try {
+            return Carbon::parse($date)->format('Y-m-d');
+        } catch (\Exception) {
+            return null;
+        }
     }
 
     public function store(Request $request): RedirectResponse
