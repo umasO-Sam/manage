@@ -86,19 +86,23 @@
                             ])) }},
                             categories: {{ \Illuminate\Support\Js::from($categories) }},
                          })">
-                        <div class="relative h-4 mb-1 text-[10px] text-slate-400 font-mono select-none">
-                            <template x-for="t in axisTicks()" :key="'tick-' + t">
-                                <span class="absolute -translate-x-1/2 whitespace-nowrap" :style="{ left: tickPercent(t) + '%' }" x-text="formatMinute(t)"></span>
-                            </template>
-                        </div>
-                        <div class="relative h-10 border border-slate-200 rounded-lg overflow-hidden select-none" :style="gridBackgroundStyle()">
-                            <template x-for="(seg, idx) in entrySegments()" :key="idx">
-                                <div class="absolute top-0 bottom-0 flex items-center px-1 text-[10px] text-slate-800 border-r border-white/70 overflow-hidden"
-                                     :style="{ left: tickPercent(seg.from) + '%', width: (tickPercent(seg.to) - tickPercent(seg.from)) + '%', backgroundColor: seg.color }"
-                                     :title="seg.label + '（' + formatMinute(seg.from) + '〜' + formatMinute(seg.to) + '）'">
-                                    <span class="truncate" x-text="seg.label"></span>
+                        <div class="overflow-x-auto">
+                            <div :style="{ minWidth: gridWidthPx() + 'px' }">
+                                <div class="relative h-4 mb-1 text-[10px] text-slate-400 font-mono select-none">
+                                    <template x-for="t in axisTicks()" :key="'tick-' + t.at">
+                                        <span class="absolute -translate-x-1/2 whitespace-nowrap" :style="{ left: tickPercent(t.at) + '%' }" x-text="t.label"></span>
+                                    </template>
                                 </div>
-                            </template>
+                                <div class="relative h-12 border border-slate-200 rounded-lg overflow-hidden select-none" :style="gridBackgroundStyle()">
+                                    <template x-for="(seg, idx) in entrySegments()" :key="idx">
+                                        <div class="absolute top-0 bottom-0 flex items-start px-1 py-0.5 text-[10px] leading-tight text-slate-800 border-r border-white/70 overflow-hidden"
+                                             :style="{ left: tickPercent(seg.from) + '%', width: (tickPercent(seg.to) - tickPercent(seg.from)) + '%', backgroundColor: seg.color }"
+                                             :title="seg.label + '（' + formatMinute(seg.from) + '〜' + formatMinute(seg.to) + '）'">
+                                            <span class="line-clamp-2 break-words" x-text="seg.label"></span>
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -121,9 +125,18 @@
                 categoryColors: {},
                 gridStart: 0,
                 gridEnd: 24 * 60,
-                // 始業・休憩・終業の正確な境界時刻。目盛りに必ず表示し、
-                // 10:10や15:10のような半端な時刻も読み取れるようにする。
-                boundaryMinutes: [8 * 60, 10 * 60, 10 * 60 + 10, 12 * 60 + 10, 13 * 60, 15 * 60, 15 * 60 + 10, 16 * 60 + 10, 17 * 60 + 10],
+                pxPerMinute: 6,
+                // 始業・休憩・終業の正確な境界時刻。目盛りに必ず表示し、10:10や15:10のような
+                // 半端な時刻も読み取れるようにする。10分間の休憩(10:00-10:10、15:00-15:10)は
+                // 隣接する2つの目盛りが近すぎて重なるため、1つのラベルに短縮してまとめる。
+                boundaryTicks: [
+                    { at: 8 * 60, label: '8:00' },
+                    { at: 10 * 60, label: '10:00~10' },
+                    { at: 12 * 60 + 10, label: '12:10' },
+                    { at: 13 * 60, label: '13:00' },
+                    { at: 15 * 60, label: '15:00~10' },
+                    { at: 17 * 60 + 10, label: '17:10' },
+                ],
 
                 init() {
                     const palette = ['#a7f3d0', '#99f6e4', '#a5f3fc', '#c7d2fe', '#ddd6fe', '#e9d5ff', '#f5d0fe', '#fbcfe8', '#fecdd3', '#fed7aa', '#d9f99d', '#bbf7d0'];
@@ -141,14 +154,28 @@
 
                 // 1時間おきの目盛りに加えて、休憩・始業・終業などの正確な境界時刻を必ず含める。
                 axisTicks() {
-                    const ticks = new Set([this.gridStart, this.gridEnd]);
-                    for (let t = Math.ceil(this.gridStart / 60) * 60; t <= this.gridEnd; t += 60) ticks.add(t);
-                    this.boundaryMinutes.filter((t) => t >= this.gridStart && t <= this.gridEnd).forEach((t) => ticks.add(t));
-                    return [...ticks].sort((a, b) => a - b);
+                    const customPositions = new Set(this.boundaryTicks.map((b) => b.at));
+                    const ticks = [];
+
+                    for (let t = Math.ceil(this.gridStart / 60) * 60; t <= this.gridEnd; t += 60) {
+                        if (!customPositions.has(t)) ticks.push({ at: t, label: this.formatMinute(t) });
+                    }
+                    this.boundaryTicks
+                        .filter((b) => b.at >= this.gridStart && b.at <= this.gridEnd)
+                        .forEach((b) => ticks.push(b));
+                    if (!customPositions.has(this.gridStart)) ticks.push({ at: this.gridStart, label: this.formatMinute(this.gridStart) });
+                    if (!customPositions.has(this.gridEnd)) ticks.push({ at: this.gridEnd, label: this.formatMinute(this.gridEnd) });
+
+                    return ticks.sort((a, b) => a.at - b.at);
                 },
 
                 tickPercent(t) {
                     return ((t - this.gridStart) / (this.gridEnd - this.gridStart)) * 100;
+                },
+
+                // 横スクロールできるよう、時間範囲に応じた最小幅(px)を確保する。
+                gridWidthPx() {
+                    return Math.max(600, (this.gridEnd - this.gridStart) * this.pxPerMinute);
                 },
 
                 // 10分ごとに薄い補助線、1時間ごとにやや濃い線を重ねて表示する。

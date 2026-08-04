@@ -54,6 +54,64 @@ class LeaveRequestTest extends TestCase
         $this->assertSame(2.0, (float) $leaveRequest->hours);
     }
 
+    public function test_paid_leave_half_day_requires_am_pm_period(): void
+    {
+        $applicant = Staff::factory()->create(['paid_leave_granted_current_year' => 10]);
+        $approver = Staff::factory()->create(['is_supervisor' => true]);
+
+        $this->actingAs($applicant)->post(route('leave-requests.store'), [
+            'type' => 'paid_leave', 'approver_id' => $approver->id,
+            'start_date' => '2026-08-10', 'granularity' => 'half_day',
+        ])->assertSessionHasErrors('half_day_period');
+
+        $this->assertSame(0, LeaveRequest::count());
+    }
+
+    public function test_paid_leave_half_day_stores_am_pm_period(): void
+    {
+        $applicant = Staff::factory()->create(['paid_leave_granted_current_year' => 10]);
+        $approver = Staff::factory()->create(['is_supervisor' => true]);
+
+        $this->actingAs($applicant)->post(route('leave-requests.store'), [
+            'type' => 'paid_leave', 'approver_id' => $approver->id,
+            'start_date' => '2026-08-10', 'granularity' => 'half_day', 'half_day_period' => 'pm',
+        ])->assertRedirect(route('leave-requests.index'));
+
+        $leaveRequest = LeaveRequest::first();
+        $this->assertSame('pm', $leaveRequest->half_day_period);
+        $this->assertSame(0.5, (float) $leaveRequest->day_count);
+        $this->assertSame('PM半休', $leaveRequest->shortLabel());
+    }
+
+    public function test_short_label_covers_paid_leave_variants(): void
+    {
+        $staff = Staff::factory()->create();
+        $approver = Staff::factory()->create(['is_supervisor' => true]);
+
+        $make = fn (array $overrides) => LeaveRequest::create([
+            'staff_id' => $staff->id, 'type' => 'paid_leave', 'start_date' => '2026-08-10', 'end_date' => '2026-08-10',
+            'day_count' => 1.0, 'approver_id' => $approver->id, 'status' => 'pending', ...$overrides,
+        ]);
+
+        $this->assertSame('1D有給', $make(['granularity' => 'full_day'])->shortLabel());
+        $this->assertSame('2H有給', $make(['granularity' => 'hours'])->shortLabel());
+        $this->assertSame('AM半休', $make(['granularity' => 'half_day', 'half_day_period' => 'am'])->shortLabel());
+        $this->assertSame('PM半休', $make(['granularity' => 'half_day', 'half_day_period' => 'pm'])->shortLabel());
+
+        $telework = LeaveRequest::create([
+            'staff_id' => $staff->id, 'type' => 'telework', 'start_date' => '2026-08-10', 'end_date' => '2026-08-10',
+            'approver_id' => $approver->id, 'status' => 'pending',
+        ]);
+        $this->assertSame('在宅', $telework->shortLabel());
+
+        $holidayWork = LeaveRequest::create([
+            'staff_id' => $staff->id, 'type' => 'holiday_work', 'start_date' => '2026-08-10', 'end_date' => '2026-08-10',
+            'order_no' => 'A-1', 'work_location' => '本社', 'no_substitute_needed' => true,
+            'approver_id' => $approver->id, 'status' => 'pending',
+        ]);
+        $this->assertSame('休出', $holidayWork->shortLabel());
+    }
+
     public function test_paid_leave_request_is_rejected_when_balance_is_insufficient(): void
     {
         $applicant = Staff::factory()->create(['paid_leave_granted_current_year' => 0.5]);

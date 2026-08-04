@@ -74,6 +74,7 @@
 
                 {{-- 有給休暇 --}}
                 <fieldset x-show="type === 'paid_leave'" x-cloak :disabled="type !== 'paid_leave'"
+                          x-data="{ granularity: '{{ old('granularity', '') }}' }"
                           class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
                     <div class="text-xs bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-600">
                         有給休暇の残日数:
@@ -87,10 +88,19 @@
                     <div>
                         <x-input-label value="粒度" />
                         <div class="flex gap-3 mt-1 text-sm">
-                            <label class="flex items-center gap-1"><input type="radio" name="granularity" value="full_day" @checked(old('granularity') === 'full_day')> 1日</label>
-                            <label class="flex items-center gap-1"><input type="radio" name="granularity" value="half_day" @checked(old('granularity') === 'half_day')> 半日</label>
-                            <label class="flex items-center gap-1"><input type="radio" name="granularity" value="hours" @checked(old('granularity') === 'hours')> 2時間</label>
+                            <label class="flex items-center gap-1"><input type="radio" name="granularity" value="full_day" x-model="granularity"> 1日</label>
+                            <label class="flex items-center gap-1"><input type="radio" name="granularity" value="half_day" x-model="granularity"> 半日</label>
+                            <label class="flex items-center gap-1"><input type="radio" name="granularity" value="hours" x-model="granularity"> 2時間</label>
                         </div>
+                        <x-input-error class="mt-2" :messages="$errors->get('granularity')" />
+                    </div>
+                    <div x-show="granularity === 'half_day'" x-cloak>
+                        <x-input-label value="午前/午後" />
+                        <div class="flex gap-3 mt-1 text-sm">
+                            <label class="flex items-center gap-1"><input type="radio" name="half_day_period" value="am" @checked(old('half_day_period') === 'am')> 午前(AM)</label>
+                            <label class="flex items-center gap-1"><input type="radio" name="half_day_period" value="pm" @checked(old('half_day_period') === 'pm')> 午後(PM)</label>
+                        </div>
+                        <x-input-error class="mt-2" :messages="$errors->get('half_day_period')" />
                     </div>
                 </fieldset>
 

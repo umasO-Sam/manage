@@ -12,7 +12,7 @@
                 </a>
 
                 <!-- Navigation Links -->
-                <div class="hidden md:flex space-x-1 ml-8">
+                <div class="hidden md:flex space-x-1 ml-8 overflow-x-auto">
                     @php
                         $totalUnread = array_sum($unreadCardCountsByWorkflow ?? []);
                         $boardsActive = request()->routeIs('cards.*') || request()->routeIs('archive.*');
@@ -31,7 +31,7 @@
                         @endphp
                         @if ($procurementBoard)
                             <a href="{{ route('cards.index', $procurementBoard) }}"
-                               class="px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors {{ request()->route('workflow')?->is($procurementBoard) ? 'bg-slate-200 text-slate-800' : 'text-slate-600 hover:bg-slate-50' }}">
+                               class="px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 shrink-0 whitespace-nowrap transition-colors {{ request()->route('workflow')?->is($procurementBoard) ? 'bg-slate-200 text-slate-800' : 'text-slate-600 hover:bg-slate-50' }}">
                                 <i data-lucide="shopping-cart" class="w-4 h-4"></i>
                                 <span>購入手配ボード</span>
                                 @if (($unreadCardCountsByWorkflow[$procurementBoard->id] ?? 0) > 0)
@@ -43,7 +43,7 @@
                         @endif
                         @if ($estimateBoard)
                             <a href="{{ route('cards.index', $estimateBoard) }}"
-                               class="px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors {{ request()->route('workflow')?->is($estimateBoard) ? 'bg-slate-200 text-slate-800' : 'text-slate-600 hover:bg-slate-50' }}">
+                               class="px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 shrink-0 whitespace-nowrap transition-colors {{ request()->route('workflow')?->is($estimateBoard) ? 'bg-slate-200 text-slate-800' : 'text-slate-600 hover:bg-slate-50' }}">
                                 <i data-lucide="file-text" class="w-4 h-4"></i>
                                 <span>見積依頼ボード</span>
                                 @if (($unreadCardCountsByWorkflow[$estimateBoard->id] ?? 0) > 0)
@@ -54,14 +54,14 @@
                             </a>
                         @endif
                         <a href="{{ route('my-calendar.show') }}"
-                           class="px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors {{ request()->routeIs('my-calendar.*') ? 'bg-slate-200 text-slate-800' : 'text-slate-600 hover:bg-slate-50' }}">
+                           class="px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 shrink-0 whitespace-nowrap transition-colors {{ request()->routeIs('my-calendar.*') ? 'bg-slate-200 text-slate-800' : 'text-slate-600 hover:bg-slate-50' }}">
                             <i data-lucide="calendar" class="w-4 h-4"></i>
                             <span>個人カレンダー</span>
                         </a>
 
                         <x-dropdown align="left" width="56">
                             <x-slot name="trigger">
-                                <button class="px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors {{ $requestsActive ? 'bg-slate-200 text-slate-800' : 'text-slate-600 hover:bg-slate-50' }}">
+                                <button class="px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 shrink-0 whitespace-nowrap transition-colors {{ $requestsActive ? 'bg-slate-200 text-slate-800' : 'text-slate-600 hover:bg-slate-50' }}">
                                     <i data-lucide="file-signature" class="w-4 h-4"></i>
                                     <span>申請</span>
                                     @if ($calendarPending > 0)
@@ -96,12 +96,12 @@
                         </x-dropdown>
 
                         <a href="{{ route('work-status.index') }}"
-                           class="px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors {{ request()->routeIs('work-status.*') ? 'bg-slate-200 text-slate-800' : 'text-slate-600 hover:bg-slate-50' }}">
+                           class="px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 shrink-0 whitespace-nowrap transition-colors {{ request()->routeIs('work-status.*') ? 'bg-slate-200 text-slate-800' : 'text-slate-600 hover:bg-slate-50' }}">
                             <i data-lucide="users-round" class="w-4 h-4"></i>
                             <span>勤務状況一覧</span>
                         </a>
                         <a href="{{ route('archive.index') }}"
-                           class="px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors {{ request()->routeIs('archive.*') ? 'bg-slate-200 text-slate-800' : 'text-slate-600 hover:bg-slate-50' }}">
+                           class="px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 shrink-0 whitespace-nowrap transition-colors {{ request()->routeIs('archive.*') ? 'bg-slate-200 text-slate-800' : 'text-slate-600 hover:bg-slate-50' }}">
                             <i data-lucide="archive" class="w-4 h-4"></i>
                             <span>履歴</span>
                         </a>

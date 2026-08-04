@@ -70,6 +70,7 @@ class LeaveRequestController extends Controller
             'start_date' => ['required', 'date'],
             'end_date' => ['nullable', 'date', 'after_or_equal:start_date'],
             'granularity' => ['nullable', 'in:full_day,half_day,hours'],
+            'half_day_period' => ['nullable', 'in:am,pm'],
             'reason_code' => ['nullable', 'string', 'max:50'],
             'reason_detail' => ['nullable', 'string', 'max:255'],
             'order_no' => ['nullable', 'string', 'max:255'],
@@ -156,6 +157,10 @@ class LeaveRequestController extends Controller
             throw ValidationException::withMessages(['granularity' => '有給休暇の粒度（1日/半日/2時間）を選択してください。']);
         }
 
+        if ($data['granularity'] === 'half_day' && empty($data['half_day_period'])) {
+            throw ValidationException::withMessages(['half_day_period' => '半休の午前/午後を選択してください。']);
+        }
+
         $dayCount = match ($data['granularity']) {
             'full_day' => 1.0,
             'half_day' => 0.5,
@@ -174,6 +179,7 @@ class LeaveRequestController extends Controller
             'start_date' => $data['start_date'],
             'end_date' => $data['start_date'],
             'granularity' => $data['granularity'],
+            'half_day_period' => $data['granularity'] === 'half_day' ? $data['half_day_period'] : null,
             'hours' => $data['granularity'] === 'hours' ? 2.0 : null,
             'day_count' => $dayCount,
         ];

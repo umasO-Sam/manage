@@ -61,7 +61,7 @@ class WorkStatusTest extends TestCase
 
         $response->assertOk();
         // 一般社員には承認状況が見えないため、種別のみ表示され、承認状況の文言は出ない。
-        $response->assertSee('有給休暇');
+        $response->assertSee('1D有給');
         $response->assertDontSee('（未承認）');
         $response->assertDontSee('（承認済み）');
     }
@@ -86,7 +86,7 @@ class WorkStatusTest extends TestCase
         $response = $this->actingAs($supervisor)->get(route('work-status.index'));
 
         $response->assertOk();
-        $response->assertSee('有給休暇（承認済み）');
+        $response->assertSee('1D有給（承認済み）');
         $response->assertSee('作業日報：確認待ち');
     }
 

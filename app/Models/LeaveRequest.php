@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 #[Fillable([
-    'staff_id', 'type', 'start_date', 'end_date', 'granularity', 'hours',
+    'staff_id', 'type', 'start_date', 'end_date', 'granularity', 'half_day_period', 'hours',
     'reason_code', 'reason_detail', 'day_count', 'order_no', 'work_location',
     'substitute_holiday_date', 'no_substitute_needed', 'actual_worked_hours',
     'compensatory_date', 'approver_id', 'status', 'rejection_reason',
@@ -118,6 +118,24 @@ class LeaveRequest extends Model
     public function typeLabel(): string
     {
         return self::TYPES[$this->type] ?? $this->type;
+    }
+
+    /**
+     * 勤務状況一覧など、セル内に収める短い文字ラベル。振替休日・代休は対象日での
+     * 役割によって表示が変わるため、この短縮ラベルには含めず呼び出し側で切り替える。
+     */
+    public function shortLabel(): string
+    {
+        return match (true) {
+            $this->type === 'paid_leave' && $this->granularity === 'full_day' => '1D有給',
+            $this->type === 'paid_leave' && $this->granularity === 'hours' => '2H有給',
+            $this->type === 'paid_leave' && $this->granularity === 'half_day' && $this->half_day_period === 'am' => 'AM半休',
+            $this->type === 'paid_leave' && $this->granularity === 'half_day' && $this->half_day_period === 'pm' => 'PM半休',
+            $this->type === 'paid_leave' && $this->granularity === 'half_day' => '半休',
+            $this->type === 'telework' => '在宅',
+            $this->type === 'holiday_work' => '休出',
+            default => mb_substr($this->typeLabel(), 0, 4),
+        };
     }
 
     public function reasonLabel(): ?string
