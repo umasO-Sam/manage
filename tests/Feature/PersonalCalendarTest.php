@@ -300,4 +300,28 @@ class PersonalCalendarTest extends TestCase
             ];
         });
     }
+
+    public function test_daily_report_status_reflects_rejected(): void
+    {
+        $staff = Staff::factory()->create();
+
+        \App\Models\DailyReport::create([
+            'staff_id' => $staff->id, 'work_date' => '2026-08-06', 'submitted_at' => now(),
+            'rejected_at' => now(), 'rejection_reason' => '注番が間違っています',
+        ]);
+
+        $response = $this->actingAs($staff)->get(route('my-calendar.show', ['year' => 2026, 'month' => 8]));
+
+        $response->assertViewHas('weeks', function (array $weeks) {
+            foreach ($weeks as $week) {
+                foreach ($week as $day) {
+                    if ($day['date']->format('Y-m-d') === '2026-08-06') {
+                        return $day['dailyReportStatus'] === 'rejected';
+                    }
+                }
+            }
+
+            return false;
+        });
+    }
 }

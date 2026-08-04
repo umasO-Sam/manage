@@ -111,6 +111,10 @@ class DailyReportController extends Controller
 
             if ($isSubmit) {
                 $report->submitted_at = now();
+                // 差し戻された日報を修正して再提出した場合、差し戻し状態は解消する
+                // (再提出のたびに以前の差し戻し理由が残り続けるのを防ぐため)。
+                $report->rejected_at = null;
+                $report->rejection_reason = null;
             }
             $report->save();
 

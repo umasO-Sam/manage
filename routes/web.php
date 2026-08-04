@@ -85,7 +85,7 @@ Route::middleware('auth')->group(function () {
         Route::delete('/order-numbers/{orderNumber}', [OrderNumberController::class, 'destroy'])->name('order-numbers.destroy');
 
         Route::get('/daily-reports/review', [DailyReportReviewController::class, 'index'])->name('daily-reports.review.index');
-        Route::post('/daily-reports/review/{dailyReport}/confirm', [DailyReportReviewController::class, 'confirm'])->name('daily-reports.review.confirm');
+        Route::post('/daily-reports/review/{dailyReport}/decide', [DailyReportReviewController::class, 'decide'])->name('daily-reports.review.decide');
 
         Route::get('/holidays', [HolidayController::class, 'index'])->name('holidays.index');
         Route::get('/holidays/calendar', [HolidayController::class, 'calendar'])->name('holidays.calendar');

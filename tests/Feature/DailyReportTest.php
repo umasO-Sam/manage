@@ -40,6 +40,20 @@ class DailyReportTest extends TestCase
         $response->assertSee('修正提出');
     }
 
+    public function test_rejected_report_shows_the_rejection_reason(): void
+    {
+        $staff = Staff::factory()->create();
+        DailyReport::create([
+            'staff_id' => $staff->id, 'work_date' => '2026-08-03', 'submitted_at' => now(),
+            'rejected_at' => now(), 'rejection_reason' => '注番が間違っています',
+        ]);
+
+        $response = $this->actingAs($staff)->get(route('daily-reports.show', ['date' => '2026-08-03']));
+
+        $response->assertSee('差戻し');
+        $response->assertSee('注番が間違っています');
+    }
+
     public function test_draft_save_does_not_generate_labor_costs(): void
     {
         $staff = Staff::factory()->create();

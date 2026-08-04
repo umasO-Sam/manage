@@ -9,22 +9,67 @@
     <div class="py-8">
         <div class="max-w-4xl mx-auto sm:px-6 lg:px-8 space-y-4">
 
+            @php
+                $current = \Illuminate\Support\Carbon::parse($date);
+                $weekdayLabels = ['日', '月', '火', '水', '木', '金', '土'];
+            @endphp
+            <div class="flex items-center justify-center gap-3 text-sm">
+                <a href="{{ route('daily-reports.review.index', ['date' => $prevDate]) }}"
+                   class="font-semibold text-slate-600 hover:text-blue-600">
+                    {{ \Illuminate\Support\Carbon::parse($prevDate)->format('m/d') }}←
+                </a>
+                <span class="text-lg font-bold text-slate-900">
+                    {{ $current->format('Y/m/d') }}（{{ $weekdayLabels[$current->dayOfWeek] }}）
+                </span>
+                <a href="{{ route('daily-reports.review.index', ['date' => $nextDate]) }}"
+                   class="font-semibold text-slate-600 hover:text-blue-600">
+                    →{{ \Illuminate\Support\Carbon::parse($nextDate)->format('m/d') }}
+                </a>
+            </div>
+
             @if (session('status') === 'daily-report-confirmed')
                 <div class="p-3 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-800 text-sm">作業日報を確認済みにしました。</div>
             @endif
+            @if (session('status') === 'daily-report-rejected')
+                <div class="p-3 rounded-xl bg-amber-50 border border-amber-100 text-amber-800 text-sm">作業日報を差し戻しました。本人に修正・再提出を依頼してください。</div>
+            @endif
+            @if ($errors->any())
+                <div class="p-3 rounded-xl bg-red-50 border border-red-100 text-red-800 text-sm">
+                    @foreach ($errors->all() as $error)
+                        <p>{{ $error }}</p>
+                    @endforeach
+                </div>
+            @endif
 
             @forelse ($reports as $report)
-                <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-                    <div class="p-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
-                        <div>
+                <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden" x-data="{ showReject: false }">
+                    <div class="p-4 bg-slate-50 border-b border-slate-200">
+                        <div class="flex items-center justify-between flex-wrap gap-2">
                             <span class="font-bold text-slate-900">{{ $report->staff->name }}</span>
-                            <span class="text-sm text-slate-500 ml-2">{{ $report->work_date->format('Y/m/d（D）') }}</span>
+                            <div class="flex items-center gap-2">
+                                <button type="button" @click="showReject = ! showReject"
+                                        class="text-sm font-semibold border border-red-300 text-red-700 hover:bg-red-50 px-4 py-1.5 rounded-lg">
+                                    差し戻す
+                                </button>
+                                <form method="POST" action="{{ route('daily-reports.review.decide', $report) }}">
+                                    @csrf
+                                    <input type="hidden" name="action" value="confirm">
+                                    <button type="submit" class="text-sm font-semibold bg-blue-600 hover:bg-blue-700 text-white px-4 py-1.5 rounded-lg shadow-sm">
+                                        確認する
+                                    </button>
+                                </form>
+                            </div>
                         </div>
-                        <form method="POST" action="{{ route('daily-reports.review.confirm', $report) }}">
+                        <form method="POST" action="{{ route('daily-reports.review.decide', $report) }}" x-show="showReject" x-cloak class="mt-3 space-y-2">
                             @csrf
-                            <button type="submit" class="text-sm font-semibold bg-blue-600 hover:bg-blue-700 text-white px-4 py-1.5 rounded-lg shadow-sm">
-                                確認する
-                            </button>
+                            <input type="hidden" name="action" value="reject">
+                            <textarea name="rejection_reason" rows="2" placeholder="差し戻し理由を入力してください"
+                                      class="w-full border rounded-lg p-2 border-slate-300 text-sm" required></textarea>
+                            <div class="flex justify-end">
+                                <button type="submit" class="text-sm font-semibold bg-red-600 hover:bg-red-700 text-white px-4 py-1.5 rounded-lg shadow-sm">
+                                    差し戻しを確定
+                                </button>
+                            </div>
                         </form>
                     </div>
                     <div class="p-4"
@@ -55,7 +100,7 @@
                 </div>
             @empty
                 <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-8 text-center text-slate-400 text-sm">
-                    確認待ちの作業日報はありません。
+                    この日の確認待ちの作業日報はありません。
                 </div>
             @endforelse
         </div>

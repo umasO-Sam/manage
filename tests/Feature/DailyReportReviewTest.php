@@ -20,7 +20,7 @@ class DailyReportReviewTest extends TestCase
         $this->actingAs($staff)->get(route('daily-reports.review.index'))->assertForbidden();
     }
 
-    public function test_review_list_shows_reports_with_provisional_labor_costs(): void
+    public function test_review_list_shows_only_pending_reports_for_the_requested_date(): void
     {
         $manager = Staff::factory()->procurementManager()->create();
         $reporter = Staff::factory()->create();
@@ -35,21 +35,53 @@ class DailyReportReviewTest extends TestCase
             'work_hours' => 2, 'work_minutes' => 0, 'is_overtime' => false, 'is_provisional' => true,
         ]);
 
-        $confirmedReport = DailyReport::create(['staff_id' => $reporter->id, 'work_date' => '2026-08-11', 'submitted_at' => now()]);
+        // 同日だが確認済みのため対象外(1担当者1日1件の制約があるため別担当者にする)
+        $otherReporter = Staff::factory()->create();
+        $confirmedReport = DailyReport::create(['staff_id' => $otherReporter->id, 'work_date' => '2026-08-10', 'submitted_at' => now()]);
         LaborCost::create([
-            'work_date' => '2026-08-11', 'staff_id' => $reporter->id, 'daily_report_id' => $confirmedReport->id,
+            'work_date' => '2026-08-10', 'staff_id' => $otherReporter->id, 'daily_report_id' => $confirmedReport->id,
             'work_hours' => 8, 'work_minutes' => 0, 'is_overtime' => false, 'is_provisional' => false,
+        ]);
+
+        // 別日のため対象外
+        $otherDateReport = DailyReport::create(['staff_id' => $reporter->id, 'work_date' => '2026-08-11', 'submitted_at' => now()]);
+        LaborCost::create([
+            'work_date' => '2026-08-11', 'staff_id' => $reporter->id, 'daily_report_id' => $otherDateReport->id,
+            'work_hours' => 8, 'work_minutes' => 0, 'is_overtime' => false, 'is_provisional' => true,
+        ]);
+
+        $response = $this->actingAs($manager)->get(route('daily-reports.review.index', ['date' => '2026-08-10']));
+
+        $response->assertOk();
+        $response->assertViewHas('reports', function ($reports) use ($report, $confirmedReport, $otherDateReport) {
+            $ids = $reports->pluck('id')->all();
+
+            return $ids === [$report->id]
+                && ! in_array($confirmedReport->id, $ids, true)
+                && ! in_array($otherDateReport->id, $ids, true);
+        });
+        $response->assertSee('雑作業');
+    }
+
+    public function test_default_date_is_the_earliest_pending_report(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        $reporter = Staff::factory()->create();
+
+        $later = DailyReport::create(['staff_id' => $reporter->id, 'work_date' => '2026-08-15', 'submitted_at' => now()]);
+        LaborCost::create([
+            'work_date' => '2026-08-15', 'staff_id' => $reporter->id, 'daily_report_id' => $later->id,
+            'work_hours' => 8, 'work_minutes' => 0, 'is_overtime' => false, 'is_provisional' => true,
+        ]);
+        $earlier = DailyReport::create(['staff_id' => $reporter->id, 'work_date' => '2026-08-05', 'submitted_at' => now()]);
+        LaborCost::create([
+            'work_date' => '2026-08-05', 'staff_id' => $reporter->id, 'daily_report_id' => $earlier->id,
+            'work_hours' => 8, 'work_minutes' => 0, 'is_overtime' => false, 'is_provisional' => true,
         ]);
 
         $response = $this->actingAs($manager)->get(route('daily-reports.review.index'));
 
-        $response->assertOk();
-        $response->assertViewHas('reports', function ($reports) use ($report, $confirmedReport) {
-            $ids = $reports->pluck('id')->all();
-
-            return in_array($report->id, $ids, true) && ! in_array($confirmedReport->id, $ids, true);
-        });
-        $response->assertSee('雑作業');
+        $response->assertViewHas('date', '2026-08-05');
     }
 
     public function test_confirming_a_report_clears_provisional_flag(): void
@@ -63,10 +95,65 @@ class DailyReportReviewTest extends TestCase
             'work_hours' => 8, 'work_minutes' => 0, 'is_overtime' => false, 'is_provisional' => true,
         ]);
 
-        $this->actingAs($manager)->post(route('daily-reports.review.confirm', $report))
+        $this->actingAs($manager)->post(route('daily-reports.review.decide', $report), ['action' => 'confirm'])
             ->assertRedirect();
 
         $this->assertFalse((bool) $laborCost->fresh()->is_provisional);
+    }
+
+    public function test_rejecting_a_report_requires_a_reason(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        $reporter = Staff::factory()->create();
+        $report = DailyReport::create(['staff_id' => $reporter->id, 'work_date' => '2026-08-10', 'submitted_at' => now()]);
+
+        $this->actingAs($manager)->post(route('daily-reports.review.decide', $report), ['action' => 'reject'])
+            ->assertSessionHasErrors('rejection_reason');
+
+        $this->assertFalse($report->fresh()->isRejected());
+    }
+
+    public function test_rejecting_a_report_records_the_reason_and_removes_it_from_the_queue(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        $reporter = Staff::factory()->create();
+
+        $report = DailyReport::create(['staff_id' => $reporter->id, 'work_date' => '2026-08-10', 'submitted_at' => now()]);
+        LaborCost::create([
+            'work_date' => '2026-08-10', 'staff_id' => $reporter->id, 'daily_report_id' => $report->id,
+            'work_hours' => 8, 'work_minutes' => 0, 'is_overtime' => false, 'is_provisional' => true,
+        ]);
+
+        $this->actingAs($manager)->post(route('daily-reports.review.decide', $report), [
+            'action' => 'reject',
+            'rejection_reason' => '注番が間違っています',
+        ])->assertRedirect();
+
+        $fresh = $report->fresh();
+        $this->assertTrue($fresh->isRejected());
+        $this->assertSame('注番が間違っています', $fresh->rejection_reason);
+
+        $response = $this->actingAs($manager)->get(route('daily-reports.review.index', ['date' => '2026-08-10']));
+        $response->assertViewHas('reports', fn ($reports) => $reports->isEmpty());
+    }
+
+    public function test_resubmitting_a_rejected_report_clears_the_rejection(): void
+    {
+        $staff = Staff::factory()->create();
+        $report = DailyReport::create([
+            'staff_id' => $staff->id, 'work_date' => '2026-08-10', 'submitted_at' => now(),
+            'rejected_at' => now(), 'rejection_reason' => '注番が間違っています',
+        ]);
+
+        $this->actingAs($staff)->post(route('daily-reports.store'), [
+            'work_date' => '2026-08-10',
+            'entries' => [],
+            'submit' => '1',
+        ])->assertRedirect();
+
+        $fresh = $report->fresh();
+        $this->assertFalse($fresh->isRejected());
+        $this->assertNull($fresh->rejection_reason);
     }
 
     public function test_general_staff_cannot_confirm_a_report(): void
@@ -75,7 +162,8 @@ class DailyReportReviewTest extends TestCase
         $reporter = Staff::factory()->create();
         $report = DailyReport::create(['staff_id' => $reporter->id, 'work_date' => '2026-08-10', 'submitted_at' => now()]);
 
-        $this->actingAs($staff)->post(route('daily-reports.review.confirm', $report))->assertForbidden();
+        $this->actingAs($staff)->post(route('daily-reports.review.decide', $report), ['action' => 'confirm'])
+            ->assertForbidden();
     }
 
     public function test_pending_approvals_count_only_counts_own_pending_requests(): void

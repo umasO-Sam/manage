@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['staff_id', 'work_date', 'submitted_at', 'remarks'])]
+#[Fillable(['staff_id', 'work_date', 'submitted_at', 'remarks', 'rejected_at', 'rejection_reason'])]
 class DailyReport extends Model
 {
     use HasFactory;
@@ -18,6 +18,7 @@ class DailyReport extends Model
         return [
             'work_date' => 'date',
             'submitted_at' => 'datetime',
+            'rejected_at' => 'datetime',
         ];
     }
 
@@ -31,8 +32,18 @@ class DailyReport extends Model
         return $this->hasMany(DailyReportEntry::class);
     }
 
+    public function laborCosts(): HasMany
+    {
+        return $this->hasMany(LaborCost::class);
+    }
+
     public function isSubmitted(): bool
     {
         return $this->submitted_at !== null;
+    }
+
+    public function isRejected(): bool
+    {
+        return $this->rejected_at !== null;
     }
 }

@@ -31,6 +31,12 @@
             @if (session('status') === 'daily-report-submitted')
                 <div class="p-3 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-800 text-sm">日報を提出しました。資材管理担当者の確認後、正式な人工データとして反映されます。</div>
             @endif
+            @if ($report->exists && $report->isRejected())
+                <div class="p-3 rounded-xl bg-red-50 border border-red-100 text-red-800 text-sm">
+                    <p class="font-bold">この日報は差し戻されました。内容を修正のうえ、再度提出してください。</p>
+                    <p class="mt-1 whitespace-pre-wrap">{{ $report->rejection_reason }}</p>
+                </div>
+            @endif
             @if ($errors->any())
                 <div class="p-3 rounded-xl bg-red-50 border border-red-100 text-red-800 text-sm">
                     @foreach ($errors->all() as $error)
@@ -53,7 +59,9 @@
                         <i data-lucide="chevron-right" class="w-4 h-4"></i>
                     </a>
                 </div>
-                @if ($report->exists && $report->isSubmitted())
+                @if ($report->exists && $report->isRejected())
+                    <span class="text-xs font-bold px-2.5 py-1 rounded-full bg-red-100 text-red-800 border border-red-300">差戻し</span>
+                @elseif ($report->exists && $report->isSubmitted())
                     <span class="text-xs font-bold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
                         提出済み（{{ $report->submitted_at->format('Y/m/d H:i') }}）
                     </span>

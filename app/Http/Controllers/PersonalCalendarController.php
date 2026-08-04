@@ -159,7 +159,8 @@ class PersonalCalendarController extends Controller
     /**
      * 作業日報の登録状況を日付ごとに判定する。draft(下書き・未提出)、
      * pending_confirmation(提出済みだが資材管理担当者の確認待ち)、
-     * confirmed(確認済み、またはLaborCostが発生しない内容で提出済み)の3状態。
+     * rejected(差し戻し中、本人の修正・再提出待ち)、
+     * confirmed(確認済み、またはLaborCostが発生しない内容で提出済み)の4状態。
      *
      * @return Collection<string, string>
      */
@@ -176,9 +177,12 @@ class PersonalCalendarController extends Controller
             ->unique();
 
         return $reports->mapWithKeys(function (DailyReport $report) use ($hasProvisionalByReportId) {
-            $status = ! $report->isSubmitted()
-                ? 'draft'
-                : ($hasProvisionalByReportId->contains($report->id) ? 'pending_confirmation' : 'confirmed');
+            $status = match (true) {
+                $report->isRejected() => 'rejected',
+                ! $report->isSubmitted() => 'draft',
+                $hasProvisionalByReportId->contains($report->id) => 'pending_confirmation',
+                default => 'confirmed',
+            };
 
             return [$report->work_date->format('Y-m-d') => $status];
         });

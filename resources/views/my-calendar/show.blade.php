@@ -51,6 +51,7 @@
                                 $dailyReportLabels = [
                                     'draft' => ['作業日報（下書き）', 'bg-slate-200 text-slate-700'],
                                     'pending_confirmation' => ['作業日報（確認待ち）', 'bg-amber-100 text-amber-800'],
+                                    'rejected' => ['作業日報（差戻し）', 'bg-red-100 text-red-800'],
                                     'confirmed' => ['作業日報', 'bg-emerald-100 text-emerald-800'],
                                 ];
                             @endphp
