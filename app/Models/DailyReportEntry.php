@@ -15,8 +15,7 @@ class DailyReportEntry extends Model
     /** @var array<string, string> leave_type値 => 表示名 */
     public const LEAVE_TYPES = [
         'full_day' => '休暇（1日）',
-        'half_day_am' => '休暇（午前）',
-        'half_day_pm' => '休暇（午後）',
+        'half_day' => '休暇（半日）',
         'hours' => '休暇（2時間）',
     ];
 

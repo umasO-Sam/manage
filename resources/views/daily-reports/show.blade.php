@@ -278,8 +278,7 @@
                 leaveColor: '#fecaca',
                 leaveTypes: [
                     { value: 'full_day', label: '休暇（1日）' },
-                    { value: 'half_day_am', label: '休暇（午前）' },
-                    { value: 'half_day_pm', label: '休暇（午後）' },
+                    { value: 'half_day', label: '休暇（半日）' },
                     { value: 'hours', label: '休暇（2時間）' },
                 ],
                 selection: { type: 'category', categoryId: null, freeText: '', orderNo: '', leaveType: null },
