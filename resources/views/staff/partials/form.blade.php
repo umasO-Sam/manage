@@ -76,7 +76,7 @@
 <div>
     <label class="flex items-center gap-2 text-sm">
         <input type="checkbox" name="is_supervisor" value="1" @checked(old('is_supervisor', $staff?->is_supervisor))>
-        上長（休暇・勤務申請の承認者として選べる担当者）
+        上長（休暇・休出申請の承認者として選べる担当者）
     </label>
     <x-input-error class="mt-2" :messages="$errors->get('is_supervisor')" />
 </div>

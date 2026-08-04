@@ -13,38 +13,75 @@
 
                 <!-- Navigation Links -->
                 <div class="hidden md:flex space-x-1 ml-8">
-                    @foreach (\App\Models\WorkflowType::orderBy('id')->get() as $nav)
-                        <a href="{{ route('cards.index', $nav) }}"
-                           class="px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 whitespace-nowrap transition-colors {{ request()->route('workflow')?->is($nav) ? $nav->accentClasses()['nav_active'] : 'text-slate-600 hover:bg-slate-50' }}">
-                            <i data-lucide="{{ $nav->icon }}" class="w-4 h-4"></i>
-                            <span>{{ $nav->name }}ボード</span>
-                            @if (($unreadCardCountsByWorkflow[$nav->id] ?? 0) > 0)
-                                <span class="inline-flex items-center justify-center min-w-[1.125rem] h-[1.125rem] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold leading-none">
-                                    {{ $unreadCardCountsByWorkflow[$nav->id] }}
-                                </span>
+                    @php
+                        $totalUnread = array_sum($unreadCardCountsByWorkflow ?? []);
+                        $boardsActive = request()->routeIs('cards.*') || request()->routeIs('archive.*');
+                        $calendarActive = request()->routeIs('my-calendar.*') || request()->routeIs('daily-reports.*')
+                            || request()->routeIs('leave-requests.*') || request()->routeIs('work-status.*') || request()->routeIs('holidays.*');
+                        $systemActive = request()->routeIs('staff.*') || request()->routeIs('order-numbers.*');
+                    @endphp
+
+                    {{-- 調達ボード --}}
+                    <x-dropdown align="left" width="56">
+                        <x-slot name="trigger">
+                            <button class="px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors {{ $boardsActive ? 'bg-slate-200 text-slate-800' : 'text-slate-600 hover:bg-slate-50' }}">
+                                <i data-lucide="layout-grid" class="w-4 h-4"></i>
+                                <span>調達ボード</span>
+                                @if ($totalUnread > 0)
+                                    <span class="inline-flex items-center justify-center min-w-[1.125rem] h-[1.125rem] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold leading-none">
+                                        {{ $totalUnread }}
+                                    </span>
+                                @endif
+                                <i data-lucide="chevron-down" class="w-3.5 h-3.5"></i>
+                            </button>
+                        </x-slot>
+                        <x-slot name="content">
+                            @foreach (\App\Models\WorkflowType::orderBy('id')->get() as $nav)
+                                <x-dropdown-link :href="route('cards.index', $nav)">
+                                    <i data-lucide="{{ $nav->icon }}" class="w-3.5 h-3.5 inline-block align-text-bottom mr-1"></i> {{ $nav->name }}ボード
+                                    @if (($unreadCardCountsByWorkflow[$nav->id] ?? 0) > 0)
+                                        <span class="inline-flex items-center justify-center min-w-[1.125rem] h-[1.125rem] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold leading-none align-text-bottom">
+                                            {{ $unreadCardCountsByWorkflow[$nav->id] }}
+                                        </span>
+                                    @endif
+                                </x-dropdown-link>
+                            @endforeach
+                            <x-dropdown-link :href="route('archive.index')">
+                                <i data-lucide="archive" class="w-3.5 h-3.5 inline-block align-text-bottom mr-1"></i> 履歴
+                            </x-dropdown-link>
+                        </x-slot>
+                    </x-dropdown>
+
+                    {{-- カレンダー --}}
+                    <x-dropdown align="left" width="56">
+                        <x-slot name="trigger">
+                            <button class="px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors {{ $calendarActive ? 'bg-slate-200 text-slate-800' : 'text-slate-600 hover:bg-slate-50' }}">
+                                <i data-lucide="calendar-days" class="w-4 h-4"></i>
+                                <span>カレンダー</span>
+                                <i data-lucide="chevron-down" class="w-3.5 h-3.5"></i>
+                            </button>
+                        </x-slot>
+                        <x-slot name="content">
+                            <x-dropdown-link :href="route('my-calendar.show')">
+                                <i data-lucide="calendar" class="w-3.5 h-3.5 inline-block align-text-bottom mr-1"></i> 個人カレンダー
+                            </x-dropdown-link>
+                            <x-dropdown-link :href="route('daily-reports.show')">
+                                <i data-lucide="clipboard-list" class="w-3.5 h-3.5 inline-block align-text-bottom mr-1"></i> 作業日報
+                            </x-dropdown-link>
+                            <x-dropdown-link :href="route('leave-requests.index')">
+                                <i data-lucide="calendar-check" class="w-3.5 h-3.5 inline-block align-text-bottom mr-1"></i> 休暇・休出申請
+                            </x-dropdown-link>
+                            <x-dropdown-link :href="route('work-status.index')">
+                                <i data-lucide="users-round" class="w-3.5 h-3.5 inline-block align-text-bottom mr-1"></i> 勤務状況一覧
+                            </x-dropdown-link>
+                            @if (Auth::user()->is_procurement_manager)
+                                <x-dropdown-link :href="route('holidays.index')">
+                                    <i data-lucide="calendar-range" class="w-3.5 h-3.5 inline-block align-text-bottom mr-1"></i> 休日マスタ
+                                </x-dropdown-link>
                             @endif
-                        </a>
-                    @endforeach
-                    <a href="{{ route('archive.index') }}"
-                       class="px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors {{ request()->routeIs('archive.*') ? 'bg-slate-200 text-slate-800' : 'text-slate-600 hover:bg-slate-50' }}">
-                        <i data-lucide="archive" class="w-4 h-4"></i>
-                        <span>履歴</span>
-                    </a>
-                    <a href="{{ route('daily-reports.show') }}"
-                       class="px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors {{ request()->routeIs('daily-reports.*') ? 'bg-slate-200 text-slate-800' : 'text-slate-600 hover:bg-slate-50' }}">
-                        <i data-lucide="clipboard-list" class="w-4 h-4"></i>
-                        <span>作業日報</span>
-                    </a>
-                    <a href="{{ route('my-calendar.show') }}"
-                       class="px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors {{ request()->routeIs('my-calendar.*') ? 'bg-slate-200 text-slate-800' : 'text-slate-600 hover:bg-slate-50' }}">
-                        <i data-lucide="calendar" class="w-4 h-4"></i>
-                        <span>個人カレンダー</span>
-                    </a>
-                    <a href="{{ route('leave-requests.index') }}"
-                       class="px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors {{ request()->routeIs('leave-requests.*') ? 'bg-slate-200 text-slate-800' : 'text-slate-600 hover:bg-slate-50' }}">
-                        <i data-lucide="calendar-check" class="w-4 h-4"></i>
-                        <span>休暇・勤務申請</span>
-                    </a>
+                        </x-slot>
+                    </x-dropdown>
+
                     @if (Auth::user()->canAccessPurchasing())
                         <x-dropdown align="left" width="56">
                             <x-slot name="trigger">
@@ -55,16 +92,15 @@
                                 </button>
                             </x-slot>
                             <x-slot name="content">
-                                <x-dropdown-link :href="route('purchasing.index')">
-                                    <i data-lucide="search" class="w-3.5 h-3.5 inline-block align-text-bottom mr-1"></i> 検索
-                                </x-dropdown-link>
-                                <x-dropdown-link :href="route('purchasing.estimate.index')">
-                                    <i data-lucide="calculator" class="w-3.5 h-3.5 inline-block align-text-bottom mr-1"></i> 見積補助
-                                </x-dropdown-link>
                                 @if (Auth::user()->is_procurement_manager)
                                     <x-dropdown-link :href="route('purchasing.input')">
                                         <i data-lucide="pencil-line" class="w-3.5 h-3.5 inline-block align-text-bottom mr-1"></i> データ入力
                                     </x-dropdown-link>
+                                @endif
+                                <x-dropdown-link :href="route('purchasing.index')">
+                                    <i data-lucide="search" class="w-3.5 h-3.5 inline-block align-text-bottom mr-1"></i> 検索
+                                </x-dropdown-link>
+                                @if (Auth::user()->is_procurement_manager)
                                     <x-dropdown-link :href="route('purchasing.orders.index')">
                                         <i data-lucide="file-text" class="w-3.5 h-3.5 inline-block align-text-bottom mr-1"></i> 注文書発行
                                     </x-dropdown-link>
@@ -72,11 +108,14 @@
                                         <i data-lucide="receipt" class="w-3.5 h-3.5 inline-block align-text-bottom mr-1"></i> 明細書発行
                                     </x-dropdown-link>
                                 @endif
-                                <x-dropdown-link :href="route('purchasing.labor.index')">
-                                    <i data-lucide="clock" class="w-3.5 h-3.5 inline-block align-text-bottom mr-1"></i> 人工計算
+                                <x-dropdown-link :href="route('purchasing.estimate.index')">
+                                    <i data-lucide="calculator" class="w-3.5 h-3.5 inline-block align-text-bottom mr-1"></i> 見積補助
                                 </x-dropdown-link>
                                 <x-dropdown-link :href="route('purchasing.cost.index')">
                                     <i data-lucide="bar-chart-3" class="w-3.5 h-3.5 inline-block align-text-bottom mr-1"></i> 原価計算
+                                </x-dropdown-link>
+                                <x-dropdown-link :href="route('purchasing.labor.index')">
+                                    <i data-lucide="clock" class="w-3.5 h-3.5 inline-block align-text-bottom mr-1"></i> 人工計算
                                 </x-dropdown-link>
                                 @if (Auth::user()->is_procurement_manager)
                                     <x-dropdown-link :href="route('purchasing.cost-report.index')">
@@ -86,22 +125,25 @@
                             </x-slot>
                         </x-dropdown>
                     @endif
+
                     @if (Auth::user()->is_procurement_manager)
-                        <a href="{{ route('staff.index') }}"
-                           class="px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors {{ request()->routeIs('staff.*') ? 'bg-slate-100 text-blue-600' : 'text-slate-600 hover:bg-slate-50' }}">
-                            <i data-lucide="users" class="w-4 h-4"></i>
-                            <span>ＩＤ管理</span>
-                        </a>
-                        <a href="{{ route('order-numbers.index') }}"
-                           class="px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors {{ request()->routeIs('order-numbers.*') ? 'bg-slate-100 text-blue-600' : 'text-slate-600 hover:bg-slate-50' }}">
-                            <i data-lucide="hash" class="w-4 h-4"></i>
-                            <span>注番管理</span>
-                        </a>
-                        <a href="{{ route('holidays.index') }}"
-                           class="px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors {{ request()->routeIs('holidays.*') ? 'bg-slate-100 text-blue-600' : 'text-slate-600 hover:bg-slate-50' }}">
-                            <i data-lucide="calendar-days" class="w-4 h-4"></i>
-                            <span>休日マスタ</span>
-                        </a>
+                        <x-dropdown align="left" width="56">
+                            <x-slot name="trigger">
+                                <button class="px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors {{ $systemActive ? 'bg-slate-200 text-slate-800' : 'text-slate-600 hover:bg-slate-50' }}">
+                                    <i data-lucide="settings" class="w-4 h-4"></i>
+                                    <span>システム管理</span>
+                                    <i data-lucide="chevron-down" class="w-3.5 h-3.5"></i>
+                                </button>
+                            </x-slot>
+                            <x-slot name="content">
+                                <x-dropdown-link :href="route('staff.index')">
+                                    <i data-lucide="users" class="w-3.5 h-3.5 inline-block align-text-bottom mr-1"></i> ＩＤ管理
+                                </x-dropdown-link>
+                                <x-dropdown-link :href="route('order-numbers.index')">
+                                    <i data-lucide="hash" class="w-3.5 h-3.5 inline-block align-text-bottom mr-1"></i> 注番管理
+                                </x-dropdown-link>
+                            </x-slot>
+                        </x-dropdown>
                     @endif
                 </div>
             </div>
@@ -151,6 +193,7 @@
     <!-- Responsive Navigation Menu -->
     <div :class="{'block': open, 'hidden': ! open}" class="hidden md:hidden border-t border-slate-200">
         <div class="pt-2 pb-3 space-y-1 px-2">
+            <div class="px-3 py-2 text-xs font-bold text-slate-400 uppercase tracking-wider">調達ボード</div>
             @foreach (\App\Models\WorkflowType::orderBy('id')->get() as $nav)
                 <a href="{{ route('cards.index', $nav) }}" class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap {{ request()->route('workflow')?->is($nav) ? $nav->accentClasses()['nav_active'] : 'text-slate-600' }}">
                     <span>{{ $nav->name }}ボード</span>
@@ -164,27 +207,37 @@
             <a href="{{ route('archive.index') }}" class="block px-3 py-2 rounded-lg text-sm font-medium {{ request()->routeIs('archive.*') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
                 履歴
             </a>
-            <a href="{{ route('daily-reports.show') }}" class="block px-3 py-2 rounded-lg text-sm font-medium {{ request()->routeIs('daily-reports.*') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
-                作業日報
-            </a>
+
+            <div class="px-3 py-2 text-xs font-bold text-slate-400 uppercase tracking-wider">カレンダー</div>
             <a href="{{ route('my-calendar.show') }}" class="block px-3 py-2 rounded-lg text-sm font-medium {{ request()->routeIs('my-calendar.*') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
                 個人カレンダー
             </a>
-            <a href="{{ route('leave-requests.index') }}" class="block px-3 py-2 rounded-lg text-sm font-medium {{ request()->routeIs('leave-requests.*') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
-                休暇・勤務申請
+            <a href="{{ route('daily-reports.show') }}" class="block px-3 py-2 rounded-lg text-sm font-medium {{ request()->routeIs('daily-reports.*') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
+                作業日報
             </a>
+            <a href="{{ route('leave-requests.index') }}" class="block px-3 py-2 rounded-lg text-sm font-medium {{ request()->routeIs('leave-requests.*') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
+                休暇・休出申請
+            </a>
+            <a href="{{ route('work-status.index') }}" class="block px-3 py-2 rounded-lg text-sm font-medium {{ request()->routeIs('work-status.*') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
+                勤務状況一覧
+            </a>
+            @if (Auth::user()->is_procurement_manager)
+                <a href="{{ route('holidays.index') }}" class="block px-3 py-2 rounded-lg text-sm font-medium {{ request()->routeIs('holidays.*') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
+                    休日マスタ
+                </a>
+            @endif
+
             @if (Auth::user()->canAccessPurchasing())
                 <div class="px-3 py-2 text-xs font-bold text-slate-400 uppercase tracking-wider">仕入管理</div>
-                <a href="{{ route('purchasing.index') }}" class="block px-3 py-2 rounded-lg text-sm font-medium {{ request()->routeIs('purchasing.index') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
-                    検索
-                </a>
-                <a href="{{ route('purchasing.estimate.index') }}" class="block px-3 py-2 rounded-lg text-sm font-medium {{ request()->routeIs('purchasing.estimate.*') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
-                    見積補助
-                </a>
                 @if (Auth::user()->is_procurement_manager)
                     <a href="{{ route('purchasing.input') }}" class="block px-3 py-2 rounded-lg text-sm font-medium {{ request()->routeIs('purchasing.input') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
                         データ入力
                     </a>
+                @endif
+                <a href="{{ route('purchasing.index') }}" class="block px-3 py-2 rounded-lg text-sm font-medium {{ request()->routeIs('purchasing.index') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
+                    検索
+                </a>
+                @if (Auth::user()->is_procurement_manager)
                     <a href="{{ route('purchasing.orders.index') }}" class="block px-3 py-2 rounded-lg text-sm font-medium {{ request()->routeIs('purchasing.orders.*') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
                         注文書発行
                     </a>
@@ -192,11 +245,14 @@
                         明細書発行
                     </a>
                 @endif
-                <a href="{{ route('purchasing.labor.index') }}" class="block px-3 py-2 rounded-lg text-sm font-medium {{ request()->routeIs('purchasing.labor.*') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
-                    人工計算
+                <a href="{{ route('purchasing.estimate.index') }}" class="block px-3 py-2 rounded-lg text-sm font-medium {{ request()->routeIs('purchasing.estimate.*') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
+                    見積補助
                 </a>
                 <a href="{{ route('purchasing.cost.index') }}" class="block px-3 py-2 rounded-lg text-sm font-medium {{ request()->routeIs('purchasing.cost.*') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
                     原価計算
+                </a>
+                <a href="{{ route('purchasing.labor.index') }}" class="block px-3 py-2 rounded-lg text-sm font-medium {{ request()->routeIs('purchasing.labor.*') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
+                    人工計算
                 </a>
                 @if (Auth::user()->is_procurement_manager)
                     <a href="{{ route('purchasing.cost-report.index') }}" class="block px-3 py-2 rounded-lg text-sm font-medium {{ request()->routeIs('purchasing.cost-report.*') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
@@ -204,15 +260,14 @@
                     </a>
                 @endif
             @endif
+
             @if (Auth::user()->is_procurement_manager)
+                <div class="px-3 py-2 text-xs font-bold text-slate-400 uppercase tracking-wider">システム管理</div>
                 <a href="{{ route('staff.index') }}" class="block px-3 py-2 rounded-lg text-sm font-medium {{ request()->routeIs('staff.*') ? 'bg-slate-100 text-blue-600' : 'text-slate-600' }}">
                     ＩＤ管理
                 </a>
                 <a href="{{ route('order-numbers.index') }}" class="block px-3 py-2 rounded-lg text-sm font-medium {{ request()->routeIs('order-numbers.*') ? 'bg-slate-100 text-blue-600' : 'text-slate-600' }}">
                     注番管理
-                </a>
-                <a href="{{ route('holidays.index') }}" class="block px-3 py-2 rounded-lg text-sm font-medium {{ request()->routeIs('holidays.*') ? 'bg-slate-100 text-blue-600' : 'text-slate-600' }}">
-                    休日マスタ
                 </a>
             @endif
         </div>

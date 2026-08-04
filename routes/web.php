@@ -18,6 +18,7 @@ use App\Http\Controllers\PurchaseInputController;
 use App\Http\Controllers\PurchaseInvoiceController;
 use App\Http\Controllers\PurchaseOrderController;
 use App\Http\Controllers\StaffController;
+use App\Http\Controllers\WorkStatusController;
 use Illuminate\Support\Facades\Route;
 
 Route::redirect('/', '/boards/purchase');
@@ -43,6 +44,8 @@ Route::middleware('auth')->group(function () {
     Route::post('/daily-reports', [DailyReportController::class, 'store'])->name('daily-reports.store');
 
     Route::get('/my-calendar', [PersonalCalendarController::class, 'show'])->name('my-calendar.show');
+
+    Route::get('/work-status', [WorkStatusController::class, 'index'])->name('work-status.index');
 
     Route::get('/leave-requests', [LeaveRequestController::class, 'index'])->name('leave-requests.index');
     Route::get('/leave-requests/create', [LeaveRequestController::class, 'create'])->name('leave-requests.create');

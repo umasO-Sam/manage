@@ -3,7 +3,7 @@
         <div class="flex items-center justify-between">
             <h2 class="font-bold text-2xl text-slate-900 flex items-center gap-2">
                 <i data-lucide="calendar-check" class="text-slate-600 w-6 h-6"></i>
-                <span>休暇・勤務申請</span>
+                <span>休暇・休出申請</span>
             </h2>
             <a href="{{ route('leave-requests.create') }}" class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-xl shadow-sm hover:shadow flex items-center gap-2 text-sm transition-all">
                 <i data-lucide="plus-circle" class="w-4 h-4"></i>

@@ -2,7 +2,7 @@
     <x-slot name="header">
         <h2 class="font-bold text-2xl text-slate-900 flex items-center gap-2">
             <i data-lucide="calendar-check" class="text-slate-600 w-6 h-6"></i>
-            <span>休暇・勤務申請</span>
+            <span>休暇・休出申請</span>
         </h2>
     </x-slot>
 
