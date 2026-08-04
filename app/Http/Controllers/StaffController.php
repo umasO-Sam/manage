@@ -26,7 +26,7 @@ class StaffController extends Controller
 {
     public function index(): View
     {
-        return view('staff.index', ['staffList' => Staff::orderBy('name')->get()]);
+        return view('staff.index', ['staffList' => Staff::orderedForRoster()->get()]);
     }
 
     public function create(): View
@@ -39,6 +39,7 @@ class StaffController extends Controller
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'department' => ['required', 'string', 'max:255'],
+            'display_order' => ['nullable', 'integer', 'min:0', 'max:9999'],
             'sid' => ['nullable', 'integer', 'min:0', 'unique:staff,sid'],
             'login_id' => ['required', 'string', 'max:255', 'unique:staff,login_id'],
             'email' => ['required', 'string', 'email', 'max:255', 'unique:staff,email'],
@@ -54,6 +55,7 @@ class StaffController extends Controller
         try {
             Staff::create([
                 ...$data,
+                'display_order' => $data['display_order'] ?? 0,
                 'password' => Hash::make($data['password']),
                 'is_supervisor' => $request->boolean('is_supervisor'),
             ]);
@@ -100,6 +102,7 @@ class StaffController extends Controller
         $staff->fill([
             'name' => $data['name'],
             'department' => $data['department'],
+            'display_order' => $data['display_order'] ?? 0,
             'sid' => $data['sid'] ?? null,
             'login_id' => $data['login_id'],
             'email' => $data['email'],
@@ -148,6 +151,7 @@ class StaffController extends Controller
             $validator = Validator::make((array) $fields, [
                 'name' => ['required', 'string', 'max:255'],
                 'department' => ['required', 'string', 'max:255'],
+                'display_order' => ['nullable', 'integer', 'min:0', 'max:9999'],
                 'sid' => ['nullable', 'integer', 'min:0', Rule::unique('staff', 'sid')->ignore($staff->id)],
                 'login_id' => ['required', 'string', 'max:255', Rule::unique('staff', 'login_id')->ignore($staff->id)],
                 'email' => ['required', 'string', 'email', 'max:255', Rule::unique('staff', 'email')->ignore($staff->id)],
@@ -169,6 +173,7 @@ class StaffController extends Controller
             // validated()に含めるだけでは常にtrueにしかならない。明示的にboolean化する。
             $validatedById[$staff->id] = [
                 ...$validator->validated(),
+                'display_order' => $validator->validated()['display_order'] ?? 0,
                 'is_supervisor' => $request->boolean("updates.{$id}.is_supervisor"),
             ];
         }

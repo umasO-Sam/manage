@@ -13,6 +13,12 @@
 </div>
 
 <div>
+    <x-input-label for="display_order" value="表示順（同じ部署内での並び順。任意、数字が小さいほど上に表示）" />
+    <x-text-input id="display_order" name="display_order" type="number" min="0" max="9999" class="mt-1 block w-40" :value="old('display_order', $staff?->display_order)" />
+    <x-input-error class="mt-2" :messages="$errors->get('display_order')" />
+</div>
+
+<div>
     <x-input-label for="sid" value="SID（任意・社内人工日報の一括登録で使用）" />
     <x-text-input id="sid" name="sid" type="number" class="mt-1 block w-40" :value="old('sid', $staff?->sid)" />
     <x-input-error class="mt-2" :messages="$errors->get('sid')" />

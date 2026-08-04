@@ -87,6 +87,9 @@
                                 <p class="text-xs text-slate-500 mt-1 flex items-center gap-1">
                                     <i data-lucide="building" class="w-3.5 h-3.5 text-slate-400"></i>
                                     <span>{{ $staff->department }}</span>
+                                    @if ($staff->display_order > 0)
+                                        <span class="text-slate-300">/ 表示順 {{ $staff->display_order }}</span>
+                                    @endif
                                 </p>
                                 <p class="text-xs text-slate-500 mt-1 flex items-center gap-1">
                                     <i data-lucide="mail" class="w-3.5 h-3.5 text-slate-400"></i>
@@ -144,6 +147,7 @@
                                     <tr class="bg-slate-50 border-b border-slate-200 font-semibold text-slate-600">
                                         <th class="p-2.5">氏名</th>
                                         <th class="p-2.5">部署</th>
+                                        <th class="p-2.5">表示順</th>
                                         <th class="p-2.5">SID</th>
                                         <th class="p-2.5">ログインID</th>
                                         <th class="p-2.5">メールアドレス</th>
@@ -167,6 +171,11 @@
                                                 <span x-show="!editMode">{{ $staff->department }}</span>
                                                 <input x-show="editMode" x-cloak type="text" name="updates[{{ $staff->id }}][department]"
                                                        value="{{ $staff->department }}" class="w-full min-w-[100px] text-xs border rounded px-1.5 py-1 border-slate-300">
+                                            </td>
+                                            <td class="p-2.5">
+                                                <span x-show="!editMode" class="font-mono">{{ $staff->display_order }}</span>
+                                                <input x-show="editMode" x-cloak type="number" min="0" max="9999" name="updates[{{ $staff->id }}][display_order]"
+                                                       value="{{ $staff->display_order }}" class="w-16 text-xs border rounded px-1.5 py-1 border-slate-300">
                                             </td>
                                             <td class="p-2.5">
                                                 <span x-show="!editMode" class="font-mono">{{ $staff->sid }}</span>

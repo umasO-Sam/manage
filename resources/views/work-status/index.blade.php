@@ -7,92 +7,84 @@
     </x-slot>
 
     <div class="py-8">
-        <div class="max-w-4xl mx-auto sm:px-6 lg:px-8 space-y-4">
+        <div class="max-w-full mx-auto sm:px-6 lg:px-8 space-y-4">
 
-            @php
-                $current = \Illuminate\Support\Carbon::parse($date);
-                $weekdayLabels = ['日', '月', '火', '水', '木', '金', '土'];
-            @endphp
-            <div class="flex items-center justify-center gap-3 text-sm">
-                <a href="{{ route('work-status.index', ['date' => $prevDate]) }}"
-                   class="font-semibold text-slate-600 hover:text-blue-600">
-                    {{ \Illuminate\Support\Carbon::parse($prevDate)->format('m/d') }}←
-                </a>
-                <span class="text-lg font-bold text-slate-900">
-                    {{ $current->format('Y/m/d') }}（{{ $weekdayLabels[$current->dayOfWeek] }}）
-                </span>
-                <a href="{{ route('work-status.index', ['date' => $nextDate]) }}"
-                   class="font-semibold text-slate-600 hover:text-blue-600">
-                    →{{ \Illuminate\Support\Carbon::parse($nextDate)->format('m/d') }}
-                </a>
-            </div>
+            <p class="text-xs text-slate-500">今日を基準に前1週間・先4週間（35日分）を表示しています。</p>
 
-            @if (Auth::user()->is_procurement_manager)
-                <div class="flex justify-end">
-                    <a href="{{ route('daily-reports.review.index', ['date' => $date]) }}"
-                       class="text-sm font-semibold bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow-sm inline-flex items-center gap-1.5">
-                        <i data-lucide="clipboard-check" class="w-4 h-4"></i>
-                        この日の作業日報を確認する
-                    </a>
-                </div>
-            @endif
-
-            <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-                <table class="w-full text-left text-sm">
+            <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-x-auto">
+                <table class="border-collapse text-xs">
                     <thead>
-                        <tr class="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-600">
-                            <th class="p-3">氏名</th>
-                            <th class="p-3">休暇・休日出勤</th>
-                            @if ($isPrivileged)
-                                <th class="p-3">作業日報</th>
-                            @endif
+                        <tr class="bg-slate-50 border-b border-slate-200 text-slate-600">
+                            <th class="sticky left-0 z-10 bg-slate-50 p-2 text-left font-semibold border-r border-slate-200 whitespace-nowrap">氏名</th>
+                            @foreach ($dates as $index => $dateString)
+                                @php
+                                    $current = \Illuminate\Support\Carbon::parse($dateString);
+                                    $weekdayLabels = ['日', '月', '火', '水', '木', '金', '土'];
+                                    $isWeekend = in_array($current->dayOfWeek, [0, 6], true);
+                                    $holiday = $holidaysByDate->get($dateString);
+                                    $isDayOff = $isWeekend || in_array($holiday?->type, [\App\Models\Holiday::TYPE_PUBLIC_HOLIDAY, \App\Models\Holiday::TYPE_COMPANY_HOLIDAY], true);
+                                    $isToday = $dateString === $today;
+                                @endphp
+                                <th class="p-1 font-semibold text-center w-8 {{ $index % 7 === 0 ? 'border-l border-slate-200' : '' }} {{ $isDayOff ? 'bg-pink-50' : '' }} {{ $isToday ? 'bg-slate-800 text-white' : '' }}"
+                                    title="{{ $current->format('Y/m/d') }}（{{ $weekdayLabels[$current->dayOfWeek] }}）{{ $holiday?->name }}">
+                                    <div class="whitespace-nowrap">{{ $current->format('n/j') }}</div>
+                                    <div class="whitespace-nowrap {{ ! $isToday && $current->dayOfWeek === 0 ? 'text-red-500' : (! $isToday && $current->dayOfWeek === 6 ? 'text-blue-500' : '') }}">{{ $weekdayLabels[$current->dayOfWeek] }}</div>
+                                    @if (Auth::user()->is_procurement_manager)
+                                        <a href="{{ route('daily-reports.review.index', ['date' => $dateString]) }}" class="block {{ $isToday ? 'text-white/80 hover:text-white' : 'text-slate-400 hover:text-blue-600' }}" title="{{ $current->format('n/j') }}の作業日報を確認する">
+                                            <i data-lucide="clipboard-check" class="w-3 h-3 inline-block"></i>
+                                        </a>
+                                    @endif
+                                </th>
+                            @endforeach
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100">
                         @foreach ($staffList as $staff)
-                            @php
-                                $entries = $leaveRequestsByStaff->get($staff->id, collect());
-                                $reportStatus = $dailyReportStatusByStaff->get($staff->id);
-                                $reportLabels = [
-                                    'draft' => ['下書き', 'bg-slate-200 text-slate-700'],
-                                    'pending_confirmation' => ['確認待ち', 'bg-amber-100 text-amber-800'],
-                                    'rejected' => ['差戻し', 'bg-red-100 text-red-800'],
-                                    'confirmed' => ['確認済み', 'bg-emerald-100 text-emerald-800'],
-                                ];
-                            @endphp
                             <tr class="hover:bg-slate-50">
-                                <td class="p-3 font-semibold text-slate-800 whitespace-nowrap">{{ $staff->name }}</td>
-                                <td class="p-3">
-                                    @forelse ($entries as $entry)
-                                        @php
-                                            $leaveRequest = $entry['request'];
-                                            $label = match ($entry['role']) {
-                                                'substitute' => '振替休日',
-                                                'compensatory' => '代休',
-                                                default => $leaveRequest->typeLabel(),
-                                            };
-                                            $classes = $isPrivileged
-                                                ? ($leaveRequest->isApproved() ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800')
-                                                : 'bg-slate-100 text-slate-600';
-                                        @endphp
-                                        <span class="inline-block text-xs font-semibold px-2 py-0.5 rounded-full mr-1 {{ $classes }}">
-                                            {{ $label }}
-                                        </span>
-                                    @empty
-                                        <span class="text-xs text-slate-300">—</span>
-                                    @endforelse
+                                <td class="sticky left-0 z-10 bg-white p-2 font-semibold text-slate-800 whitespace-nowrap border-r border-slate-200">
+                                    {{ $staff->name }}
                                 </td>
-                                @if ($isPrivileged)
-                                    <td class="p-3">
-                                        @if ($reportStatus)
-                                            <span class="text-xs font-semibold px-2 py-0.5 rounded-full {{ $reportLabels[$reportStatus][1] }}">
-                                                {{ $reportLabels[$reportStatus][0] }}
-                                            </span>
-                                        @else
-                                            <span class="text-xs text-slate-300">未提出</span>
-                                        @endif
+                                @foreach ($dates as $index => $dateString)
+                                    @php
+                                        $current = \Illuminate\Support\Carbon::parse($dateString);
+                                        $isWeekend = in_array($current->dayOfWeek, [0, 6], true);
+                                        $holiday = $holidaysByDate->get($dateString);
+                                        $isDayOff = $isWeekend || in_array($holiday?->type, [\App\Models\Holiday::TYPE_PUBLIC_HOLIDAY, \App\Models\Holiday::TYPE_COMPANY_HOLIDAY], true);
+                                        $isToday = $dateString === $today;
+                                        $entries = $leaveEntriesByStaffAndDate[$staff->id][$dateString] ?? [];
+                                        $reportStatus = $dailyReportStatusByStaffAndDate[$staff->id][$dateString] ?? null;
+                                        $reportDotClass = match ($reportStatus) {
+                                            'draft' => 'bg-slate-300',
+                                            'pending_confirmation' => 'bg-amber-500',
+                                            'rejected' => 'bg-red-500',
+                                            'confirmed' => 'bg-emerald-500',
+                                            default => null,
+                                        };
+                                    @endphp
+                                    <td class="p-0.5 text-center align-middle {{ $index % 7 === 0 ? 'border-l border-slate-100' : '' }} {{ $isDayOff ? 'bg-pink-50/60' : '' }} {{ $isToday ? 'bg-slate-100' : '' }}">
+                                        <div class="flex items-center justify-center gap-0.5 min-h-[14px]">
+                                            @foreach ($entries as $entry)
+                                                @php
+                                                    $leaveRequest = $entry['request'];
+                                                    $label = match ($entry['role']) {
+                                                        'substitute' => '振替休日',
+                                                        'compensatory' => '代休',
+                                                        default => $leaveRequest->typeLabel(),
+                                                    };
+                                                    $dotClass = $isPrivileged
+                                                        ? ($leaveRequest->isApproved() ? 'bg-emerald-500' : 'bg-amber-500')
+                                                        : 'bg-slate-400';
+                                                @endphp
+                                                <span class="w-2.5 h-2.5 rounded-full inline-block {{ $dotClass }}"
+                                                      title="{{ $label }}{{ $isPrivileged ? '（'.$leaveRequest->statusLabel().'）' : '' }}"></span>
+                                            @endforeach
+                                            @if ($isPrivileged && $reportDotClass)
+                                                <span class="w-2 h-2 rounded-sm inline-block {{ $reportDotClass }}"
+                                                      title="作業日報：{{ ['draft' => '下書き', 'pending_confirmation' => '確認待ち', 'rejected' => '差戻し', 'confirmed' => '確認済み'][$reportStatus] }}"></span>
+                                            @endif
+                                        </div>
                                     </td>
-                                @endif
+                                @endforeach
                             </tr>
                         @endforeach
                     </tbody>
@@ -100,13 +92,16 @@
             </div>
 
             <div class="flex flex-wrap gap-4 text-xs text-slate-600">
+                <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-slate-400 inline-block"></span>休暇・休日出勤の申請あり</span>
                 @if ($isPrivileged)
-                    <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded bg-amber-100 inline-block"></span>承認待ち・確認待ち</span>
-                    <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded bg-emerald-100 inline-block"></span>承認済み・確認済み</span>
-                    <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded bg-red-100 inline-block"></span>差戻し</span>
-                @else
-                    <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded bg-slate-100 inline-block"></span>休暇・休日出勤の申請あり</span>
+                    <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block"></span>承認待ち</span>
+                    <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block"></span>承認済み</span>
+                    <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-sm bg-slate-300 inline-block"></span>作業日報：下書き</span>
+                    <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-sm bg-amber-500 inline-block"></span>作業日報：確認待ち</span>
+                    <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-sm bg-red-500 inline-block"></span>作業日報：差戻し</span>
+                    <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-sm bg-emerald-500 inline-block"></span>作業日報：確認済み</span>
                 @endif
+                <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded bg-pink-50 border border-pink-100 inline-block"></span>土日・祝日・会社休日</span>
             </div>
         </div>
     </div>

@@ -5,12 +5,13 @@ namespace App\Models;
 use Database\Factories\StaffFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
-#[Fillable(['name', 'department', 'sid', 'login_id', 'email', 'role', 'is_labor_target', 'position_weight', 'password', 'must_change_password', 'hire_date', 'paid_leave_granted_current_year', 'paid_leave_granted_last_year', 'is_supervisor'])]
+#[Fillable(['name', 'department', 'display_order', 'sid', 'login_id', 'email', 'role', 'is_labor_target', 'position_weight', 'password', 'must_change_password', 'hire_date', 'paid_leave_granted_current_year', 'paid_leave_granted_last_year', 'is_supervisor'])]
 #[Hidden(['password', 'remember_token'])]
 class Staff extends Authenticatable
 {
@@ -29,6 +30,13 @@ class Staff extends Authenticatable
         self::ROLE_SALES => '営業担当',
         self::ROLE_GENERAL => '一般社員',
     ];
+
+    /**
+     * 勤務状況一覧・担当者一覧で使う部署の並び順。この配列に無い部署名は末尾にまとめる。
+     *
+     * @var array<int, string>
+     */
+    public const DEPARTMENT_ORDER = ['役員', '営業', '事務', '機械設計', '電気制御設計', '機械製造'];
 
     protected function casts(): array
     {
@@ -61,6 +69,20 @@ class Staff extends Authenticatable
     public function roleLabel(): string
     {
         return self::ROLE_LABELS[$this->role] ?? $this->role;
+    }
+
+    /**
+     * DEPARTMENT_ORDERの部署順、同じ部署内はdisplay_order順(同値は氏名順)で並べる。
+     * DEPARTMENT_ORDERに無い部署名は末尾にまとめる。
+     */
+    public static function orderedForRoster(): Builder
+    {
+        $cases = implode(' ', array_map(fn ($index) => "WHEN department = ? THEN {$index}", array_keys(self::DEPARTMENT_ORDER)));
+
+        return static::query()
+            ->orderByRaw("CASE {$cases} ELSE ".count(self::DEPARTMENT_ORDER).' END', array_values(self::DEPARTMENT_ORDER))
+            ->orderBy('display_order')
+            ->orderBy('name');
     }
 
     public function createdCards(): HasMany

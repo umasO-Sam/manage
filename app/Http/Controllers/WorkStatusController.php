@@ -3,109 +3,117 @@
 namespace App\Http\Controllers;
 
 use App\Models\DailyReport;
+use App\Models\Holiday;
 use App\Models\LaborCost;
 use App\Models\LeaveRequest;
 use App\Models\Staff;
-use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 
 /**
- * 勤務状況一覧。日付単位で全社員の休暇・休日出勤の状況を表示する。
- * 一般社員・営業担当には申請種別のみ(承認待ち/承認済みの色分けなし)を、
+ * 勤務状況一覧。今日を基準に前1週間・先4週間(35日)を横軸に、全社員(部署順・表示順)を
+ * 縦軸に一覧表示する。一般社員・営業担当には休暇・休日出勤の種別のみを、
  * 上長・資材管理担当者には承認状況の色分けと、作業日報の登録状況もあわせて表示する。
  */
 class WorkStatusController extends Controller
 {
-    public function index(Request $request): View
+    public function index(): View
     {
         /** @var Staff $viewer */
         $viewer = Auth::user();
         $isPrivileged = $viewer->is_procurement_manager || $viewer->is_supervisor;
 
-        $date = $this->resolveDate($request->query('date'));
+        $today = Carbon::today();
+        $rangeStart = $today->copy()->subDays(7);
+        $rangeEnd = $today->copy()->addDays(27);
+
+        $dates = [];
+        for ($d = $rangeStart->copy(); $d->lte($rangeEnd); $d->addDay()) {
+            $dates[] = $d->format('Y-m-d');
+        }
+
+        $holidaysByDate = Holiday::whereDate('date', '>=', $rangeStart->toDateString())
+            ->whereDate('date', '<=', $rangeEnd->toDateString())
+            ->get()->keyBy(fn (Holiday $h) => $h->date->format('Y-m-d'));
 
         return view('work-status.index', [
-            'date' => $date,
-            'prevDate' => Carbon::parse($date)->subDay()->format('Y-m-d'),
-            'nextDate' => Carbon::parse($date)->addDay()->format('Y-m-d'),
-            'staffList' => Staff::orderBy('name')->get(),
-            'leaveRequestsByStaff' => $this->buildLeaveRequestsByStaff($date),
-            'dailyReportStatusByStaff' => $isPrivileged ? $this->buildDailyReportStatusByStaff($date) : collect(),
+            'dates' => $dates,
+            'today' => $today->format('Y-m-d'),
+            'holidaysByDate' => $holidaysByDate,
+            'staffList' => Staff::orderedForRoster()->get(),
+            'leaveEntriesByStaffAndDate' => $this->buildLeaveEntriesByStaffAndDate($rangeStart, $rangeEnd),
+            'dailyReportStatusByStaffAndDate' => $isPrivileged ? $this->buildDailyReportStatusByStaffAndDate($rangeStart, $rangeEnd) : [],
             'isPrivileged' => $isPrivileged,
         ]);
     }
 
-    private function resolveDate(?string $date): string
-    {
-        if ($date) {
-            try {
-                return Carbon::createFromFormat('Y-m-d', $date)->format('Y-m-d');
-            } catch (\Exception) {
-                // fall through to today
-            }
-        }
-
-        return now()->format('Y-m-d');
-    }
-
     /**
-     * 指定日にかかる全社員の休暇・勤務申請(承認待ち・承認済み)。休日勤務申請の振替休日、
-     * 代休申請の代休日は対象日と一致する場合のみ役割を切り替える
-     * (PersonalCalendarControllerと同じ考え方)。
+     * 期間内にかかる全社員の休暇・勤務申請(承認待ち・承認済み)。休日勤務申請の振替休日、
+     * 代休申請の代休日は、対象日がその日と一致する場合のみ役割を切り替える。
      *
-     * @return Collection<int, Collection<int, array{request: LeaveRequest, role: string}>>
+     * @return array<int, array<string, array<int, array{request: LeaveRequest, role: string}>>>
      */
-    private function buildLeaveRequestsByStaff(string $date): Collection
+    private function buildLeaveEntriesByStaffAndDate(Carbon $rangeStart, Carbon $rangeEnd): array
     {
+        $rangeStartStr = $rangeStart->toDateString();
+        $rangeEndStr = $rangeEnd->toDateString();
+
         $requests = LeaveRequest::whereIn('status', [LeaveRequest::STATUS_PENDING, LeaveRequest::STATUS_APPROVED])
-            ->where(function ($query) use ($date) {
-                $query->where(function ($q) use ($date) {
-                    $q->whereDate('start_date', '<=', $date)
-                        ->where(function ($q2) use ($date) {
-                            $q2->whereNull('end_date')->orWhereDate('end_date', '>=', $date);
+            ->where(function ($query) use ($rangeStartStr, $rangeEndStr) {
+                $query->where(function ($q) use ($rangeStartStr, $rangeEndStr) {
+                    $q->whereDate('start_date', '<=', $rangeEndStr)
+                        ->where(function ($q2) use ($rangeStartStr) {
+                            $q2->whereNull('end_date')->orWhereDate('end_date', '>=', $rangeStartStr);
                         });
                 })
-                    ->orWhereDate('substitute_holiday_date', $date)
-                    ->orWhereDate('compensatory_date', $date);
+                    ->orWhere(function ($q) use ($rangeStartStr, $rangeEndStr) {
+                        $q->whereDate('substitute_holiday_date', '>=', $rangeStartStr)->whereDate('substitute_holiday_date', '<=', $rangeEndStr);
+                    })
+                    ->orWhere(function ($q) use ($rangeStartStr, $rangeEndStr) {
+                        $q->whereDate('compensatory_date', '>=', $rangeStartStr)->whereDate('compensatory_date', '<=', $rangeEndStr);
+                    });
             })
             ->get();
 
-        $byStaff = collect();
-        foreach ($requests as $leaveRequest) {
-            $end = $leaveRequest->end_date ?? $leaveRequest->start_date;
-            $inMainRange = Carbon::parse($date)->betweenIncluded($leaveRequest->start_date, $end);
+        $result = [];
 
-            $role = 'main';
-            if (! $inMainRange && $leaveRequest->substitute_holiday_date?->format('Y-m-d') === $date) {
-                $role = 'substitute';
-            } elseif (! $inMainRange && $leaveRequest->compensatory_date?->format('Y-m-d') === $date) {
-                $role = 'compensatory';
+        foreach ($requests as $leaveRequest) {
+            $mainStart = Carbon::parse($leaveRequest->start_date)->max($rangeStart);
+            $mainEnd = Carbon::parse($leaveRequest->end_date ?? $leaveRequest->start_date)->min($rangeEnd);
+            for ($d = $mainStart->copy(); $d->lte($mainEnd); $d->addDay()) {
+                $result[$leaveRequest->staff_id][$d->format('Y-m-d')][] = ['request' => $leaveRequest, 'role' => 'main'];
             }
 
-            $byStaff->put(
-                $leaveRequest->staff_id,
-                $byStaff->get($leaveRequest->staff_id, collect())->push(['request' => $leaveRequest, 'role' => $role])
-            );
+            $substituteDate = $leaveRequest->substitute_holiday_date?->format('Y-m-d');
+            if ($substituteDate && $substituteDate >= $rangeStartStr && $substituteDate <= $rangeEndStr) {
+                $result[$leaveRequest->staff_id][$substituteDate][] = ['request' => $leaveRequest, 'role' => 'substitute'];
+            }
+
+            $compensatoryDate = $leaveRequest->compensatory_date?->format('Y-m-d');
+            if ($compensatoryDate && $compensatoryDate >= $rangeStartStr && $compensatoryDate <= $rangeEndStr) {
+                $result[$leaveRequest->staff_id][$compensatoryDate][] = ['request' => $leaveRequest, 'role' => 'compensatory'];
+            }
         }
 
-        return $byStaff;
+        return $result;
     }
 
     /**
-     * @return Collection<int, string> staff_id => draft|pending_confirmation|rejected|confirmed
+     * @return array<int, array<string, string>> staff_id => [work_date => draft|pending_confirmation|rejected|confirmed]
      */
-    private function buildDailyReportStatusByStaff(string $date): Collection
+    private function buildDailyReportStatusByStaffAndDate(Carbon $rangeStart, Carbon $rangeEnd): array
     {
-        $reports = DailyReport::whereDate('work_date', $date)->get();
+        $reports = DailyReport::whereDate('work_date', '>=', $rangeStart->toDateString())
+            ->whereDate('work_date', '<=', $rangeEnd->toDateString())
+            ->get();
 
         $provisionalReportIds = LaborCost::where('is_provisional', true)
             ->whereNotNull('daily_report_id')
             ->pluck('daily_report_id');
 
-        return $reports->mapWithKeys(function (DailyReport $report) use ($provisionalReportIds) {
+        $result = [];
+        foreach ($reports as $report) {
             $status = match (true) {
                 $report->isRejected() => 'rejected',
                 ! $report->isSubmitted() => 'draft',
@@ -113,7 +121,9 @@ class WorkStatusController extends Controller
                 default => 'confirmed',
             };
 
-            return [$report->staff_id => $status];
-        });
+            $result[$report->staff_id][$report->work_date->format('Y-m-d')] = $status;
+        }
+
+        return $result;
     }
 }

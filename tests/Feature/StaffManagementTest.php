@@ -107,6 +107,32 @@ class StaffManagementTest extends TestCase
         $this->assertDatabaseHas('staff', ['login_id' => 'new-staff', 'sid' => 50]);
     }
 
+    public function test_ordered_for_roster_sorts_by_department_order_then_display_order(): void
+    {
+        Staff::factory()->create(['name' => '製造二郎', 'department' => '機械製造', 'display_order' => 2]);
+        Staff::factory()->create(['name' => '製造太郎', 'department' => '機械製造', 'display_order' => 1]);
+        Staff::factory()->create(['name' => '営業花子', 'department' => '営業', 'display_order' => 1]);
+        Staff::factory()->create(['name' => '謎部署太郎', 'department' => '謎の部署', 'display_order' => 0]);
+        Staff::factory()->create(['name' => '役員太郎', 'department' => '役員', 'display_order' => 1]);
+
+        $names = Staff::orderedForRoster()->pluck('name')->all();
+
+        $this->assertSame(['役員太郎', '営業花子', '製造太郎', '製造二郎', '謎部署太郎'], $names);
+    }
+
+    public function test_manager_can_set_display_order_when_creating_a_staff(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+
+        $this->actingAs($manager)->post(route('staff.store'), [
+            'name' => '新入社員', 'department' => '機械製造', 'display_order' => 5,
+            'login_id' => 'ordered-staff', 'email' => 'ordered-staff@example.com',
+            'role' => Staff::ROLE_GENERAL, 'password' => 'Abcdefgh123456789012',
+        ]);
+
+        $this->assertDatabaseHas('staff', ['login_id' => 'ordered-staff', 'display_order' => 5]);
+    }
+
     public function test_new_staff_defaults_is_supervisor_to_null(): void
     {
         $manager = Staff::factory()->procurementManager()->create();
