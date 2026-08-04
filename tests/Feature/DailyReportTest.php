@@ -20,6 +20,26 @@ class DailyReportTest extends TestCase
         $this->actingAs($staff)->get(route('daily-reports.show'))->assertOk();
     }
 
+    public function test_submit_button_says_teishutsu_before_first_submission(): void
+    {
+        $staff = Staff::factory()->create();
+
+        $response = $this->actingAs($staff)->get(route('daily-reports.show', ['date' => '2026-08-03']));
+
+        $response->assertSee('>提出<', false);
+        $response->assertDontSee('修正提出');
+    }
+
+    public function test_submit_button_says_shusei_teishutsu_after_first_submission(): void
+    {
+        $staff = Staff::factory()->create();
+        DailyReport::create(['staff_id' => $staff->id, 'work_date' => '2026-08-03', 'submitted_at' => now()]);
+
+        $response = $this->actingAs($staff)->get(route('daily-reports.show', ['date' => '2026-08-03']));
+
+        $response->assertSee('修正提出');
+    }
+
     public function test_draft_save_does_not_generate_labor_costs(): void
     {
         $staff = Staff::factory()->create();
@@ -104,6 +124,32 @@ class DailyReportTest extends TestCase
         $this->assertCount(1, $rows);
         $this->assertTrue($rows->first()->is_provisional);
         $this->assertSame(2, $rows->first()->work_hours);
+    }
+
+    public function test_leave_entry_survives_a_page_reload_without_becoming_uncategorized(): void
+    {
+        $staff = Staff::factory()->create();
+
+        $this->actingAs($staff)->post(route('daily-reports.store'), [
+            'work_date' => '2026-08-03',
+            'entries' => [
+                ['start_minute' => 480, 'end_minute' => 600, 'is_leave' => 1, 'leave_type' => 'hours'],
+            ],
+        ])->assertRedirect();
+
+        $response = $this->actingAs($staff)->get(route('daily-reports.show', ['date' => '2026-08-03']));
+
+        $response->assertOk();
+
+        // initialEntriesにis_leave/leave_typeが含まれていないと、再読み込み時にJS側の
+        // entry.is_leaveがundefinedになりカテゴリなし扱い(未分類)になってしまう不具合の回帰確認。
+        // Js::from()自体が生成するエスケープ済み断片(先頭の{と末尾の}は実際のオブジェクトでは
+        // 前後に他のキーが続くため取り除く)と比較することで、手打ちのエスケープ表記ミスを避ける。
+        $wrapped = (string) \Illuminate\Support\Js::from(['is_leave' => true, 'leave_type' => 'hours']);
+        preg_match('/^JSON\.parse\(\'\{(.*)\}\'\)$/', $wrapped, $matches);
+        $expectedFragment = $matches[1];
+
+        $this->assertStringContainsString($expectedFragment, $response->getContent());
     }
 
     public function test_category_entry_without_order_no_is_dropped_unless_exempt(): void

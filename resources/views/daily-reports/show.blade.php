@@ -17,6 +17,8 @@
                 'is_other' => $e->is_other,
                 'free_text' => $e->free_text,
                 'is_break' => $e->is_break,
+                'is_leave' => $e->is_leave,
+                'leave_type' => $e->leave_type,
             ])) }},
             categories: {{ \Illuminate\Support\Js::from($categories) }},
             orderNumbers: {{ \Illuminate\Support\Js::from($orderNumbers) }},
@@ -105,6 +107,9 @@
                                     class="text-xs font-semibold px-2.5 py-1.5 rounded-lg border transition-colors"
                                     x-text="lt.label"></button>
                         </template>
+                        <button type="button" @click="selectDelete()"
+                                :class="selection.type === 'delete' ? 'bg-red-600 border-red-600 text-white font-bold' : 'bg-white text-red-700 border-red-300 hover:bg-red-50'"
+                                class="text-xs font-semibold px-2.5 py-1.5 rounded-lg border transition-colors">削除</button>
                     </div>
 
                     <div x-show="selection.type === 'other'" x-cloak>
@@ -240,9 +245,12 @@
                     </span>
                 </template>
 
+                @php($isResubmit = $report->exists && $report->isSubmitted())
                 <div class="flex justify-end gap-2">
                     <button type="submit" @click="$refs.submitFlag.value = '0'" class="px-5 py-2.5 rounded-lg font-bold text-sm border border-slate-300 text-slate-700 bg-white hover:bg-slate-50">下書き保存</button>
-                    <button type="submit" @click="$refs.submitFlag.value = '1'" class="px-5 py-2.5 rounded-lg font-bold text-sm bg-blue-600 text-white hover:bg-blue-700">提出</button>
+                    <button type="submit"
+                            @click="if (! confirm('{{ $isResubmit ? '修正内容を提出します。よろしいですか？' : '作業日報を提出します。よろしいですか？' }}')) { $event.preventDefault(); } else { $refs.submitFlag.value = '1'; }"
+                            class="px-5 py-2.5 rounded-lg font-bold text-sm bg-blue-600 text-white hover:bg-blue-700">{{ $isResubmit ? '修正提出' : '提出' }}</button>
                 </div>
             </form>
         </div>
@@ -397,6 +405,12 @@
                     this.selection.type = 'break';
                 },
 
+                // 反映すると、その時間帯の内容(休憩を除く)をクリアするだけで新しい内容は入れない。
+                // 誤って登録した内容を消したいだけの場合に使う(削除ボタンで個別に消す代わり)。
+                selectDelete() {
+                    this.selection.type = 'delete';
+                },
+
                 selectLeave(leaveType) {
                     this.selection.type = 'leave';
                     this.selection.leaveType = leaveType;
@@ -433,7 +447,7 @@
                     }
                     if (this.selection.type === 'other') return this.selection.freeText.trim() !== '';
                     if (this.selection.type === 'leave') return this.selection.leaveType !== null;
-                    return this.selection.type === 'break';
+                    return this.selection.type === 'break' || this.selection.type === 'delete';
                 },
 
                 selectionSummary() {
@@ -442,6 +456,7 @@
                     if (this.selection.type === 'category') return orderPart + this.categoryLabel(this.selection.categoryId);
                     if (this.selection.type === 'other') return orderPart + 'その他：' + this.selection.freeText;
                     if (this.selection.type === 'leave') return this.leaveLabel(this.selection.leaveType);
+                    if (this.selection.type === 'delete') return '削除（クリア）';
                     return '休憩';
                 },
 
@@ -659,6 +674,9 @@
                         if (e.end_minute > endMinute) pieces.push({ ...e, id: this.nextId++, start_minute: endMinute });
                         return pieces;
                     });
+
+                    // 削除選択時は、既存内容(休憩を除く)を取り除くだけで新しい内容は入れない。
+                    if (this.selection.type === 'delete') return;
 
                     gaps.forEach(([gapStart, gapEnd]) => {
                         if (gapEnd <= gapStart) return;
