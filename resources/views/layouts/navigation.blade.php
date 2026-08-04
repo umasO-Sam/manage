@@ -92,6 +92,11 @@
                             <i data-lucide="hash" class="w-4 h-4"></i>
                             <span>注番管理</span>
                         </a>
+                        <a href="{{ route('holidays.index') }}"
+                           class="px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors {{ request()->routeIs('holidays.*') ? 'bg-slate-100 text-blue-600' : 'text-slate-600 hover:bg-slate-50' }}">
+                            <i data-lucide="calendar-days" class="w-4 h-4"></i>
+                            <span>休日マスタ</span>
+                        </a>
                     @endif
                 </div>
             </div>
@@ -197,6 +202,9 @@
                 </a>
                 <a href="{{ route('order-numbers.index') }}" class="block px-3 py-2 rounded-lg text-sm font-medium {{ request()->routeIs('order-numbers.*') ? 'bg-slate-100 text-blue-600' : 'text-slate-600' }}">
                     注番管理
+                </a>
+                <a href="{{ route('holidays.index') }}" class="block px-3 py-2 rounded-lg text-sm font-medium {{ request()->routeIs('holidays.*') ? 'bg-slate-100 text-blue-600' : 'text-slate-600' }}">
+                    休日マスタ
                 </a>
             @endif
         </div>

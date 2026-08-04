@@ -7,6 +7,7 @@ use App\Http\Controllers\CostAnalysisController;
 use App\Http\Controllers\CostReportController;
 use App\Http\Controllers\DailyReportController;
 use App\Http\Controllers\EstimateAssistController;
+use App\Http\Controllers\HolidayController;
 use App\Http\Controllers\LaborCostController;
 use App\Http\Controllers\LeaveRequestController;
 use App\Http\Controllers\OrderNumberController;
@@ -75,6 +76,13 @@ Route::middleware('auth')->group(function () {
         Route::post('/order-numbers', [OrderNumberController::class, 'store'])->name('order-numbers.store');
         Route::put('/order-numbers/{orderNumber}', [OrderNumberController::class, 'update'])->name('order-numbers.update');
         Route::delete('/order-numbers/{orderNumber}', [OrderNumberController::class, 'destroy'])->name('order-numbers.destroy');
+
+        Route::get('/holidays', [HolidayController::class, 'index'])->name('holidays.index');
+        Route::get('/holidays/create', [HolidayController::class, 'create'])->name('holidays.create');
+        Route::post('/holidays', [HolidayController::class, 'store'])->name('holidays.store');
+        Route::get('/holidays/{holiday}/edit', [HolidayController::class, 'edit'])->name('holidays.edit');
+        Route::put('/holidays/{holiday}', [HolidayController::class, 'update'])->name('holidays.update');
+        Route::delete('/holidays/{holiday}', [HolidayController::class, 'destroy'])->name('holidays.destroy');
 
         Route::get('/cards/{card}/edit', [CardController::class, 'edit'])->name('cards.edit');
         Route::put('/cards/{card}', [CardController::class, 'update'])->name('cards.update');
