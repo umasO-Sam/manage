@@ -31,6 +31,7 @@ class DailyReportController extends Controller
             ->whereBetween('code', [59, 71])->orderBy('code')->get()
             ->map(fn (CategoryCode $c) => [
                 'id' => $c->id,
+                'code' => $c->code,
                 'label' => $c->code.':'.($c->sub_category ?: $c->major_category),
                 'itemName' => $c->item_name,
             ])->values();
@@ -71,7 +72,12 @@ class DailyReportController extends Controller
         $report = $this->findReport(Auth::id(), $validated['work_date'])
             ?? DailyReport::create(['staff_id' => Auth::id(), 'work_date' => $validated['work_date']]);
 
-        DB::transaction(function () use ($report, $validated, $isSubmit) {
+        // 研修など(69)・管理(70)・空き(71)以外の分類は、注番の付け忘れを防ぐため
+        // 注番が無ければ保存しない(画面側でも同じ条件で反映ボタンを無効化しているが、
+        // サーバー側でも二重にチェックする)。
+        $categoriesRequiringOrderNo = CategoryCode::whereNotIn('code', [69, 70, 71])->pluck('id')->all();
+
+        DB::transaction(function () use ($report, $validated, $isSubmit, $categoriesRequiringOrderNo) {
             $report->remarks = $validated['remarks'] ?? null;
             $report->entries()->delete();
 
@@ -82,12 +88,19 @@ class DailyReportController extends Controller
 
                 $isOther = (bool) ($entry['is_other'] ?? false);
                 $isLeave = (bool) ($entry['is_leave'] ?? false);
+                $categoryId = ($isOther || $isLeave) ? null : ($entry['category_id'] ?? null);
+
+                if ($categoryId !== null
+                    && in_array($categoryId, $categoriesRequiringOrderNo, true)
+                    && empty($entry['order_no'])) {
+                    continue;
+                }
 
                 $report->entries()->create([
                     'start_minute' => $entry['start_minute'],
                     'end_minute' => $entry['end_minute'],
                     'order_no' => $isLeave ? null : ($entry['order_no'] ?? null),
-                    'category_id' => ($isOther || $isLeave) ? null : ($entry['category_id'] ?? null),
+                    'category_id' => $categoryId,
                     'is_other' => $isOther,
                     'free_text' => $isOther ? ($entry['free_text'] ?? null) : null,
                     'is_break' => (bool) ($entry['is_break'] ?? false),

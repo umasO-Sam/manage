@@ -106,6 +106,27 @@ class DailyReportTest extends TestCase
         $this->assertSame(2, $rows->first()->work_hours);
     }
 
+    public function test_category_entry_without_order_no_is_dropped_unless_exempt(): void
+    {
+        $staff = Staff::factory()->create();
+        $regular = CategoryCode::create(['code' => 59, 'major_category' => '社内人工', 'sub_category' => '機械製缶', 'item_name' => '機械製造']);
+        $exempt = CategoryCode::create(['code' => 70, 'major_category' => '雑人工', 'sub_category' => '管理', 'item_name' => '調整・工程会議']);
+
+        $this->actingAs($staff)->post(route('daily-reports.store'), [
+            'work_date' => '2026-08-03',
+            'entries' => [
+                // 注番の無い通常分類(59)は保存されない
+                ['start_minute' => 480, 'end_minute' => 540, 'category_id' => $regular->id],
+                // 除外対象の分類(70:管理)は注番が無くても保存される
+                ['start_minute' => 540, 'end_minute' => 600, 'category_id' => $exempt->id],
+            ],
+        ])->assertRedirect();
+
+        $report = DailyReport::where('staff_id', $staff->id)->whereDate('work_date', '2026-08-03')->first();
+        $this->assertSame(1, $report->entries()->count());
+        $this->assertSame($exempt->id, $report->entries()->first()->category_id);
+    }
+
     public function test_purchasing_labor_screen_hides_provisional_rows_by_default_and_shows_them_when_included(): void
     {
         $manager = Staff::factory()->procurementManager()->create();

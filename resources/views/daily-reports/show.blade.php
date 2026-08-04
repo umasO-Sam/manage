@@ -116,6 +116,9 @@
                         <span class="text-slate-400">選択中：</span>
                         <span class="font-bold text-slate-800" x-text="selectionSummary()"></span>
                         <span class="block text-slate-500 mt-0.5" x-show="selectionItemName()" x-text="selectionItemName()"></span>
+                        <span class="block text-amber-600 font-bold mt-0.5"
+                              x-show="selection.type === 'category' && selection.categoryId !== null && categoryRequiresOrderNo(selection.categoryId) && ! selection.orderNo"
+                              x-cloak>この分類は注番を選択しないと反映できません。</span>
                     </div>
                 </div>
 
@@ -414,8 +417,20 @@
                     return cat ? cat.itemName : '';
                 },
 
+                // 研修など(69)・管理(70)・空き(71)は特定の注番に紐づく作業ではないため、
+                // 注番未選択でも反映できる。それ以外の分類は注番の入力ミス・付け忘れを
+                // 防ぐため、注番を選択するまで反映できないようにする。
+                categoryRequiresOrderNo(id) {
+                    const cat = this.categories.find((c) => c.id === id);
+                    return cat ? ! [69, 70, 71].includes(cat.code) : true;
+                },
+
                 isSelectionValid() {
-                    if (this.selection.type === 'category') return this.selection.categoryId !== null;
+                    if (this.selection.type === 'category') {
+                        if (this.selection.categoryId === null) return false;
+                        if (this.categoryRequiresOrderNo(this.selection.categoryId) && ! this.selection.orderNo) return false;
+                        return true;
+                    }
                     if (this.selection.type === 'other') return this.selection.freeText.trim() !== '';
                     if (this.selection.type === 'leave') return this.selection.leaveType !== null;
                     return this.selection.type === 'break';
