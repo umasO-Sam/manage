@@ -28,6 +28,7 @@ class LeaveRequestController extends Controller
             'orderNumbers' => OrderNumber::orderBy('code')->get()
                 ->map(fn (OrderNumber $o) => ['code' => $o->code, 'label' => $o->displayLabel()])
                 ->values(),
+            'paidLeaveBalance' => Auth::user()->paidLeaveBalance(),
         ]);
     }
 
@@ -141,6 +142,13 @@ class LeaveRequestController extends Controller
             'hours' => 0.25, // 所定労働時間8時間・2時間単位付与のため 2/8
             default => null,
         };
+
+        $remaining = Auth::user()->paidLeaveBalance()['remainingTotal'];
+        if ($dayCount > $remaining) {
+            throw ValidationException::withMessages([
+                'granularity' => "有給休暇の残日数が不足しています（残り{$remaining}日）。",
+            ]);
+        }
 
         return [
             'start_date' => $data['start_date'],

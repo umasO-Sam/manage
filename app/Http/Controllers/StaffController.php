@@ -45,6 +45,8 @@ class StaffController extends Controller
             'role' => ['required', Rule::in(array_keys(Staff::ROLE_LABELS))],
             'password' => ['required', Password::defaults(), new NotSimilarToLoginId($request->input('login_id'))],
             'is_supervisor' => ['nullable', 'boolean'],
+            'paid_leave_granted_current_year' => ['nullable', 'numeric', 'min:0', 'max:99.9'],
+            'paid_leave_granted_last_year' => ['nullable', 'numeric', 'min:0', 'max:99.9'],
         ]);
 
         // アプリ側のunique検証後に別リクエストが割り込む競合状態に備え、
@@ -78,6 +80,8 @@ class StaffController extends Controller
             'role' => ['required', Rule::in(array_keys(Staff::ROLE_LABELS))],
             'password' => ['nullable', Password::defaults(), new NotSimilarToLoginId($request->input('login_id'))],
             'is_supervisor' => ['nullable', 'boolean'],
+            'paid_leave_granted_current_year' => ['nullable', 'numeric', 'min:0', 'max:99.9'],
+            'paid_leave_granted_last_year' => ['nullable', 'numeric', 'min:0', 'max:99.9'],
         ]);
 
         // 最後の1人を降格すると、担当者管理・注番管理に誰もアクセスできなくなるため禁止する。
@@ -101,6 +105,8 @@ class StaffController extends Controller
             'email' => $data['email'],
             'role' => $data['role'],
             'is_supervisor' => $request->boolean('is_supervisor'),
+            'paid_leave_granted_current_year' => $data['paid_leave_granted_current_year'] ?? null,
+            'paid_leave_granted_last_year' => $data['paid_leave_granted_last_year'] ?? null,
         ]);
 
         if (! empty($data['password'])) {
@@ -147,6 +153,8 @@ class StaffController extends Controller
                 'email' => ['required', 'string', 'email', 'max:255', Rule::unique('staff', 'email')->ignore($staff->id)],
                 'role' => ['required', Rule::in(array_keys(Staff::ROLE_LABELS))],
                 'is_supervisor' => ['nullable', 'boolean'],
+                'paid_leave_granted_current_year' => ['nullable', 'numeric', 'min:0', 'max:99.9'],
+                'paid_leave_granted_last_year' => ['nullable', 'numeric', 'min:0', 'max:99.9'],
             ]);
 
             if ($validator->fails()) {

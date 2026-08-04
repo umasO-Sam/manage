@@ -73,6 +73,46 @@ class Staff extends Authenticatable
         return $this->hasMany(CardStageLog::class, 'actor_id');
     }
 
+    public function leaveRequests(): HasMany
+    {
+        return $this->hasMany(LeaveRequest::class);
+    }
+
+    /**
+     * 有給休暇の残日数(前年度繰越分・当年度付与分の2バケツ管理)。
+     * 承認済みの有給休暇申請の消化分を、前年度繰越分から優先して差し引く
+     * (繰越分は失効が近いため先に使い切る想定)。
+     *
+     * @return array{grantedLastYear: float, grantedCurrentYear: float, grantedTotal: float,
+     *     consumed: float, remainingLastYear: float, remainingCurrentYear: float, remainingTotal: float}
+     */
+    public function paidLeaveBalance(): array
+    {
+        $grantedLastYear = (float) ($this->paid_leave_granted_last_year ?? 0);
+        $grantedCurrentYear = (float) ($this->paid_leave_granted_current_year ?? 0);
+
+        $consumed = (float) $this->leaveRequests()
+            ->where('type', 'paid_leave')
+            ->where('status', LeaveRequest::STATUS_APPROVED)
+            ->sum('day_count');
+
+        $consumedFromLastYear = min($consumed, $grantedLastYear);
+        $consumedFromCurrentYear = max(0.0, $consumed - $grantedLastYear);
+
+        $remainingLastYear = max(0.0, $grantedLastYear - $consumedFromLastYear);
+        $remainingCurrentYear = max(0.0, $grantedCurrentYear - $consumedFromCurrentYear);
+
+        return [
+            'grantedLastYear' => $grantedLastYear,
+            'grantedCurrentYear' => $grantedCurrentYear,
+            'grantedTotal' => $grantedLastYear + $grantedCurrentYear,
+            'consumed' => $consumed,
+            'remainingLastYear' => $remainingLastYear,
+            'remainingCurrentYear' => $remainingCurrentYear,
+            'remainingTotal' => $remainingLastYear + $remainingCurrentYear,
+        ];
+    }
+
     /**
      * ボード上（未アーカイブ）のカードのうち、このスタッフから見て
      * 未確認・新着コメントありのものを、ワークフロー種別ごとに集計する。

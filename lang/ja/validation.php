@@ -251,6 +251,8 @@ return [
 
         // 担当者管理
         'is_supervisor' => '上長',
+        'paid_leave_granted_current_year' => '有給休暇 当年度付与日数',
+        'paid_leave_granted_last_year' => '有給休暇 前年度繰越日数',
 
         // 作業日報(daily_reports/daily_report_entries)
         'entries' => '入力内容',

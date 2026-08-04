@@ -152,6 +152,26 @@ class StaffManagementTest extends TestCase
         $this->assertFalse((bool) $target->fresh()->is_supervisor);
     }
 
+    public function test_manager_can_set_paid_leave_grants(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        $target = Staff::factory()->create();
+
+        $this->actingAs($manager)->put(route('staff.update', $target), [
+            'name' => $target->name,
+            'department' => $target->department,
+            'login_id' => $target->login_id,
+            'email' => $target->email,
+            'role' => $target->role,
+            'paid_leave_granted_current_year' => '12.5',
+            'paid_leave_granted_last_year' => '3',
+        ])->assertRedirect(route('staff.index'));
+
+        $fresh = $target->fresh();
+        $this->assertSame(12.5, (float) $fresh->paid_leave_granted_current_year);
+        $this->assertSame(3.0, (float) $fresh->paid_leave_granted_last_year);
+    }
+
     public function test_manager_can_update_and_clear_sid(): void
     {
         $manager = Staff::factory()->procurementManager()->create();

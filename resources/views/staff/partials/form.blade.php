@@ -80,3 +80,22 @@
     </label>
     <x-input-error class="mt-2" :messages="$errors->get('is_supervisor')" />
 </div>
+
+<div class="grid grid-cols-2 gap-4">
+    <div>
+        <x-input-label for="paid_leave_granted_current_year" value="有給休暇 当年度付与日数" />
+        <x-text-input id="paid_leave_granted_current_year" name="paid_leave_granted_current_year" type="number" step="0.5" min="0" max="99.9"
+                       class="mt-1 block w-full" :value="old('paid_leave_granted_current_year', $staff?->paid_leave_granted_current_year)" />
+        <x-input-error class="mt-2" :messages="$errors->get('paid_leave_granted_current_year')" />
+    </div>
+    <div>
+        <x-input-label for="paid_leave_granted_last_year" value="有給休暇 前年度繰越日数" />
+        <x-text-input id="paid_leave_granted_last_year" name="paid_leave_granted_last_year" type="number" step="0.5" min="0" max="99.9"
+                       class="mt-1 block w-full" :value="old('paid_leave_granted_last_year', $staff?->paid_leave_granted_last_year)" />
+        <x-input-error class="mt-2" :messages="$errors->get('paid_leave_granted_last_year')" />
+    </div>
+</div>
+@if ($isEdit)
+    @php($balance = $staff->paidLeaveBalance())
+    <p class="text-xs text-slate-500">現在の残日数: {{ $balance['remainingTotal'] }}日(消化済み{{ $balance['consumed'] }}日)</p>
+@endif

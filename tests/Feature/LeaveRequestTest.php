@@ -20,7 +20,7 @@ class LeaveRequestTest extends TestCase
 
     public function test_paid_leave_full_day_is_created_with_day_count_one(): void
     {
-        $applicant = Staff::factory()->create();
+        $applicant = Staff::factory()->create(['paid_leave_granted_current_year' => 10]);
         $approver = Staff::factory()->create(['is_supervisor' => true]);
 
         $this->actingAs($applicant)->post(route('leave-requests.store'), [
@@ -39,7 +39,7 @@ class LeaveRequestTest extends TestCase
 
     public function test_paid_leave_hours_granularity_computes_quarter_day(): void
     {
-        $applicant = Staff::factory()->create();
+        $applicant = Staff::factory()->create(['paid_leave_granted_current_year' => 10]);
         $approver = Staff::factory()->create(['is_supervisor' => true]);
 
         $this->actingAs($applicant)->post(route('leave-requests.store'), [
@@ -52,6 +52,58 @@ class LeaveRequestTest extends TestCase
         $leaveRequest = LeaveRequest::first();
         $this->assertSame(0.25, (float) $leaveRequest->day_count);
         $this->assertSame(2.0, (float) $leaveRequest->hours);
+    }
+
+    public function test_paid_leave_request_is_rejected_when_balance_is_insufficient(): void
+    {
+        $applicant = Staff::factory()->create(['paid_leave_granted_current_year' => 0.5]);
+        $approver = Staff::factory()->create(['is_supervisor' => true]);
+
+        $this->actingAs($applicant)->post(route('leave-requests.store'), [
+            'type' => 'paid_leave',
+            'approver_id' => $approver->id,
+            'start_date' => '2026-08-10',
+            'granularity' => 'full_day',
+        ])->assertSessionHasErrors('granularity');
+
+        $this->assertSame(0, LeaveRequest::count());
+    }
+
+    public function test_paid_leave_balance_consumes_last_year_grant_before_current_year(): void
+    {
+        $staff = Staff::factory()->create([
+            'paid_leave_granted_last_year' => 3,
+            'paid_leave_granted_current_year' => 10,
+        ]);
+        $approver = Staff::factory()->create(['is_supervisor' => true]);
+
+        LeaveRequest::create([
+            'staff_id' => $staff->id, 'type' => 'paid_leave', 'start_date' => '2026-04-01', 'end_date' => '2026-04-05',
+            'granularity' => 'full_day', 'day_count' => 5.0, 'approver_id' => $approver->id, 'status' => LeaveRequest::STATUS_APPROVED,
+        ]);
+
+        $balance = $staff->paidLeaveBalance();
+
+        $this->assertSame(0.0, $balance['remainingLastYear']);
+        $this->assertSame(8.0, $balance['remainingCurrentYear']);
+        $this->assertSame(8.0, $balance['remainingTotal']);
+    }
+
+    public function test_paid_leave_balance_ignores_pending_and_rejected_requests(): void
+    {
+        $staff = Staff::factory()->create(['paid_leave_granted_current_year' => 10]);
+        $approver = Staff::factory()->create(['is_supervisor' => true]);
+
+        LeaveRequest::create([
+            'staff_id' => $staff->id, 'type' => 'paid_leave', 'start_date' => '2026-04-01', 'end_date' => '2026-04-01',
+            'granularity' => 'full_day', 'day_count' => 1.0, 'approver_id' => $approver->id, 'status' => LeaveRequest::STATUS_PENDING,
+        ]);
+        LeaveRequest::create([
+            'staff_id' => $staff->id, 'type' => 'paid_leave', 'start_date' => '2026-04-02', 'end_date' => '2026-04-02',
+            'granularity' => 'full_day', 'day_count' => 1.0, 'approver_id' => $approver->id, 'status' => LeaveRequest::STATUS_REJECTED,
+        ]);
+
+        $this->assertSame(10.0, $staff->paidLeaveBalance()['remainingTotal']);
     }
 
     public function test_ceremonial_leave_marriage_auto_fills_five_days(): void

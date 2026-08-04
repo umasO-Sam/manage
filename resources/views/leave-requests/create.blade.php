@@ -75,6 +75,11 @@
                 {{-- 有給休暇 --}}
                 <fieldset x-show="type === 'paid_leave'" x-cloak :disabled="type !== 'paid_leave'"
                           class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
+                    <div class="text-xs bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-600">
+                        有給休暇の残日数:
+                        <strong class="text-slate-900">{{ $paidLeaveBalance['remainingTotal'] }}日</strong>
+                        (前年度繰越 {{ $paidLeaveBalance['remainingLastYear'] }}日 ／ 当年度 {{ $paidLeaveBalance['remainingCurrentYear'] }}日)
+                    </div>
                     <div>
                         <x-input-label value="対象日" />
                         <x-date-text-input name="start_date" class="mt-1 block w-full" :value="old('start_date')" />
