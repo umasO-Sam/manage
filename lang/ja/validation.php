@@ -245,6 +245,42 @@ return [
 
         // カードコメント
         'body' => 'コメント内容',
+
+        // 注番管理
+        'project_name' => '工事名',
+
+        // 担当者管理
+        'is_supervisor' => '上長',
+
+        // 作業日報(daily_reports/daily_report_entries)
+        'entries' => '入力内容',
+        'start_minute' => '開始時刻',
+        'end_minute' => '終了時刻',
+        'is_other' => 'その他',
+        'free_text' => '自由記入',
+        'is_break' => '休憩',
+
+        // 休暇・勤務申請(leave_requests)
+        'type' => '申請種別',
+        'approver_id' => '承認者',
+        'start_date' => '開始日',
+        'end_date' => '終了日',
+        'granularity' => '粒度',
+        'reason_code' => '事由',
+        'reason_detail' => '事由の詳細',
+        'work_location' => '勤務地',
+        'substitute_holiday_date' => '振替休日とする日',
+        'no_substitute_needed' => '振り替えない',
+        'actual_worked_hours' => '実際に勤務した時間',
+        'compensatory_date' => '代休日',
+        'funeral_venue_address' => '葬儀場住所',
+        'funeral_venue_phone' => '葬儀場電話番号',
+        'wake_datetime' => '通夜',
+        'funeral_datetime' => '葬儀',
+        'flowers_declined' => '花の辞退',
+        'telegram_declined' => '電報の辞退',
+        'action' => '操作',
+        'rejection_reason' => '却下理由',
     ],
 
 ];
