@@ -200,4 +200,24 @@ class EstimateAssistTest extends TestCase
 
         $response->assertSee('C1');
     }
+
+    public function test_reference_price_search_filters_by_order_no_and_supplier(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+
+        PurchaseDetail::create([
+            'item_code' => 'D9', 'item_name' => 'センサ', 'supplier_name' => '丸紅商事',
+            'unit_price' => 500, 'is_provisional' => false,
+        ]);
+        PurchaseDetail::create([
+            'item_code' => 'D8', 'item_name' => 'センサ', 'supplier_name' => '別商社',
+            'unit_price' => 800, 'is_provisional' => false,
+        ]);
+
+        $byOrderNo = $this->actingAs($manager)->get(route('purchasing.estimate.index', ['ref_item_code' => 'D9']));
+        $byOrderNo->assertSee('D9')->assertDontSee('D8');
+
+        $bySupplier = $this->actingAs($manager)->get(route('purchasing.estimate.index', ['ref_supplier_name' => '丸紅']));
+        $bySupplier->assertSee('D9')->assertDontSee('D8');
+    }
 }

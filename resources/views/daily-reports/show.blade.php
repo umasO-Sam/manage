@@ -22,6 +22,10 @@
             ])) }},
             categories: {{ \Illuminate\Support\Js::from($categories) }},
             orderNumbers: {{ \Illuminate\Support\Js::from($orderNumbers) }},
+            weekOtherMinutes: {{ \Illuminate\Support\Js::from($weekOtherMinutes) }},
+            monthOtherMinutes: {{ \Illuminate\Support\Js::from($monthOtherMinutes) }},
+            monthOtherOvertimeMinutes: {{ \Illuminate\Support\Js::from($monthOtherOvertimeMinutes) }},
+            isRestDay: {{ \Illuminate\Support\Js::from($isRestDay) }},
         })">
         <div class="max-w-4xl mx-auto sm:px-6 lg:px-8 space-y-6">
 
@@ -182,7 +186,7 @@
                              @mouseup.window="endDrag()" @mouseleave="endDrag()">
                             <template x-for="i in slotIndexes" :key="i">
                                 <div @mousedown.prevent="startDrag(i, $event)" @mouseenter="dragOver(i)" @mouseup="endDrag()"
-                                     :class="slotClass(i)" :style="slotBackgroundStyle(i)"
+                                     :class="[slotClass(i), boundaryLineClass(i)]" :style="slotBackgroundStyle(i)"
                                      class="flex items-center h-6 border-b border-slate-100 cursor-pointer text-[11px] px-1 gap-2">
                                     <span class="w-24 shrink-0 font-mono text-slate-400"
                                           x-text="showTimeLabel(i) ? formatMinute(slotStart(i)) + '〜' + formatMinute(slotEnd(i)) : ''"></span>
@@ -233,6 +237,70 @@
                     </div>
                 </div>
 
+                <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-2">
+                    <h3 class="text-xs font-bold text-slate-700">労働時間集計</h3>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
+                        <div class="flex items-center justify-between bg-slate-50 rounded-lg px-2.5 py-1.5">
+                            <span class="text-slate-500">本日の勤務時間</span>
+                            <span class="font-bold text-slate-800" x-text="formatDuration(todayWorkMinutes())"></span>
+                        </div>
+                        <div class="flex items-center justify-between rounded-lg px-2.5 py-1.5"
+                             :class="todayOvertimeMinutes() > 0 ? 'bg-amber-50 text-amber-800' : 'bg-slate-50 text-slate-400'">
+                            <span>うち8時間超過分</span>
+                            <span class="font-bold" x-text="formatDuration(todayOvertimeMinutes())"></span>
+                        </div>
+                        <div class="flex items-center justify-between rounded-lg px-2.5 py-1.5"
+                             :class="lateNightMinutes() > 0 ? 'bg-indigo-50 text-indigo-800' : 'bg-slate-50 text-slate-400'">
+                            <span>深夜(22:00〜翌5:00)</span>
+                            <span class="font-bold" x-text="formatDuration(lateNightMinutes())"></span>
+                        </div>
+                        <div class="flex items-center justify-between bg-slate-50 rounded-lg px-2.5 py-1.5">
+                            <span class="text-slate-500">今週（{{ $weekLabel }}）の勤務時間</span>
+                            <span class="font-bold text-slate-800" x-text="formatDuration(weekTotalMinutes())"></span>
+                        </div>
+                        <div class="flex items-center justify-between rounded-lg px-2.5 py-1.5"
+                             :class="weekOvertimeMinutes() > 0 ? 'bg-amber-50 text-amber-800' : 'bg-slate-50 text-slate-400'">
+                            <span>うち週40時間超過分</span>
+                            <span class="font-bold" x-text="formatDuration(weekOvertimeMinutes())"></span>
+                        </div>
+                        <div class="flex items-center justify-between bg-slate-50 rounded-lg px-2.5 py-1.5">
+                            <span class="text-slate-500">今月（{{ $monthLabel }}・20日締め）の残業時間</span>
+                            <span class="font-bold text-slate-800" x-text="formatDuration(monthOvertimeMinutes())"></span>
+                        </div>
+                        <div class="flex items-center justify-between rounded-lg px-2.5 py-1.5"
+                             :class="monthOvertimeExcessMinutes() > 0 ? 'bg-red-50 text-red-800' : 'bg-slate-50 text-slate-400'">
+                            <span>うち月60時間超過分</span>
+                            <span class="font-bold" x-text="formatDuration(monthOvertimeExcessMinutes())"></span>
+                        </div>
+                    </div>
+
+                    @if ($specialClause['hardCapExceeded'])
+                        <p class="text-xs font-bold text-red-700 bg-red-50 border border-red-100 rounded-lg p-2">
+                            今月の残業時間が単月100時間の上限に達しています（法令違反のおそれ）。至急対応してください。
+                        </p>
+                    @else
+                        <p class="text-xs text-slate-500 bg-slate-50 rounded-lg p-2">
+                            今月の残業が単月100時間の上限に達するまで、残り<span class="font-bold text-slate-800">{{ number_format(intdiv($specialClause['hardCapRemainingMinutes'], 60)) }}時間{{ $specialClause['hardCapRemainingMinutes'] % 60 }}分</span>です。
+                        </p>
+                    @endif
+
+                    @if ($specialClause['specialClauseLimitReached'])
+                        <p class="text-xs font-bold text-red-700 bg-red-50 border border-red-100 rounded-lg p-2">
+                            月45時間超の残業（特別条項）が、年度（{{ $specialClause['fiscalYearStart']->format('Y/m/d') }}〜{{ $specialClause['fiscalYearEnd']->format('Y/m/d') }}）の上限6か月に達しています。
+                        </p>
+                    @else
+                        <p class="text-xs text-slate-500 bg-slate-50 rounded-lg p-2">
+                            月45時間超の残業（特別条項）は年度内あと<span class="font-bold text-slate-800">{{ $specialClause['specialClauseMonthsRemaining'] }}か月</span>まで（今年度実績：{{ $specialClause['specialClauseMonthsUsedThisFiscalYear'] }}か月）。
+                        </p>
+                    @endif
+
+                    @if ($specialClause['worstAverage'])
+                        <p class="text-xs font-bold text-red-700 bg-red-50 border border-red-100 rounded-lg p-2">
+                            直近{{ $specialClause['worstAverage']['months'] }}か月平均の残業時間（休日労働を含む）が{{ number_format(intdiv($specialClause['worstAverage']['averageMinutes'], 60)) }}時間{{ $specialClause['worstAverage']['averageMinutes'] % 60 }}分となり、複数月平均80時間の上限を超えています。
+                        </p>
+                    @endif
+                </div>
+
                 <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
                     <label class="block mb-1 text-xs font-bold text-slate-700">備考</label>
                     <textarea name="remarks" rows="3" placeholder="連絡事項など自由に記入してください"
@@ -272,6 +340,10 @@
                 orderNumbers: config.orderNumbers,
                 entries: config.initialEntries,
                 nextId: Math.max(0, ...config.initialEntries.map((e) => e.id)) + 1,
+                weekOtherMinutes: config.weekOtherMinutes,
+                monthOtherMinutes: config.monthOtherMinutes,
+                monthOtherOvertimeMinutes: config.monthOtherOvertimeMinutes,
+                isRestDay: config.isRestDay,
                 mode: 'drag',
                 granularity: 60,
                 gridStart: 0,
@@ -284,6 +356,9 @@
                 // 10:00〜11:00のスロットの一部にしか重ならず、境目の時刻(10:10等)が
                 // ラベルとしても出てこない。
                 fixedBoundaries: [8 * 60, 10 * 60, 10 * 60 + 10, 12 * 60 + 10, 13 * 60, 15 * 60, 15 * 60 + 10, 17 * 60 + 10],
+                // 定時の目印(実線)を引く境界。始業(8:00)の上端・終業(17:10)の下端のみを強調し、他の区切りとは差をつける。
+                standardStartLine: 8 * 60,
+                standardEndLines: [17 * 60 + 10],
                 dragging: false,
                 dragAnchor: null,
                 dragCurrent: null,
@@ -330,6 +405,15 @@
                     if (t === this.workStart) return '始業';
                     if (t === this.workEnd) return '終業';
                     return '';
+                },
+
+                // 始業(8:00)の上端・終業(17:10)の下端だけに太い実線を引き、定時の目印にする。
+                // 他の区切り線(休憩の境目など)より明確に目立たせるため、太さ・濃さを強調する。
+                boundaryLineClass(i) {
+                    const classes = [];
+                    if (this.slotStart(i) === this.standardStartLine) classes.push('border-t-4 border-t-slate-900');
+                    if (this.standardEndLines.includes(this.slotEnd(i))) classes.push('border-b-4 border-b-slate-900');
+                    return classes.join(' ');
                 },
 
                 makeBreak(start, end) {
@@ -773,6 +857,66 @@
 
                 sortedValidEntries() {
                     return this.validEntries().slice().sort((a, b) => a.start_minute - b.start_minute);
+                },
+
+                // 休憩・休暇を除く実働分数の合計。
+                todayWorkMinutes() {
+                    return this.validEntries()
+                        .filter((e) => !e.is_break && !e.is_leave)
+                        .reduce((sum, e) => sum + (e.end_minute - e.start_minute), 0);
+                },
+
+                // 休日は実働全て、平日は8時間超過分を「残業」とみなす(月間残業の集計と同じ考え方)。
+                todayOvertimeMinutes() {
+                    const worked = this.todayWorkMinutes();
+                    return this.isRestDay ? worked : Math.max(0, worked - 480);
+                },
+
+                lateNightMinutes() {
+                    const ranges = [[22 * 60, 24 * 60], [0, 5 * 60]];
+                    return this.validEntries()
+                        .filter((e) => !e.is_break && !e.is_leave)
+                        .reduce((sum, e) => {
+                            let overlap = 0;
+                            ranges.forEach(([s, en]) => {
+                                const from = Math.max(e.start_minute, s);
+                                const to = Math.min(e.end_minute, en);
+                                if (to > from) overlap += to - from;
+                            });
+                            return sum + overlap;
+                        }, 0);
+                },
+
+                weekTotalMinutes() {
+                    return this.weekOtherMinutes + this.todayWorkMinutes();
+                },
+
+                weekOvertimeMinutes() {
+                    return Math.max(0, this.weekTotalMinutes() - 2400);
+                },
+
+                monthTotalMinutes() {
+                    return this.monthOtherMinutes + this.todayWorkMinutes();
+                },
+
+                // 月の残業超過(50%割増の目安となる60時間超)は、今日の分だけ残業換算
+                // (todayOvertimeMinutes)にして、他日分(サーバー側で同じ考え方に基づき
+                // 計算済み)と合算する。月合計そのものと閾値を単純比較すると常に
+                // 超過扱いになってしまうため、残業時間ベースで比較する必要がある。
+                monthOvertimeMinutes() {
+                    return this.monthOtherOvertimeMinutes + this.todayOvertimeMinutes();
+                },
+
+                monthOvertimeExcessMinutes() {
+                    return Math.max(0, this.monthOvertimeMinutes() - 3600);
+                },
+
+                formatDuration(minutes) {
+                    const sign = minutes < 0 ? '-' : '';
+                    const abs = Math.abs(Math.round(minutes));
+                    const h = Math.floor(abs / 60);
+                    const m = abs % 60;
+                    return `${sign}${h}時間${m}分`;
                 },
             }));
         });

@@ -86,13 +86,17 @@
                             ])) }},
                             categories: {{ \Illuminate\Support\Js::from($categories) }},
                          })">
-                        <div class="border border-slate-200 rounded-lg overflow-hidden select-none max-h-[40vh] overflow-y-auto">
-                            <template x-for="i in slotIndexes" :key="i">
-                                <div :style="slotBackgroundStyle(i)"
-                                     class="flex items-center h-6 border-b border-slate-100 text-[11px] px-1 gap-2">
-                                    <span class="w-24 shrink-0 font-mono text-slate-400"
-                                          x-text="formatMinute(slotStart(i)) + '〜' + formatMinute(slotEnd(i))"></span>
-                                    <span class="truncate" x-text="label(i)"></span>
+                        <div class="relative h-4 mb-1 text-[10px] text-slate-400 font-mono select-none">
+                            <template x-for="t in axisTicks()" :key="'tick-' + t">
+                                <span class="absolute -translate-x-1/2 whitespace-nowrap" :style="{ left: tickPercent(t) + '%' }" x-text="formatMinute(t)"></span>
+                            </template>
+                        </div>
+                        <div class="relative h-10 border border-slate-200 rounded-lg overflow-hidden select-none" :style="gridBackgroundStyle()">
+                            <template x-for="(seg, idx) in entrySegments()" :key="idx">
+                                <div class="absolute top-0 bottom-0 flex items-center px-1 text-[10px] text-slate-800 border-r border-white/70 overflow-hidden"
+                                     :style="{ left: tickPercent(seg.from) + '%', width: (tickPercent(seg.to) - tickPercent(seg.from)) + '%', backgroundColor: seg.color }"
+                                     :title="seg.label + '（' + formatMinute(seg.from) + '〜' + formatMinute(seg.to) + '）'">
+                                    <span class="truncate" x-text="seg.label"></span>
                                 </div>
                             </template>
                         </div>
@@ -117,7 +121,9 @@
                 categoryColors: {},
                 gridStart: 0,
                 gridEnd: 24 * 60,
-                granularity: 30,
+                // 始業・休憩・終業の正確な境界時刻。目盛りに必ず表示し、
+                // 10:10や15:10のような半端な時刻も読み取れるようにする。
+                boundaryMinutes: [8 * 60, 10 * 60, 10 * 60 + 10, 12 * 60 + 10, 13 * 60, 15 * 60, 15 * 60 + 10, 16 * 60 + 10, 17 * 60 + 10],
 
                 init() {
                     const palette = ['#a7f3d0', '#99f6e4', '#a5f3fc', '#c7d2fe', '#ddd6fe', '#e9d5ff', '#f5d0fe', '#fbcfe8', '#fecdd3', '#fed7aa', '#d9f99d', '#bbf7d0'];
@@ -133,17 +139,28 @@
                     this.gridEnd = Math.min(24 * 60, Math.ceil(maxEnd / 60) * 60 + 60);
                 },
 
-                get slotIndexes() {
-                    const count = Math.ceil((this.gridEnd - this.gridStart) / this.granularity);
-                    return Array.from({ length: Math.max(count, 0) }, (_, i) => i);
+                // 1時間おきの目盛りに加えて、休憩・始業・終業などの正確な境界時刻を必ず含める。
+                axisTicks() {
+                    const ticks = new Set([this.gridStart, this.gridEnd]);
+                    for (let t = Math.ceil(this.gridStart / 60) * 60; t <= this.gridEnd; t += 60) ticks.add(t);
+                    this.boundaryMinutes.filter((t) => t >= this.gridStart && t <= this.gridEnd).forEach((t) => ticks.add(t));
+                    return [...ticks].sort((a, b) => a - b);
                 },
 
-                slotStart(i) {
-                    return this.gridStart + i * this.granularity;
+                tickPercent(t) {
+                    return ((t - this.gridStart) / (this.gridEnd - this.gridStart)) * 100;
                 },
 
-                slotEnd(i) {
-                    return Math.min(this.gridStart + (i + 1) * this.granularity, this.gridEnd);
+                // 10分ごとに薄い補助線、1時間ごとにやや濃い線を重ねて表示する。
+                gridBackgroundStyle() {
+                    const total = this.gridEnd - this.gridStart;
+                    if (total <= 0) return {};
+                    const tenMinPct = (10 / total) * 100;
+                    const hourPct = (60 / total) * 100;
+                    return {
+                        backgroundImage: `repeating-linear-gradient(to right, rgba(15,23,42,0.07) 0, rgba(15,23,42,0.07) 1px, transparent 1px, transparent ${tenMinPct}%), `
+                            + `repeating-linear-gradient(to right, rgba(15,23,42,0.2) 0, rgba(15,23,42,0.2) 1px, transparent 1px, transparent ${hourPct}%)`,
+                    };
                 },
 
                 formatMinute(m) {
@@ -172,44 +189,20 @@
                     return orderPart + this.categoryLabel(entry.category_id);
                 },
 
-                segments(i) {
-                    const start = this.slotStart(i);
-                    const end = this.slotEnd(i);
+                // グリッド範囲にクリップした各エントリを、そのまま横棒の1区画として描画する
+                // (時刻入力は既に休憩を優先して重ならないよう保存されているため、行への
+                // 集約は不要になった)。
+                entrySegments() {
                     return this.entries
-                        .filter((e) => e.start_minute !== null && e.end_minute !== null && e.start_minute < end && e.end_minute > start)
-                        .map((e) => ({ entry: e, from: Math.max(e.start_minute, start), to: Math.min(e.end_minute, end) }))
+                        .filter((e) => e.start_minute !== null && e.end_minute !== null
+                            && e.end_minute > this.gridStart && e.start_minute < this.gridEnd)
+                        .map((e) => ({
+                            from: Math.max(e.start_minute, this.gridStart),
+                            to: Math.min(e.end_minute, this.gridEnd),
+                            color: this.entryColor(e),
+                            label: this.entryLabel(e),
+                        }))
                         .sort((a, b) => a.from - b.from);
-                },
-
-                label(i) {
-                    const segs = this.segments(i);
-                    if (segs.length === 0) return '';
-                    return [...new Set(segs.map((s) => this.entryLabel(s.entry)))].join('・');
-                },
-
-                slotBackgroundStyle(i) {
-                    const segs = this.segments(i);
-                    if (segs.length === 0) return {};
-
-                    const start = this.slotStart(i);
-                    const width = this.slotEnd(i) - start;
-                    if (segs.length === 1 && segs[0].from <= start && segs[0].to >= this.slotEnd(i)) {
-                        return { backgroundColor: this.entryColor(segs[0].entry) };
-                    }
-
-                    const stops = [];
-                    let cursor = 0;
-                    segs.forEach((seg) => {
-                        const fromPct = ((seg.from - start) / width) * 100;
-                        const toPct = ((seg.to - start) / width) * 100;
-                        if (fromPct > cursor) stops.push(`#ffffff ${cursor}%`, `#ffffff ${fromPct}%`);
-                        const color = this.entryColor(seg.entry);
-                        stops.push(`${color} ${fromPct}%`, `${color} ${toPct}%`);
-                        cursor = toPct;
-                    });
-                    if (cursor < 100) stops.push(`#ffffff ${cursor}%`, `#ffffff 100%`);
-
-                    return { backgroundImage: `linear-gradient(to right, ${stops.join(', ')})` };
                 },
             }));
         });

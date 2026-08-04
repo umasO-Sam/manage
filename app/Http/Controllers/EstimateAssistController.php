@@ -149,7 +149,13 @@ class EstimateAssistController extends Controller
     private function searchReferencePrices(Request $request): array
     {
         $fields = [];
-        foreach (['manufacturer' => 'ref_manufacturer', 'item_name' => 'ref_item_name', 'dimensions' => 'ref_dimensions'] as $column => $param) {
+        foreach ([
+            'item_code' => 'ref_item_code',
+            'manufacturer' => 'ref_manufacturer',
+            'item_name' => 'ref_item_name',
+            'dimensions' => 'ref_dimensions',
+            'supplier_name' => 'ref_supplier_name',
+        ] as $column => $param) {
             $value = trim((string) $request->query($param, ''));
             $match = $request->query("{$param}_match") === 'perfect' ? 'perfect' : 'partial';
             $fields[$column] = ['value' => $value, 'match' => $match];

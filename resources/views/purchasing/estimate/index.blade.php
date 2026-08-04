@@ -201,10 +201,10 @@
 
                 {{-- 参考価格検索 --}}
                 <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4">
-                    <h3 class="text-sm font-bold text-slate-700">参考価格検索（メーカー・品名・形式/寸法から過去の類似取引を探す）</h3>
+                    <h3 class="text-sm font-bold text-slate-700">参考価格検索（注番・メーカー・品名・形式/寸法・商社から過去の類似取引を探す）</h3>
 
-                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-                        @foreach ([['manufacturer', 'メーカー'], ['item_name', '品名'], ['dimensions', '形式/寸法']] as [$key, $label])
+                    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                        @foreach ([['item_code', '注番'], ['manufacturer', 'メーカー'], ['item_name', '品名'], ['dimensions', '形式/寸法'], ['supplier_name', '商社']] as [$key, $label])
                             <div>
                                 <label class="block text-xs font-semibold text-slate-600 mb-1">{{ $label }}</label>
                                 <input type="text" name="ref_{{ $key }}" value="{{ $referenceFilters[$key]['value'] }}"
@@ -270,7 +270,7 @@
                                         <td class="p-2 text-slate-500">{{ $detail->order_date?->format('Y/m/d') ?? '-' }}</td>
                                     </tr>
                                 @empty
-                                    <tr><td colspan="8" class="p-6 text-center text-slate-400">メーカー・品名・形式/寸法のいずれかを入力して検索してください。</td></tr>
+                                    <tr><td colspan="8" class="p-6 text-center text-slate-400">注番・メーカー・品名・形式/寸法・商社のいずれかを入力して検索してください。</td></tr>
                                 @endforelse
                             </tbody>
                         </table>

@@ -8,6 +8,7 @@ use App\Models\DailyReportEntry;
 use App\Models\LaborCost;
 use App\Models\OperationLog;
 use App\Models\OrderNumber;
+use App\Services\WorkTimeComplianceService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -17,7 +18,7 @@ use Illuminate\View\View;
 
 class DailyReportController extends Controller
 {
-    public function show(Request $request): View
+    public function show(Request $request, WorkTimeComplianceService $compliance): View
     {
         $workDate = $this->parseDate($request->query('date'));
 
@@ -41,6 +42,26 @@ class DailyReportController extends Controller
             ->map(fn (OrderNumber $o) => ['code' => $o->code, 'label' => $o->displayLabel()])
             ->values();
 
+        $staff = Auth::user();
+        $referenceDate = Carbon::parse($workDate);
+
+        [$weekStart, $weekEnd] = $compliance->weekPeriod($referenceDate);
+        [$monthStart, $monthEnd] = $compliance->monthPeriod($referenceDate);
+
+        // 今日の分は画面側の未保存の入力内容を反映してリアルタイムに集計するため、
+        // 週・月の合計からは今日の分を除いたサーバー側の既存実績のみを渡す。
+        $weekWorkedByDate = $compliance->workedMinutesByDate($staff, $weekStart, $weekEnd);
+        $monthWorkedByDate = $compliance->workedMinutesByDate($staff, $monthStart, $monthEnd);
+
+        // 月の残業超過(60時間超)は残業換算した値で比較する必要があるため、今日の分の
+        // 既存実績(DB上の値)を月合計の残業時間から差し引き、画面側で今日の分だけ
+        // 未保存の入力内容を反映した残業時間に差し替えられるようにする。
+        $todayWorkedFromDb = $monthWorkedByDate[$workDate] ?? 0;
+        $todayOvertimeFromDb = $compliance->isRestDay($referenceDate) ? $todayWorkedFromDb : max(0, $todayWorkedFromDb - WorkTimeComplianceService::DAILY_LEGAL_MINUTES);
+        $monthOtherOvertimeMinutes = $compliance->overtimeMinutesForPeriod($staff, $monthStart, $monthEnd) - $todayOvertimeFromDb;
+
+        unset($weekWorkedByDate[$workDate], $monthWorkedByDate[$workDate]);
+
         return view('daily-reports.show', [
             'report' => $report,
             'workDate' => $workDate,
@@ -48,6 +69,13 @@ class DailyReportController extends Controller
             'nextDate' => Carbon::parse($workDate)->addDay()->format('Y-m-d'),
             'categories' => $categories,
             'orderNumbers' => $orderNumbers,
+            'weekOtherMinutes' => array_sum($weekWorkedByDate),
+            'monthOtherMinutes' => array_sum($monthWorkedByDate),
+            'monthOtherOvertimeMinutes' => $monthOtherOvertimeMinutes,
+            'weekLabel' => $weekStart->format('m/d').'〜'.$weekEnd->format('m/d'),
+            'monthLabel' => $monthStart->format('m/d').'〜'.$monthEnd->format('m/d'),
+            'isRestDay' => $compliance->isRestDay($referenceDate),
+            'specialClause' => $compliance->specialClauseSummary($staff, $referenceDate),
         ]);
     }
 

@@ -40,6 +40,34 @@ class DailyReportTest extends TestCase
         $response->assertSee('修正提出');
     }
 
+    public function test_show_screen_includes_the_work_time_summary_panel(): void
+    {
+        $staff = Staff::factory()->create();
+
+        $response = $this->actingAs($staff)->get(route('daily-reports.show', ['date' => '2026-08-03']));
+
+        $response->assertOk();
+        $response->assertSee('労働時間集計');
+        $response->assertSee('うち8時間超過分');
+        $response->assertSee('うち週40時間超過分');
+        $response->assertSee('うち月60時間超過分');
+    }
+
+    public function test_show_screen_warns_when_monthly_overtime_hard_cap_is_reached(): void
+    {
+        $staff = Staff::factory()->create();
+
+        // 20日締めの当月(2026-07-21〜2026-08-20)に平日10日、1日18時間ずつ働かせ、
+        // 残業(18-8)*10=100時間ちょうどにする。
+        foreach (['2026-07-21', '2026-07-22', '2026-07-23', '2026-07-24', '2026-07-27', '2026-07-28', '2026-07-29', '2026-07-30', '2026-07-31', '2026-08-03'] as $date) {
+            LaborCost::create(['work_date' => $date, 'staff_id' => $staff->id, 'work_hours' => 18, 'work_minutes' => 0, 'is_overtime' => false, 'is_provisional' => false]);
+        }
+
+        $response = $this->actingAs($staff)->get(route('daily-reports.show', ['date' => '2026-08-04']));
+
+        $response->assertSee('今月の残業時間が単月100時間の上限に達しています');
+    }
+
     public function test_rejected_report_shows_the_rejection_reason(): void
     {
         $staff = Staff::factory()->create();

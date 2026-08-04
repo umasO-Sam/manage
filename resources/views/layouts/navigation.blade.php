@@ -23,6 +23,90 @@
                         $calendarPending = $pendingApprovalsCount + $pendingDailyReportReviewCount;
                     @endphp
 
+                    @if (Auth::user()->role === \App\Models\Staff::ROLE_GENERAL)
+                        @php
+                            $procurementBoard = \App\Models\WorkflowType::where('name', '購入手配')->first();
+                            $estimateBoard = \App\Models\WorkflowType::where('name', '見積依頼')->first();
+                            $requestsActive = request()->routeIs('daily-reports.*') || request()->routeIs('leave-requests.*') || request()->routeIs('operation-logs.*');
+                        @endphp
+                        @if ($procurementBoard)
+                            <a href="{{ route('cards.index', $procurementBoard) }}"
+                               class="px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors {{ request()->route('workflow')?->is($procurementBoard) ? 'bg-slate-200 text-slate-800' : 'text-slate-600 hover:bg-slate-50' }}">
+                                <i data-lucide="shopping-cart" class="w-4 h-4"></i>
+                                <span>購入手配ボード</span>
+                                @if (($unreadCardCountsByWorkflow[$procurementBoard->id] ?? 0) > 0)
+                                    <span class="inline-flex items-center justify-center min-w-[1.125rem] h-[1.125rem] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold leading-none">
+                                        {{ $unreadCardCountsByWorkflow[$procurementBoard->id] }}
+                                    </span>
+                                @endif
+                            </a>
+                        @endif
+                        @if ($estimateBoard)
+                            <a href="{{ route('cards.index', $estimateBoard) }}"
+                               class="px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors {{ request()->route('workflow')?->is($estimateBoard) ? 'bg-slate-200 text-slate-800' : 'text-slate-600 hover:bg-slate-50' }}">
+                                <i data-lucide="file-text" class="w-4 h-4"></i>
+                                <span>見積依頼ボード</span>
+                                @if (($unreadCardCountsByWorkflow[$estimateBoard->id] ?? 0) > 0)
+                                    <span class="inline-flex items-center justify-center min-w-[1.125rem] h-[1.125rem] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold leading-none">
+                                        {{ $unreadCardCountsByWorkflow[$estimateBoard->id] }}
+                                    </span>
+                                @endif
+                            </a>
+                        @endif
+                        <a href="{{ route('my-calendar.show') }}"
+                           class="px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors {{ request()->routeIs('my-calendar.*') ? 'bg-slate-200 text-slate-800' : 'text-slate-600 hover:bg-slate-50' }}">
+                            <i data-lucide="calendar" class="w-4 h-4"></i>
+                            <span>個人カレンダー</span>
+                        </a>
+
+                        <x-dropdown align="left" width="56">
+                            <x-slot name="trigger">
+                                <button class="px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors {{ $requestsActive ? 'bg-slate-200 text-slate-800' : 'text-slate-600 hover:bg-slate-50' }}">
+                                    <i data-lucide="file-signature" class="w-4 h-4"></i>
+                                    <span>申請</span>
+                                    @if ($calendarPending > 0)
+                                        <span class="inline-flex items-center justify-center min-w-[1.125rem] h-[1.125rem] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold leading-none">
+                                            {{ $calendarPending }}
+                                        </span>
+                                    @endif
+                                    <i data-lucide="chevron-down" class="w-3.5 h-3.5"></i>
+                                </button>
+                            </x-slot>
+                            <x-slot name="content">
+                                <x-dropdown-link :href="route('daily-reports.show')">
+                                    <i data-lucide="clipboard-list" class="w-3.5 h-3.5 inline-block align-text-bottom mr-1"></i> 作業日報
+                                </x-dropdown-link>
+                                <x-dropdown-link :href="route('leave-requests.index')">
+                                    <i data-lucide="calendar-check" class="w-3.5 h-3.5 inline-block align-text-bottom mr-1"></i> 休暇・休出申請
+                                </x-dropdown-link>
+                                @if (Auth::user()->is_supervisor)
+                                    <x-dropdown-link :href="route('leave-requests.approvals')">
+                                        <i data-lucide="check-check" class="w-3.5 h-3.5 inline-block align-text-bottom mr-1"></i> 申請承認
+                                        @if ($pendingApprovalsCount > 0)
+                                            <span class="inline-flex items-center justify-center min-w-[1.125rem] h-[1.125rem] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold leading-none align-text-bottom">
+                                                {{ $pendingApprovalsCount }}
+                                            </span>
+                                        @endif
+                                    </x-dropdown-link>
+                                @endif
+                                <x-dropdown-link :href="route('operation-logs.index')">
+                                    <i data-lucide="scroll-text" class="w-3.5 h-3.5 inline-block align-text-bottom mr-1"></i> 操作ログ
+                                </x-dropdown-link>
+                            </x-slot>
+                        </x-dropdown>
+
+                        <a href="{{ route('work-status.index') }}"
+                           class="px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors {{ request()->routeIs('work-status.*') ? 'bg-slate-200 text-slate-800' : 'text-slate-600 hover:bg-slate-50' }}">
+                            <i data-lucide="users-round" class="w-4 h-4"></i>
+                            <span>勤務状況一覧</span>
+                        </a>
+                        <a href="{{ route('archive.index') }}"
+                           class="px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors {{ request()->routeIs('archive.*') ? 'bg-slate-200 text-slate-800' : 'text-slate-600 hover:bg-slate-50' }}">
+                            <i data-lucide="archive" class="w-4 h-4"></i>
+                            <span>履歴</span>
+                        </a>
+                    @else
+
                     {{-- 調達ボード --}}
                     <x-dropdown align="left" width="56">
                         <x-slot name="trigger">
@@ -175,6 +259,7 @@
                             </x-slot>
                         </x-dropdown>
                     @endif
+                    @endif
                 </div>
             </div>
 
@@ -223,6 +308,63 @@
     <!-- Responsive Navigation Menu -->
     <div :class="{'block': open, 'hidden': ! open}" class="hidden md:hidden border-t border-slate-200">
         <div class="pt-2 pb-3 space-y-1 px-2">
+            @if (Auth::user()->role === \App\Models\Staff::ROLE_GENERAL)
+                @php
+                    $procurementBoard ??= \App\Models\WorkflowType::where('name', '購入手配')->first();
+                    $estimateBoard ??= \App\Models\WorkflowType::where('name', '見積依頼')->first();
+                @endphp
+                @if ($procurementBoard)
+                    <a href="{{ route('cards.index', $procurementBoard) }}" class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium {{ request()->route('workflow')?->is($procurementBoard) ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
+                        <span>購入手配ボード</span>
+                        @if (($unreadCardCountsByWorkflow[$procurementBoard->id] ?? 0) > 0)
+                            <span class="inline-flex items-center justify-center min-w-[1.125rem] h-[1.125rem] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold leading-none">
+                                {{ $unreadCardCountsByWorkflow[$procurementBoard->id] }}
+                            </span>
+                        @endif
+                    </a>
+                @endif
+                @if ($estimateBoard)
+                    <a href="{{ route('cards.index', $estimateBoard) }}" class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium {{ request()->route('workflow')?->is($estimateBoard) ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
+                        <span>見積依頼ボード</span>
+                        @if (($unreadCardCountsByWorkflow[$estimateBoard->id] ?? 0) > 0)
+                            <span class="inline-flex items-center justify-center min-w-[1.125rem] h-[1.125rem] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold leading-none">
+                                {{ $unreadCardCountsByWorkflow[$estimateBoard->id] }}
+                            </span>
+                        @endif
+                    </a>
+                @endif
+                <a href="{{ route('my-calendar.show') }}" class="block px-3 py-2 rounded-lg text-sm font-medium {{ request()->routeIs('my-calendar.*') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
+                    個人カレンダー
+                </a>
+
+                <div class="px-3 py-2 text-xs font-bold text-slate-400 uppercase tracking-wider">申請</div>
+                <a href="{{ route('daily-reports.show') }}" class="block px-3 py-2 rounded-lg text-sm font-medium {{ request()->routeIs('daily-reports.show') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
+                    作業日報
+                </a>
+                <a href="{{ route('leave-requests.index') }}" class="block px-3 py-2 rounded-lg text-sm font-medium {{ request()->routeIs('leave-requests.index') || request()->routeIs('leave-requests.create') || request()->routeIs('leave-requests.show') || request()->routeIs('leave-requests.withdraw') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
+                    休暇・休出申請
+                </a>
+                @if (Auth::user()->is_supervisor)
+                    <a href="{{ route('leave-requests.approvals') }}" class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium {{ request()->routeIs('leave-requests.approvals') || request()->routeIs('leave-requests.decide') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
+                        <span>申請承認</span>
+                        @if ($pendingApprovalsCount > 0)
+                            <span class="inline-flex items-center justify-center min-w-[1.125rem] h-[1.125rem] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold leading-none">
+                                {{ $pendingApprovalsCount }}
+                            </span>
+                        @endif
+                    </a>
+                @endif
+                <a href="{{ route('operation-logs.index') }}" class="block px-3 py-2 rounded-lg text-sm font-medium {{ request()->routeIs('operation-logs.*') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
+                    操作ログ
+                </a>
+
+                <a href="{{ route('work-status.index') }}" class="block px-3 py-2 rounded-lg text-sm font-medium {{ request()->routeIs('work-status.*') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
+                    勤務状況一覧
+                </a>
+                <a href="{{ route('archive.index') }}" class="block px-3 py-2 rounded-lg text-sm font-medium {{ request()->routeIs('archive.*') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
+                    履歴
+                </a>
+            @else
             <div class="px-3 py-2 text-xs font-bold text-slate-400 uppercase tracking-wider">調達ボード</div>
             @foreach (\App\Models\WorkflowType::orderBy('id')->get() as $nav)
                 <a href="{{ route('cards.index', $nav) }}" class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap {{ request()->route('workflow')?->is($nav) ? $nav->accentClasses()['nav_active'] : 'text-slate-600' }}">
@@ -322,6 +464,7 @@
                 <a href="{{ route('order-numbers.index') }}" class="block px-3 py-2 rounded-lg text-sm font-medium {{ request()->routeIs('order-numbers.*') ? 'bg-slate-100 text-blue-600' : 'text-slate-600' }}">
                     注番管理
                 </a>
+            @endif
             @endif
         </div>
 
