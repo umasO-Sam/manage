@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\CategoryCode;
 use App\Models\DailyReport;
 use App\Models\LaborCost;
 use Illuminate\Http\RedirectResponse;
@@ -24,14 +25,21 @@ class DailyReportReviewController extends Controller
 
         $reports = DailyReport::with([
             'staff',
-            'entries' => fn ($q) => $q->where('is_break', false)->where('is_leave', false)->orderBy('start_minute'),
+            'entries' => fn ($q) => $q->orderBy('start_minute'),
             'entries.category',
         ])
             ->whereIn('id', $reportIds)
             ->orderBy('work_date')
             ->get();
 
-        return view('daily-reports.review.index', ['reports' => $reports]);
+        // 作業日報の「なぞって選択」グリッドと同じ分類ボタン(社内人工・雑人工、コード59〜71)を
+        // 参照して色分けする。DailyReportController::show()と同じ絞り込み条件。
+        $categories = CategoryCode::whereIn('major_category', ['社内人工', '雑人工'])
+            ->whereBetween('code', [59, 71])->orderBy('code')->get()
+            ->map(fn (CategoryCode $c) => ['id' => $c->id, 'label' => $c->code.':'.($c->sub_category ?: $c->major_category)])
+            ->values();
+
+        return view('daily-reports.review.index', ['reports' => $reports, 'categories' => $categories]);
     }
 
     public function confirm(DailyReport $dailyReport): RedirectResponse
