@@ -148,6 +148,7 @@
                                         <th class="p-2.5">ログインID</th>
                                         <th class="p-2.5">メールアドレス</th>
                                         <th class="p-2.5">権限</th>
+                                        <th class="p-2.5">上長</th>
                                         <th class="p-2.5"></th>
                                     </tr>
                                 </thead>
@@ -187,6 +188,11 @@
                                                         <option value="{{ $value }}" @selected($staff->role === $value)>{{ $label }}</option>
                                                     @endforeach
                                                 </select>
+                                            </td>
+                                            <td class="p-2.5 text-center">
+                                                <span x-show="!editMode">{{ $staff->is_supervisor ? '○' : '' }}</span>
+                                                <input x-show="editMode" x-cloak type="checkbox" name="updates[{{ $staff->id }}][is_supervisor]" value="1"
+                                                       @checked($staff->is_supervisor) class="rounded border-slate-300">
                                             </td>
                                             <td class="p-2.5">
                                                 <div class="flex gap-2">

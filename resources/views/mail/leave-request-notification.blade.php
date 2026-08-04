@@ -22,6 +22,23 @@
 @if ($leaveRequest->work_location)
 | 勤務地 | {{ $leaveRequest->work_location }} |
 @endif
+@if ($leaveRequest->isFuneral())
+@if ($leaveRequest->funeral_venue_address)
+| 葬儀場住所 | {{ $leaveRequest->funeral_venue_address }} |
+@endif
+@if ($leaveRequest->funeral_venue_phone)
+| 葬儀場電話番号 | {{ $leaveRequest->funeral_venue_phone }} |
+@endif
+@if ($leaveRequest->wake_datetime)
+| 通夜 | {{ $leaveRequest->wake_datetime->format('Y/m/d H:i') }} |
+@endif
+@if ($leaveRequest->funeral_datetime)
+| 葬儀 | {{ $leaveRequest->funeral_datetime->format('Y/m/d H:i') }} |
+@endif
+@if ($leaveRequest->flowers_declined || $leaveRequest->telegram_declined)
+| 花・電報 | {{ implode('・', array_filter([$leaveRequest->flowers_declined ? '花は辞退' : null, $leaveRequest->telegram_declined ? '電報は辞退' : null])) }} |
+@endif
+@endif
 | 申請者 | {{ $leaveRequest->staff->name }} |
 | 承認者 | {{ $leaveRequest->approver->name }} |
 | 現在の状態 | {{ $leaveRequest->statusLabel() }} |

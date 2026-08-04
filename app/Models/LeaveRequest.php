@@ -12,6 +12,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'substitute_holiday_date', 'no_substitute_needed', 'actual_worked_hours',
     'compensatory_date', 'approver_id', 'status', 'rejection_reason',
     'approved_at', 'remarks',
+    'funeral_venue_address', 'funeral_venue_phone', 'wake_datetime',
+    'funeral_datetime', 'flowers_declined', 'telegram_declined',
 ])]
 class LeaveRequest extends Model
 {
@@ -76,6 +78,10 @@ class LeaveRequest extends Model
             'hours' => 'decimal:1',
             'day_count' => 'decimal:2',
             'actual_worked_hours' => 'decimal:1',
+            'wake_datetime' => 'datetime',
+            'funeral_datetime' => 'datetime',
+            'flowers_declined' => 'boolean',
+            'telegram_declined' => 'boolean',
         ];
     }
 
@@ -102,6 +108,11 @@ class LeaveRequest extends Model
     public function isRejected(): bool
     {
         return $this->status === self::STATUS_REJECTED;
+    }
+
+    public function isFuneral(): bool
+    {
+        return $this->type === 'ceremonial_leave' && $this->reason_code === 'funeral';
     }
 
     public function typeLabel(): string

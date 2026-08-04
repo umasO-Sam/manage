@@ -33,14 +33,40 @@
             <form method="POST" action="{{ route('leave-requests.store') }}" class="space-y-4">
                 @csrf
 
-                <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
-                    <label class="block text-xs font-bold text-slate-700">申請種別</label>
-                    <div class="flex flex-wrap gap-1.5">
-                        @foreach (\App\Models\LeaveRequest::TYPES as $value => $label)
-                            <button type="button" @click="type = '{{ $value }}'"
-                                    :class="type === '{{ $value }}' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'"
-                                    class="text-xs font-semibold px-2.5 py-1.5 rounded-lg border transition-colors">{{ $label }}</button>
-                        @endforeach
+                <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-4"
+                     x-data="{ otherLeaveTypes: ['ceremonial_leave', 'special_leave_paid', 'special_leave_unpaid', 'juror_leave', 'volunteer_leave', 'banked_paid_leave'] }">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1.5">休暇申請</label>
+                        <div class="flex flex-wrap gap-1.5">
+                            <button type="button" @click="type = 'paid_leave'"
+                                    :class="type === 'paid_leave' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'"
+                                    class="text-xs font-semibold px-2.5 py-1.5 rounded-lg border transition-colors">有給休暇</button>
+                            <select x-model="type"
+                                    :class="otherLeaveTypes.includes(type) ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'"
+                                    class="text-xs font-semibold px-2.5 py-1.5 rounded-lg border transition-colors">
+                                <option value="" disabled>その他休暇 ▾</option>
+                                @foreach (\App\Models\LeaveRequest::TYPES as $value => $label)
+                                    @continue(! in_array($value, ['ceremonial_leave', 'special_leave_paid', 'special_leave_unpaid', 'juror_leave', 'volunteer_leave', 'banked_paid_leave'], true))
+                                    <option value="{{ $value }}">{{ $label }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1.5">休日勤務</label>
+                        <div class="flex flex-wrap gap-1.5">
+                            <button type="button" @click="type = 'holiday_work'"
+                                    :class="type === 'holiday_work' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'"
+                                    class="text-xs font-semibold px-2.5 py-1.5 rounded-lg border transition-colors">休日勤務申請</button>
+                            <button type="button" @click="type = 'compensatory_leave'"
+                                    :class="type === 'compensatory_leave' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'"
+                                    class="text-xs font-semibold px-2.5 py-1.5 rounded-lg border transition-colors">代休申請</button>
+                        </div>
+                    </div>
+                    <div>
+                        <button type="button" @click="type = 'telework'"
+                                :class="type === 'telework' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'"
+                                class="text-xs font-semibold px-2.5 py-1.5 rounded-lg border transition-colors">テレワーク申請</button>
                     </div>
                     <input type="hidden" name="type" :value="type">
                     <x-input-error class="mt-1" :messages="$errors->get('type')" />
@@ -77,13 +103,49 @@
                             <label class="flex items-center gap-1"><input type="radio" name="reason_code" value="funeral" x-model="ceremonialReason"> 忌引き</label>
                         </div>
                     </div>
-                    <div x-show="ceremonialReason === 'funeral'" x-cloak>
-                        <x-input-label value="続柄" />
-                        <input type="text" name="reason_detail" value="{{ old('reason_detail') }}" placeholder="例: 父" class="mt-1 block w-full rounded-lg border-slate-300 text-sm">
-                        <p class="mt-1 text-[11px] text-amber-600">忌引き日数は給与規定別表３（近親者4日／それ以外2日、同居の場合は4日）を確認のうえ、終了日を設定してください。</p>
-                        <x-input-label value="終了日" class="mt-2" />
-                        <input type="date" name="end_date" value="{{ old('end_date') }}" class="mt-1 block w-full rounded-lg border-slate-300 text-sm">
-                    </div>
+                    <fieldset x-show="ceremonialReason === 'funeral'" x-cloak :disabled="ceremonialReason !== 'funeral'" class="space-y-3">
+                        <div>
+                            <x-input-label value="続柄" />
+                            <input type="text" name="reason_detail" value="{{ old('reason_detail') }}" placeholder="例: 父" class="mt-1 block w-full rounded-lg border-slate-300 text-sm">
+                            <p class="mt-1 text-[11px] text-amber-600">忌引き日数は給与規定別表３（近親者4日／それ以外2日、同居の場合は4日）を確認のうえ、終了日を設定してください。</p>
+                        </div>
+                        <div>
+                            <x-input-label value="終了日" />
+                            <input type="date" name="end_date" value="{{ old('end_date') }}" class="mt-1 block w-full rounded-lg border-slate-300 text-sm">
+                        </div>
+
+                        <div class="pt-2 border-t border-slate-100">
+                            <p class="text-xs font-bold text-slate-700 mb-2">通夜・葬儀の予定（任意・花や電報の手配に使用します）</p>
+                            <div>
+                                <x-input-label value="葬儀場住所" />
+                                <input type="text" name="funeral_venue_address" value="{{ old('funeral_venue_address') }}" class="mt-1 block w-full rounded-lg border-slate-300 text-sm">
+                            </div>
+                            <div class="mt-2">
+                                <x-input-label value="葬儀場電話番号" />
+                                <input type="text" name="funeral_venue_phone" value="{{ old('funeral_venue_phone') }}" class="mt-1 block w-48 rounded-lg border-slate-300 text-sm">
+                            </div>
+                            <div class="mt-2 flex gap-3">
+                                <div class="flex-1">
+                                    <x-input-label value="通夜" />
+                                    <input type="datetime-local" name="wake_datetime" value="{{ old('wake_datetime') }}" class="mt-1 block w-full rounded-lg border-slate-300 text-sm">
+                                </div>
+                                <div class="flex-1">
+                                    <x-input-label value="葬儀" />
+                                    <input type="datetime-local" name="funeral_datetime" value="{{ old('funeral_datetime') }}" class="mt-1 block w-full rounded-lg border-slate-300 text-sm">
+                                </div>
+                            </div>
+                            <div class="mt-2 flex gap-4">
+                                <label class="flex items-center gap-1 text-sm">
+                                    <input type="checkbox" name="flowers_declined" value="1" @checked(old('flowers_declined'))>
+                                    花を辞退する
+                                </label>
+                                <label class="flex items-center gap-1 text-sm">
+                                    <input type="checkbox" name="telegram_declined" value="1" @checked(old('telegram_declined'))>
+                                    電報を辞退する
+                                </label>
+                            </div>
+                        </div>
+                    </fieldset>
                 </fieldset>
 
                 {{-- 特別休暇（有給） --}}

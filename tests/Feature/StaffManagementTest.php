@@ -107,6 +107,51 @@ class StaffManagementTest extends TestCase
         $this->assertDatabaseHas('staff', ['login_id' => 'new-staff', 'sid' => 50]);
     }
 
+    public function test_new_staff_defaults_is_supervisor_to_null(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+
+        $this->actingAs($manager)->post(route('staff.store'), [
+            'name' => '新入社員',
+            'department' => '製造部',
+            'login_id' => 'new-staff2',
+            'email' => 'new-staff2@example.com',
+            'role' => Staff::ROLE_GENERAL,
+            'password' => 'Abcdefgh123456789012',
+        ]);
+
+        // チェックボックス未送信時はfalseになる(新規作成フォームで明示的に選ばなかった場合)。
+        $created = Staff::where('login_id', 'new-staff2')->first();
+        $this->assertFalse((bool) $created->is_supervisor);
+    }
+
+    public function test_manager_can_set_and_unset_supervisor_flag(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        $target = Staff::factory()->create(['is_supervisor' => null]);
+
+        $this->actingAs($manager)->put(route('staff.update', $target), [
+            'name' => $target->name,
+            'department' => $target->department,
+            'login_id' => $target->login_id,
+            'email' => $target->email,
+            'role' => $target->role,
+            'is_supervisor' => '1',
+        ]);
+
+        $this->assertTrue((bool) $target->fresh()->is_supervisor);
+
+        $this->actingAs($manager)->put(route('staff.update', $target), [
+            'name' => $target->name,
+            'department' => $target->department,
+            'login_id' => $target->login_id,
+            'email' => $target->email,
+            'role' => $target->role,
+        ]);
+
+        $this->assertFalse((bool) $target->fresh()->is_supervisor);
+    }
+
     public function test_manager_can_update_and_clear_sid(): void
     {
         $manager = Staff::factory()->procurementManager()->create();

@@ -53,6 +53,12 @@ class LeaveRequestController extends Controller
             'no_substitute_needed' => ['nullable', 'boolean'],
             'actual_worked_hours' => ['nullable', 'numeric', 'min:0', 'max:24'],
             'compensatory_date' => ['nullable', 'date'],
+            'funeral_venue_address' => ['nullable', 'string', 'max:255'],
+            'funeral_venue_phone' => ['nullable', 'string', 'max:50'],
+            'wake_datetime' => ['nullable', 'date'],
+            'funeral_datetime' => ['nullable', 'date'],
+            'flowers_declined' => ['nullable', 'boolean'],
+            'telegram_declined' => ['nullable', 'boolean'],
         ]);
 
         $fields = $this->buildTypeFields($data);
@@ -84,7 +90,7 @@ class LeaveRequestController extends Controller
     {
         return match ($data['type']) {
             'paid_leave' => $this->buildPaidLeaveFields($data),
-            'ceremonial_leave' => $this->buildDateRangeFields($data, 'ceremonial_leave', required: ['reason_code']),
+            'ceremonial_leave' => $this->buildCeremonialLeaveFields($data),
             'special_leave_paid' => $this->buildDateRangeFields($data, 'special_leave_paid', required: ['reason_code']),
             'special_leave_unpaid' => $this->buildDateRangeFields($data, 'special_leave_unpaid', required: ['reason_code']),
             'volunteer_leave' => $this->buildDateRangeFields($data, 'volunteer_leave', required: ['reason_code']),
@@ -93,6 +99,28 @@ class LeaveRequestController extends Controller
             'compensatory_leave' => $this->buildCompensatoryLeaveFields($data),
             default => throw ValidationException::withMessages(['type' => '未対応の申請種別です。']),
         };
+    }
+
+    /**
+     * 忌引きの場合のみ、通夜・葬儀の日程や会場情報(花・電報の手配用、任意入力)を追加で保持する。
+     */
+    private function buildCeremonialLeaveFields(array $data): array
+    {
+        $fields = $this->buildDateRangeFields($data, 'ceremonial_leave', required: ['reason_code']);
+
+        if (($data['reason_code'] ?? null) === 'funeral') {
+            $fields = [
+                ...$fields,
+                'funeral_venue_address' => $data['funeral_venue_address'] ?? null,
+                'funeral_venue_phone' => $data['funeral_venue_phone'] ?? null,
+                'wake_datetime' => $data['wake_datetime'] ?? null,
+                'funeral_datetime' => $data['funeral_datetime'] ?? null,
+                'flowers_declined' => (bool) ($data['flowers_declined'] ?? false),
+                'telegram_declined' => (bool) ($data['telegram_declined'] ?? false),
+            ];
+        }
+
+        return $fields;
     }
 
     private function buildPaidLeaveFields(array $data): array

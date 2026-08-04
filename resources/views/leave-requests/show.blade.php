@@ -60,6 +60,26 @@
                     @if ($leaveRequest->day_count !== null)
                         <div class="py-2 flex justify-between"><dt class="text-slate-500">日数</dt><dd>{{ $leaveRequest->day_count }}日</dd></div>
                     @endif
+                    @if ($leaveRequest->isFuneral())
+                        @if ($leaveRequest->funeral_venue_address)
+                            <div class="py-2 flex justify-between"><dt class="text-slate-500">葬儀場住所</dt><dd>{{ $leaveRequest->funeral_venue_address }}</dd></div>
+                        @endif
+                        @if ($leaveRequest->funeral_venue_phone)
+                            <div class="py-2 flex justify-between"><dt class="text-slate-500">葬儀場電話番号</dt><dd>{{ $leaveRequest->funeral_venue_phone }}</dd></div>
+                        @endif
+                        @if ($leaveRequest->wake_datetime)
+                            <div class="py-2 flex justify-between"><dt class="text-slate-500">通夜</dt><dd>{{ $leaveRequest->wake_datetime->format('Y/m/d H:i') }}</dd></div>
+                        @endif
+                        @if ($leaveRequest->funeral_datetime)
+                            <div class="py-2 flex justify-between"><dt class="text-slate-500">葬儀</dt><dd>{{ $leaveRequest->funeral_datetime->format('Y/m/d H:i') }}</dd></div>
+                        @endif
+                        @if ($leaveRequest->flowers_declined || $leaveRequest->telegram_declined)
+                            <div class="py-2 flex justify-between">
+                                <dt class="text-slate-500">花・電報</dt>
+                                <dd>{{ implode('・', array_filter([$leaveRequest->flowers_declined ? '花は辞退' : null, $leaveRequest->telegram_declined ? '電報は辞退' : null])) }}</dd>
+                            </div>
+                        @endif
+                    @endif
                     @if ($leaveRequest->hours !== null)
                         <div class="py-2 flex justify-between"><dt class="text-slate-500">時間数</dt><dd>{{ $leaveRequest->hours }}時間</dd></div>
                     @endif

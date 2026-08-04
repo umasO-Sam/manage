@@ -44,6 +44,7 @@ class StaffController extends Controller
             'email' => ['required', 'string', 'email', 'max:255', 'unique:staff,email'],
             'role' => ['required', Rule::in(array_keys(Staff::ROLE_LABELS))],
             'password' => ['required', Password::defaults(), new NotSimilarToLoginId($request->input('login_id'))],
+            'is_supervisor' => ['nullable', 'boolean'],
         ]);
 
         // アプリ側のunique検証後に別リクエストが割り込む競合状態に備え、
@@ -52,6 +53,7 @@ class StaffController extends Controller
             Staff::create([
                 ...$data,
                 'password' => Hash::make($data['password']),
+                'is_supervisor' => $request->boolean('is_supervisor'),
             ]);
         } catch (UniqueConstraintViolationException) {
             throw ValidationException::withMessages(['login_id' => 'このログインID・メールアドレス・SIDのいずれかはすでに使用されています。']);
@@ -75,6 +77,7 @@ class StaffController extends Controller
             'email' => ['required', 'string', 'email', 'max:255', Rule::unique('staff', 'email')->ignore($staff->id)],
             'role' => ['required', Rule::in(array_keys(Staff::ROLE_LABELS))],
             'password' => ['nullable', Password::defaults(), new NotSimilarToLoginId($request->input('login_id'))],
+            'is_supervisor' => ['nullable', 'boolean'],
         ]);
 
         // 最後の1人を降格すると、担当者管理・注番管理に誰もアクセスできなくなるため禁止する。
@@ -97,6 +100,7 @@ class StaffController extends Controller
             'login_id' => $data['login_id'],
             'email' => $data['email'],
             'role' => $data['role'],
+            'is_supervisor' => $request->boolean('is_supervisor'),
         ]);
 
         if (! empty($data['password'])) {
@@ -142,6 +146,7 @@ class StaffController extends Controller
                 'login_id' => ['required', 'string', 'max:255', Rule::unique('staff', 'login_id')->ignore($staff->id)],
                 'email' => ['required', 'string', 'email', 'max:255', Rule::unique('staff', 'email')->ignore($staff->id)],
                 'role' => ['required', Rule::in(array_keys(Staff::ROLE_LABELS))],
+                'is_supervisor' => ['nullable', 'boolean'],
             ]);
 
             if ($validator->fails()) {
@@ -152,7 +157,12 @@ class StaffController extends Controller
                 continue;
             }
 
-            $validatedById[$staff->id] = $validator->validated();
+            // チェックボックスは未チェック時にキー自体が送信されないため、
+            // validated()に含めるだけでは常にtrueにしかならない。明示的にboolean化する。
+            $validatedById[$staff->id] = [
+                ...$validator->validated(),
+                'is_supervisor' => $request->boolean("updates.{$id}.is_supervisor"),
+            ];
         }
 
         if ($errors !== []) {

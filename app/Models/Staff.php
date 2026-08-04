@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
-#[Fillable(['name', 'department', 'sid', 'login_id', 'email', 'role', 'is_labor_target', 'position_weight', 'password', 'must_change_password', 'hire_date', 'paid_leave_granted_current_year', 'paid_leave_granted_last_year'])]
+#[Fillable(['name', 'department', 'sid', 'login_id', 'email', 'role', 'is_labor_target', 'position_weight', 'password', 'must_change_password', 'hire_date', 'paid_leave_granted_current_year', 'paid_leave_granted_last_year', 'is_supervisor'])]
 #[Hidden(['password', 'remember_token'])]
 class Staff extends Authenticatable
 {
@@ -38,6 +38,7 @@ class Staff extends Authenticatable
             'is_labor_target' => 'boolean',
             'must_change_password' => 'boolean',
             'hire_date' => 'date',
+            'is_supervisor' => 'boolean',
         ];
     }
 

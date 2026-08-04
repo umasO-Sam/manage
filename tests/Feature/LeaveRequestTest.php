@@ -90,6 +90,54 @@ class LeaveRequestTest extends TestCase
         $this->assertSame('父', $leaveRequest->reason_detail);
     }
 
+    public function test_funeral_details_are_saved_when_provided(): void
+    {
+        $applicant = Staff::factory()->create();
+        $approver = Staff::factory()->create();
+
+        $this->actingAs($applicant)->post(route('leave-requests.store'), [
+            'type' => 'ceremonial_leave',
+            'approver_id' => $approver->id,
+            'start_date' => '2026-08-10',
+            'end_date' => '2026-08-11',
+            'reason_code' => 'funeral',
+            'reason_detail' => '父',
+            'funeral_venue_address' => '三重県四日市市〇〇1-2-3 〇〇会館',
+            'funeral_venue_phone' => '059-000-0000',
+            'wake_datetime' => '2026-08-10T18:00',
+            'funeral_datetime' => '2026-08-11T11:00',
+            'flowers_declined' => '1',
+        ])->assertRedirect(route('leave-requests.index'));
+
+        $leaveRequest = LeaveRequest::first();
+        $this->assertTrue($leaveRequest->isFuneral());
+        $this->assertSame('三重県四日市市〇〇1-2-3 〇〇会館', $leaveRequest->funeral_venue_address);
+        $this->assertSame('059-000-0000', $leaveRequest->funeral_venue_phone);
+        $this->assertSame('2026-08-10 18:00', $leaveRequest->wake_datetime->format('Y-m-d H:i'));
+        $this->assertSame('2026-08-11 11:00', $leaveRequest->funeral_datetime->format('Y-m-d H:i'));
+        $this->assertTrue($leaveRequest->flowers_declined);
+        $this->assertFalse($leaveRequest->telegram_declined);
+    }
+
+    public function test_funeral_fields_are_not_set_for_marriage_reason(): void
+    {
+        $applicant = Staff::factory()->create();
+        $approver = Staff::factory()->create();
+
+        $this->actingAs($applicant)->post(route('leave-requests.store'), [
+            'type' => 'ceremonial_leave',
+            'approver_id' => $approver->id,
+            'start_date' => '2026-08-10',
+            'reason_code' => 'marriage',
+            // funeral専用欄が紛れ込んでも(異なる種別のfieldsetから)無視されることを確認
+            'funeral_venue_address' => '誤って送られた値',
+        ]);
+
+        $leaveRequest = LeaveRequest::first();
+        $this->assertFalse($leaveRequest->isFuneral());
+        $this->assertNull($leaveRequest->funeral_venue_address);
+    }
+
     public function test_holiday_work_requires_substitute_date_unless_flagged(): void
     {
         $applicant = Staff::factory()->create();
