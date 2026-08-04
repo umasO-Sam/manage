@@ -12,7 +12,7 @@
                 </a>
 
                 <!-- Navigation Links -->
-                <div class="hidden md:flex space-x-1 ml-8 overflow-x-auto">
+                <div class="hidden md:flex space-x-1 ml-8">
                     @php
                         $totalUnread = array_sum($unreadCardCountsByWorkflow ?? []);
                         $boardsActive = request()->routeIs('cards.*') || request()->routeIs('archive.*');
