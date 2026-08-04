@@ -195,7 +195,7 @@
                         <template x-for="entry in sortedValidEntries()" :key="'summary-' + entry.id">
                             <div class="flex items-center justify-between text-xs bg-slate-50 rounded-lg px-2.5 py-1.5">
                                 <span class="font-mono text-slate-500" x-text="formatMinute(entry.start_minute) + '〜' + formatMinute(entry.end_minute)"></span>
-                                <span class="flex-1 px-2" x-text="(entry.order_no ? entry.order_no + '／' : '') + entryLabel(entry)"></span>
+                                <span class="flex-1 px-2" x-text="entryLabel(entry)"></span>
                                 <button type="button" @click="removeEntry(entry.id)" class="text-red-500 hover:text-red-700">
                                     <i data-lucide="x" class="w-3.5 h-3.5"></i>
                                 </button>
@@ -391,8 +391,9 @@
                 entryLabel(entry) {
                     if (!entry) return '';
                     if (entry.is_break) return '休憩';
-                    if (entry.is_other) return 'その他' + (entry.free_text ? '：' + entry.free_text : '');
-                    return this.categoryLabel(entry.category_id);
+                    const orderPart = entry.order_no ? entry.order_no + '／' : '';
+                    if (entry.is_other) return orderPart + 'その他' + (entry.free_text ? '：' + entry.free_text : '');
+                    return orderPart + this.categoryLabel(entry.category_id);
                 },
 
                 // 一つのスロット(なぞって選択の1行)に、複数のエントリがまたがって
