@@ -6,6 +6,7 @@ use App\Models\CategoryCode;
 use App\Models\DailyReport;
 use App\Models\DailyReportEntry;
 use App\Models\LaborCost;
+use App\Models\OperationLog;
 use App\Models\OrderNumber;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -72,6 +73,8 @@ class DailyReportController extends Controller
         $report = $this->findReport(Auth::id(), $validated['work_date'])
             ?? DailyReport::create(['staff_id' => Auth::id(), 'work_date' => $validated['work_date']]);
 
+        $wasSubmittedBefore = $report->isSubmitted();
+
         // 研修など(69)・管理(70)・空き(71)以外の分類は、注番の付け忘れを防ぐため
         // 注番が無ければ保存しない(画面側でも同じ条件で反映ボタンを無効化しているが、
         // サーバー側でも二重にチェックする)。
@@ -122,6 +125,14 @@ class DailyReportController extends Controller
                 $this->syncLaborCosts($report);
             }
         });
+
+        if ($isSubmit) {
+            OperationLog::record(
+                $wasSubmittedBefore ? OperationLog::ACTION_DAILY_REPORT_RESUBMIT : OperationLog::ACTION_DAILY_REPORT_SUBMIT,
+                $report,
+                $report->staff_id
+            );
+        }
 
         return redirect()->route('daily-reports.show', ['date' => $report->work_date->format('Y-m-d')])
             ->with('status', $isSubmit ? 'daily-report-submitted' : 'daily-report-saved');

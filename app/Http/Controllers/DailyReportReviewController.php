@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\CategoryCode;
 use App\Models\DailyReport;
 use App\Models\LaborCost;
+use App\Models\OperationLog;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -62,6 +63,8 @@ class DailyReportReviewController extends Controller
                 ->where('is_provisional', true)
                 ->update(['is_provisional' => false]);
 
+            OperationLog::record(OperationLog::ACTION_DAILY_REPORT_CONFIRM, $dailyReport, $dailyReport->staff_id);
+
             return back()->with('status', 'daily-report-confirmed');
         }
 
@@ -69,6 +72,13 @@ class DailyReportReviewController extends Controller
             'rejected_at' => now(),
             'rejection_reason' => $data['rejection_reason'],
         ]);
+
+        OperationLog::record(
+            OperationLog::ACTION_DAILY_REPORT_REJECT,
+            $dailyReport,
+            $dailyReport->staff_id,
+            $data['rejection_reason']
+        );
 
         return back()->with('status', 'daily-report-rejected');
     }

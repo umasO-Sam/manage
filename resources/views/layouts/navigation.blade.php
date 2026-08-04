@@ -17,7 +17,8 @@
                         $totalUnread = array_sum($unreadCardCountsByWorkflow ?? []);
                         $boardsActive = request()->routeIs('cards.*') || request()->routeIs('archive.*');
                         $calendarActive = request()->routeIs('my-calendar.*') || request()->routeIs('daily-reports.*')
-                            || request()->routeIs('leave-requests.*') || request()->routeIs('work-status.*') || request()->routeIs('holidays.*');
+                            || request()->routeIs('leave-requests.*') || request()->routeIs('work-status.*') || request()->routeIs('holidays.*')
+                            || request()->routeIs('operation-logs.*');
                         $systemActive = request()->routeIs('staff.*') || request()->routeIs('order-numbers.*');
                         $calendarPending = $pendingApprovalsCount + $pendingDailyReportReviewCount;
                     @endphp
@@ -105,6 +106,9 @@
                                     <i data-lucide="calendar-range" class="w-3.5 h-3.5 inline-block align-text-bottom mr-1"></i> 休日マスタ
                                 </x-dropdown-link>
                             @endif
+                            <x-dropdown-link :href="route('operation-logs.index')">
+                                <i data-lucide="scroll-text" class="w-3.5 h-3.5 inline-block align-text-bottom mr-1"></i> 操作ログ
+                            </x-dropdown-link>
                         </x-slot>
                     </x-dropdown>
 
@@ -272,6 +276,9 @@
                     休日マスタ
                 </a>
             @endif
+            <a href="{{ route('operation-logs.index') }}" class="block px-3 py-2 rounded-lg text-sm font-medium {{ request()->routeIs('operation-logs.*') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
+                操作ログ
+            </a>
 
             @if (Auth::user()->canAccessPurchasing())
                 <div class="px-3 py-2 text-xs font-bold text-slate-400 uppercase tracking-wider">仕入管理</div>

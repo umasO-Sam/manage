@@ -11,6 +11,7 @@ use App\Http\Controllers\EstimateAssistController;
 use App\Http\Controllers\HolidayController;
 use App\Http\Controllers\LaborCostController;
 use App\Http\Controllers\LeaveRequestController;
+use App\Http\Controllers\OperationLogController;
 use App\Http\Controllers\OrderNumberController;
 use App\Http\Controllers\PersonalCalendarController;
 use App\Http\Controllers\ProfileController;
@@ -55,6 +56,8 @@ Route::middleware('auth')->group(function () {
     Route::get('/leave-requests/{leaveRequest}', [LeaveRequestController::class, 'show'])->name('leave-requests.show');
     Route::put('/leave-requests/{leaveRequest}/decide', [LeaveRequestController::class, 'decide'])->name('leave-requests.decide');
     Route::delete('/leave-requests/{leaveRequest}', [LeaveRequestController::class, 'withdraw'])->name('leave-requests.withdraw');
+
+    Route::get('/operation-logs', [OperationLogController::class, 'index'])->name('operation-logs.index');
 
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');

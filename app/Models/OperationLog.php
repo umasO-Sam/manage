@@ -1,0 +1,81 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
+use Illuminate\Support\Facades\Auth;
+
+/**
+ * 作業日報・休暇/勤務申請まわりの操作履歴。法定保存期間に準じ5年間保持し、
+ * PurgeOperationLogsコマンドで期限切れ分を削除する。資材管理担当者・上長は
+ * 全員分を、それ以外の一般社員・営業担当は自分(owner_staff_id)の分のみ閲覧できる。
+ */
+#[Fillable(['staff_id', 'owner_staff_id', 'action', 'subject_type', 'subject_id', 'description'])]
+class OperationLog extends Model
+{
+    public const ACTION_DAILY_REPORT_SUBMIT = 'daily_report_submit';
+
+    public const ACTION_DAILY_REPORT_RESUBMIT = 'daily_report_resubmit';
+
+    public const ACTION_DAILY_REPORT_CONFIRM = 'daily_report_confirm';
+
+    public const ACTION_DAILY_REPORT_REJECT = 'daily_report_reject';
+
+    public const ACTION_LEAVE_REQUEST_CREATE = 'leave_request_create';
+
+    public const ACTION_LEAVE_REQUEST_WITHDRAW = 'leave_request_withdraw';
+
+    public const ACTION_LEAVE_REQUEST_APPROVE = 'leave_request_approve';
+
+    public const ACTION_LEAVE_REQUEST_REJECT = 'leave_request_reject';
+
+    /** @var array<string, string> action値 => 表示名 */
+    public const ACTIONS = [
+        self::ACTION_DAILY_REPORT_SUBMIT => '作業日報を提出',
+        self::ACTION_DAILY_REPORT_RESUBMIT => '作業日報を修正提出',
+        self::ACTION_DAILY_REPORT_CONFIRM => '作業日報を確認',
+        self::ACTION_DAILY_REPORT_REJECT => '作業日報を差し戻し',
+        self::ACTION_LEAVE_REQUEST_CREATE => '休暇・休出を申請',
+        self::ACTION_LEAVE_REQUEST_WITHDRAW => '申請を取消',
+        self::ACTION_LEAVE_REQUEST_APPROVE => '申請を承認',
+        self::ACTION_LEAVE_REQUEST_REJECT => '申請を却下',
+    ];
+
+    public function staff(): BelongsTo
+    {
+        return $this->belongsTo(Staff::class);
+    }
+
+    public function owner(): BelongsTo
+    {
+        return $this->belongsTo(Staff::class, 'owner_staff_id');
+    }
+
+    public function subject(): MorphTo
+    {
+        return $this->morphTo();
+    }
+
+    public function actionLabel(): string
+    {
+        return self::ACTIONS[$this->action] ?? $this->action;
+    }
+
+    /**
+     * 現在ログイン中の担当者を実行者として記録する。
+     */
+    public static function record(string $action, Model $subject, int $ownerStaffId, ?string $description = null): self
+    {
+        return static::create([
+            'staff_id' => Auth::id(),
+            'owner_staff_id' => $ownerStaffId,
+            'action' => $action,
+            'subject_type' => $subject::class,
+            'subject_id' => $subject->getKey(),
+            'description' => $description,
+        ]);
+    }
+}

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Mail\LeaveRequestNotificationMail;
 use App\Models\LeaveRequest;
+use App\Models\OperationLog;
 use App\Models\OrderNumber;
 use App\Models\Staff;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -95,6 +96,8 @@ class LeaveRequestController extends Controller
             'status' => LeaveRequest::STATUS_PENDING,
             ...$fields,
         ]);
+
+        OperationLog::record(OperationLog::ACTION_LEAVE_REQUEST_CREATE, $leaveRequest, $leaveRequest->staff_id);
 
         $this->sendNotification(
             $leaveRequest->approver->email,
@@ -292,6 +295,8 @@ class LeaveRequestController extends Controller
 
         $leaveRequest->update(['status' => LeaveRequest::STATUS_WITHDRAWN]);
 
+        OperationLog::record(OperationLog::ACTION_LEAVE_REQUEST_WITHDRAW, $leaveRequest, $leaveRequest->staff_id);
+
         return redirect()->route('leave-requests.index')->with('status', 'leave-request-withdrawn');
     }
 
@@ -327,6 +332,13 @@ class LeaveRequestController extends Controller
             'rejection_reason' => $data['action'] === 'reject' ? $data['rejection_reason'] : null,
             'approved_at' => now(),
         ]);
+
+        OperationLog::record(
+            $data['action'] === 'approve' ? OperationLog::ACTION_LEAVE_REQUEST_APPROVE : OperationLog::ACTION_LEAVE_REQUEST_REJECT,
+            $leaveRequest,
+            $leaveRequest->staff_id,
+            $data['action'] === 'reject' ? $data['rejection_reason'] : null
+        );
 
         $this->sendNotification(
             $leaveRequest->staff->email,
