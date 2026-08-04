@@ -61,7 +61,7 @@ class PersonalCalendarTest extends TestCase
             foreach ($weeks as $week) {
                 foreach ($week as $day) {
                     if ($day['date']->format('Y-m-d') === '2026-08-10') {
-                        $ids = $day['leaveRequests']->pluck('id')->all();
+                        $ids = $day['leaveRequests']->map(fn (array $e) => $e['request']->id)->all();
 
                         return $ids === [$own->id];
                     }
@@ -91,7 +91,7 @@ class PersonalCalendarTest extends TestCase
                 foreach ($week as $day) {
                     $dateStr = $day['date']->format('Y-m-d');
                     if ($dateStr >= '2026-08-10' && $dateStr <= '2026-08-14') {
-                        if ($day['leaveRequests']->pluck('id')->contains($leaveRequest->id)) {
+                        if ($day['leaveRequests']->contains(fn (array $e) => $e['request']->id === $leaveRequest->id)) {
                             $matchedDays++;
                         }
                     }
@@ -149,5 +149,155 @@ class PersonalCalendarTest extends TestCase
 
         $response->assertOk();
         $response->assertViewHas('prefillDate', null);
+    }
+
+    public function test_approved_holiday_work_sets_white_and_substitute_holiday_backgrounds(): void
+    {
+        $staff = Staff::factory()->create();
+        $approver = Staff::factory()->create(['is_supervisor' => true]);
+
+        LeaveRequest::create([
+            'staff_id' => $staff->id, 'type' => 'holiday_work', 'start_date' => '2026-08-08', 'end_date' => '2026-08-08',
+            'order_no' => 'A-1', 'work_location' => '本社', 'substitute_holiday_date' => '2026-08-12',
+            'approver_id' => $approver->id, 'status' => LeaveRequest::STATUS_APPROVED,
+        ]);
+
+        $response = $this->actingAs($staff)->get(route('my-calendar.show', ['year' => 2026, 'month' => 8]));
+
+        $response->assertViewHas('weeks', function (array $weeks) {
+            $overrides = [];
+            foreach ($weeks as $week) {
+                foreach ($week as $day) {
+                    $dateStr = $day['date']->format('Y-m-d');
+                    if (in_array($dateStr, ['2026-08-08', '2026-08-12'], true)) {
+                        $overrides[$dateStr] = $day['backgroundOverride'];
+                    }
+                }
+            }
+
+            return $overrides === ['2026-08-08' => 'work_day', '2026-08-12' => 'substitute_holiday'];
+        });
+    }
+
+    public function test_pending_holiday_work_does_not_override_background(): void
+    {
+        $staff = Staff::factory()->create();
+        $approver = Staff::factory()->create(['is_supervisor' => true]);
+
+        LeaveRequest::create([
+            'staff_id' => $staff->id, 'type' => 'holiday_work', 'start_date' => '2026-08-08', 'end_date' => '2026-08-08',
+            'order_no' => 'A-1', 'work_location' => '本社', 'substitute_holiday_date' => '2026-08-12',
+            'approver_id' => $approver->id, 'status' => LeaveRequest::STATUS_PENDING,
+        ]);
+
+        $response = $this->actingAs($staff)->get(route('my-calendar.show', ['year' => 2026, 'month' => 8]));
+
+        $response->assertViewHas('weeks', function (array $weeks) {
+            foreach ($weeks as $week) {
+                foreach ($week as $day) {
+                    if (in_array($day['date']->format('Y-m-d'), ['2026-08-08', '2026-08-12'], true) && $day['backgroundOverride'] !== null) {
+                        return false;
+                    }
+                }
+            }
+
+            return true;
+        });
+    }
+
+    public function test_approved_compensatory_leave_does_not_override_background(): void
+    {
+        $staff = Staff::factory()->create();
+        $approver = Staff::factory()->create(['is_supervisor' => true]);
+
+        LeaveRequest::create([
+            'staff_id' => $staff->id, 'type' => 'compensatory_leave', 'start_date' => '2026-08-08', 'end_date' => '2026-08-08',
+            'order_no' => 'A-1', 'work_location' => '本社', 'actual_worked_hours' => 7.0, 'compensatory_date' => '2026-08-12',
+            'approver_id' => $approver->id, 'status' => LeaveRequest::STATUS_APPROVED,
+        ]);
+
+        $response = $this->actingAs($staff)->get(route('my-calendar.show', ['year' => 2026, 'month' => 8]));
+
+        $response->assertViewHas('weeks', function (array $weeks) {
+            foreach ($weeks as $week) {
+                foreach ($week as $day) {
+                    if (in_array($day['date']->format('Y-m-d'), ['2026-08-08', '2026-08-12'], true)) {
+                        if ($day['backgroundOverride'] !== null) {
+                            return false;
+                        }
+                        if ($day['leaveRequests']->isEmpty()) {
+                            return false;
+                        }
+                    }
+                }
+            }
+
+            return true;
+        });
+    }
+
+    public function test_compensatory_date_is_tagged_with_compensatory_role(): void
+    {
+        $staff = Staff::factory()->create();
+        $approver = Staff::factory()->create(['is_supervisor' => true]);
+
+        LeaveRequest::create([
+            'staff_id' => $staff->id, 'type' => 'compensatory_leave', 'start_date' => '2026-08-08', 'end_date' => '2026-08-08',
+            'order_no' => 'A-1', 'work_location' => '本社', 'actual_worked_hours' => 7.0, 'compensatory_date' => '2026-08-12',
+            'approver_id' => $approver->id, 'status' => LeaveRequest::STATUS_APPROVED,
+        ]);
+
+        $response = $this->actingAs($staff)->get(route('my-calendar.show', ['year' => 2026, 'month' => 8]));
+
+        $response->assertViewHas('weeks', function (array $weeks) {
+            foreach ($weeks as $week) {
+                foreach ($week as $day) {
+                    if ($day['date']->format('Y-m-d') === '2026-08-12') {
+                        return $day['leaveRequests']->contains(fn (array $e) => $e['role'] === 'compensatory');
+                    }
+                }
+            }
+
+            return false;
+        });
+    }
+
+    public function test_daily_report_status_reflects_draft_pending_and_confirmed(): void
+    {
+        $staff = Staff::factory()->create();
+
+        $draft = \App\Models\DailyReport::create(['staff_id' => $staff->id, 'work_date' => '2026-08-03']);
+
+        $pending = \App\Models\DailyReport::create(['staff_id' => $staff->id, 'work_date' => '2026-08-04', 'submitted_at' => now()]);
+        \App\Models\LaborCost::create([
+            'work_date' => '2026-08-04', 'staff_id' => $staff->id, 'daily_report_id' => $pending->id,
+            'work_hours' => 8, 'work_minutes' => 0, 'is_overtime' => false, 'is_provisional' => true,
+        ]);
+
+        $confirmed = \App\Models\DailyReport::create(['staff_id' => $staff->id, 'work_date' => '2026-08-05', 'submitted_at' => now()]);
+        \App\Models\LaborCost::create([
+            'work_date' => '2026-08-05', 'staff_id' => $staff->id, 'daily_report_id' => $confirmed->id,
+            'work_hours' => 8, 'work_minutes' => 0, 'is_overtime' => false, 'is_provisional' => false,
+        ]);
+
+        $response = $this->actingAs($staff)->get(route('my-calendar.show', ['year' => 2026, 'month' => 8]));
+
+        $response->assertViewHas('weeks', function (array $weeks) {
+            $statuses = [];
+            foreach ($weeks as $week) {
+                foreach ($week as $day) {
+                    $dateStr = $day['date']->format('Y-m-d');
+                    if (in_array($dateStr, ['2026-08-03', '2026-08-04', '2026-08-05'], true)) {
+                        $statuses[$dateStr] = $day['dailyReportStatus'];
+                    }
+                }
+            }
+
+            return $statuses === [
+                '2026-08-03' => 'draft',
+                '2026-08-04' => 'pending_confirmation',
+                '2026-08-05' => 'confirmed',
+            ];
+        });
     }
 }
