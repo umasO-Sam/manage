@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\CategoryCode;
 use App\Models\DailyReport;
+use App\Models\DailyReportEntry;
 use App\Models\LaborCost;
 use App\Models\OrderNumber;
 use Illuminate\Http\RedirectResponse;
@@ -61,6 +62,8 @@ class DailyReportController extends Controller
             'entries.*.is_other' => ['nullable', 'boolean'],
             'entries.*.free_text' => ['nullable', 'string', 'max:255'],
             'entries.*.is_break' => ['nullable', 'boolean'],
+            'entries.*.is_leave' => ['nullable', 'boolean'],
+            'entries.*.leave_type' => ['nullable', 'in:'.implode(',', array_keys(DailyReportEntry::LEAVE_TYPES))],
         ]);
 
         $isSubmit = $request->boolean('submit');
@@ -78,15 +81,18 @@ class DailyReportController extends Controller
                 }
 
                 $isOther = (bool) ($entry['is_other'] ?? false);
+                $isLeave = (bool) ($entry['is_leave'] ?? false);
 
                 $report->entries()->create([
                     'start_minute' => $entry['start_minute'],
                     'end_minute' => $entry['end_minute'],
-                    'order_no' => $entry['order_no'] ?? null,
-                    'category_id' => $isOther ? null : ($entry['category_id'] ?? null),
+                    'order_no' => $isLeave ? null : ($entry['order_no'] ?? null),
+                    'category_id' => ($isOther || $isLeave) ? null : ($entry['category_id'] ?? null),
                     'is_other' => $isOther,
                     'free_text' => $isOther ? ($entry['free_text'] ?? null) : null,
                     'is_break' => (bool) ($entry['is_break'] ?? false),
+                    'is_leave' => $isLeave,
+                    'leave_type' => $isLeave ? ($entry['leave_type'] ?? null) : null,
                 ]);
             }
 
@@ -105,15 +111,16 @@ class DailyReportController extends Controller
     }
 
     /**
-     * 休憩以外のエントリを(注番, 分類, その他フラグ, 自由記入)でグルーピングし、
+     * 休憩・休暇以外のエントリを(注番, 分類, その他フラグ, 自由記入)でグルーピングし、
      * 区間の合計分数を人工(時間+分)へ換算してLaborCostを再生成する。
      * 資材管理担当者の確認・確定待ちとして常にis_provisional=trueで作成する。
+     * 休暇は有給休暇取得の記録であり人工・原価集計の対象ではないため除外する。
      */
     private function syncLaborCosts(DailyReport $report): void
     {
         $groups = [];
 
-        foreach ($report->entries()->where('is_break', false)->get() as $entry) {
+        foreach ($report->entries()->where('is_break', false)->where('is_leave', false)->get() as $entry) {
             $key = implode('|', [
                 $entry->order_no ?? '',
                 $entry->is_other ? 'other' : (string) $entry->category_id,

@@ -98,6 +98,13 @@
                                 :style="selection.type === 'break' ? { backgroundColor: breakColor, borderColor: breakColor } : {}"
                                 :class="selection.type === 'break' ? 'text-slate-800 font-bold' : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'"
                                 class="text-xs font-semibold px-2.5 py-1.5 rounded-lg border transition-colors">休憩</button>
+                        <template x-for="lt in leaveTypes" :key="lt.value">
+                            <button type="button" @click="selectLeave(lt.value)"
+                                    :style="selection.type === 'leave' && selection.leaveType === lt.value ? { backgroundColor: leaveColor, borderColor: leaveColor } : {}"
+                                    :class="selection.type === 'leave' && selection.leaveType === lt.value ? 'text-slate-800 font-bold' : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'"
+                                    class="text-xs font-semibold px-2.5 py-1.5 rounded-lg border transition-colors"
+                                    x-text="lt.label"></button>
+                        </template>
                     </div>
 
                     <div x-show="selection.type === 'other'" x-cloak>
@@ -225,6 +232,8 @@
                         <input type="hidden" :name="`entries[${idx}][is_other]`" :value="entry.is_other ? 1 : 0">
                         <input type="hidden" :name="`entries[${idx}][free_text]`" :value="entry.free_text ?? ''">
                         <input type="hidden" :name="`entries[${idx}][is_break]`" :value="entry.is_break ? 1 : 0">
+                        <input type="hidden" :name="`entries[${idx}][is_leave]`" :value="entry.is_leave ? 1 : 0">
+                        <input type="hidden" :name="`entries[${idx}][leave_type]`" :value="entry.leave_type ?? ''">
                     </span>
                 </template>
 
@@ -266,7 +275,14 @@
                 categoryColors: {},
                 otherColor: '#fde68a',
                 breakColor: '#cbd5e1',
-                selection: { type: 'category', categoryId: null, freeText: '', orderNo: '' },
+                leaveColor: '#fecaca',
+                leaveTypes: [
+                    { value: 'full_day', label: '休暇（1日）' },
+                    { value: 'half_day_am', label: '休暇（午前）' },
+                    { value: 'half_day_pm', label: '休暇（午後）' },
+                    { value: 'hours', label: '休暇（2時間）' },
+                ],
+                selection: { type: 'category', categoryId: null, freeText: '', orderNo: '', leaveType: null },
 
                 init() {
                     if (this.entries.length === 0) {
@@ -308,6 +324,8 @@
                         is_other: false,
                         free_text: null,
                         is_break: true,
+                        is_leave: false,
+                        leave_type: null,
                     };
                 },
 
@@ -377,6 +395,16 @@
                     this.selection.type = 'break';
                 },
 
+                selectLeave(leaveType) {
+                    this.selection.type = 'leave';
+                    this.selection.leaveType = leaveType;
+                },
+
+                leaveLabel(leaveType) {
+                    const lt = this.leaveTypes.find((l) => l.value === leaveType);
+                    return lt ? lt.label : '休暇';
+                },
+
                 categoryLabel(id) {
                     const cat = this.categories.find((c) => c.id === id);
                     return cat ? cat.label : '未分類';
@@ -390,6 +418,7 @@
                 isSelectionValid() {
                     if (this.selection.type === 'category') return this.selection.categoryId !== null;
                     if (this.selection.type === 'other') return this.selection.freeText.trim() !== '';
+                    if (this.selection.type === 'leave') return this.selection.leaveType !== null;
                     return this.selection.type === 'break';
                 },
 
@@ -398,6 +427,7 @@
                     const orderPart = this.selection.orderNo ? this.selection.orderNo + '／' : '';
                     if (this.selection.type === 'category') return orderPart + this.categoryLabel(this.selection.categoryId);
                     if (this.selection.type === 'other') return orderPart + 'その他：' + this.selection.freeText;
+                    if (this.selection.type === 'leave') return this.leaveLabel(this.selection.leaveType);
                     return '休憩';
                 },
 
@@ -409,6 +439,7 @@
                 entryLabel(entry) {
                     if (!entry) return '';
                     if (entry.is_break) return '休憩';
+                    if (entry.is_leave) return this.leaveLabel(entry.leave_type);
                     const orderPart = entry.order_no ? entry.order_no + '／' : '';
                     if (entry.is_other) return orderPart + 'その他' + (entry.free_text ? '：' + entry.free_text : '');
                     return orderPart + this.categoryLabel(entry.category_id);
@@ -431,6 +462,7 @@
                 entryColor(entry) {
                     if (!entry) return '#ffffff';
                     if (entry.is_break) return this.breakColor;
+                    if (entry.is_leave) return this.leaveColor;
                     if (entry.is_other) return this.otherColor;
                     return this.categoryColors[entry.category_id] || '#a7f3d0';
                 },
@@ -620,11 +652,13 @@
                             id: this.nextId++,
                             start_minute: gapStart,
                             end_minute: gapEnd,
-                            order_no: this.selection.type === 'break' ? null : (this.selection.orderNo || null),
+                            order_no: (this.selection.type === 'break' || this.selection.type === 'leave') ? null : (this.selection.orderNo || null),
                             category_id: this.selection.type === 'category' ? this.selection.categoryId : null,
                             is_other: this.selection.type === 'other',
                             free_text: this.selection.type === 'other' ? this.selection.freeText : null,
                             is_break: this.selection.type === 'break',
+                            is_leave: this.selection.type === 'leave',
+                            leave_type: this.selection.type === 'leave' ? this.selection.leaveType : null,
                         });
                     });
                 },
@@ -644,6 +678,8 @@
                         is_other: false,
                         free_text: null,
                         is_break: false,
+                        is_leave: false,
+                        leave_type: null,
                     });
                 },
 
@@ -652,11 +688,13 @@
                 },
 
                 assignSelectionTo(entry) {
-                    entry.order_no = this.selection.type === 'break' ? null : (this.selection.orderNo || null);
+                    entry.order_no = (this.selection.type === 'break' || this.selection.type === 'leave') ? null : (this.selection.orderNo || null);
                     entry.category_id = this.selection.type === 'category' ? this.selection.categoryId : null;
                     entry.is_other = this.selection.type === 'other';
                     entry.free_text = this.selection.type === 'other' ? this.selection.freeText : null;
                     entry.is_break = this.selection.type === 'break';
+                    entry.is_leave = this.selection.type === 'leave';
+                    entry.leave_type = this.selection.type === 'leave' ? this.selection.leaveType : null;
                 },
 
                 // 時刻未入力の行はまだ重なり判定ができないので、そのまま選択中の内容を
