@@ -6,6 +6,7 @@ use App\Http\Controllers\CardController;
 use App\Http\Controllers\CostAnalysisController;
 use App\Http\Controllers\CostReportController;
 use App\Http\Controllers\DailyReportController;
+use App\Http\Controllers\DailyReportListController;
 use App\Http\Controllers\DailyReportReviewController;
 use App\Http\Controllers\EstimateAssistController;
 use App\Http\Controllers\HolidayController;
@@ -44,6 +45,7 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/daily-reports', [DailyReportController::class, 'show'])->name('daily-reports.show');
     Route::post('/daily-reports', [DailyReportController::class, 'store'])->name('daily-reports.store');
+    Route::get('/daily-reports/list', [DailyReportListController::class, 'index'])->name('daily-reports.list.index');
 
     Route::get('/my-calendar', [PersonalCalendarController::class, 'show'])->name('my-calendar.show');
 

@@ -76,6 +76,9 @@
                                 <x-dropdown-link :href="route('daily-reports.show')">
                                     <i data-lucide="clipboard-list" class="w-3.5 h-3.5 inline-block align-text-bottom mr-1"></i> 作業日報
                                 </x-dropdown-link>
+                                <x-dropdown-link :href="route('daily-reports.list.index')">
+                                    <i data-lucide="list-checks" class="w-3.5 h-3.5 inline-block align-text-bottom mr-1"></i> 作業日報一覧
+                                </x-dropdown-link>
                                 <x-dropdown-link :href="route('leave-requests.index')">
                                     <i data-lucide="calendar-check" class="w-3.5 h-3.5 inline-block align-text-bottom mr-1"></i> 休暇・休出申請
                                 </x-dropdown-link>
@@ -158,6 +161,9 @@
                             </x-dropdown-link>
                             <x-dropdown-link :href="route('daily-reports.show')">
                                 <i data-lucide="clipboard-list" class="w-3.5 h-3.5 inline-block align-text-bottom mr-1"></i> 作業日報
+                            </x-dropdown-link>
+                            <x-dropdown-link :href="route('daily-reports.list.index')">
+                                <i data-lucide="list-checks" class="w-3.5 h-3.5 inline-block align-text-bottom mr-1"></i> 作業日報一覧
                             </x-dropdown-link>
                             @if (Auth::user()->is_procurement_manager)
                                 <x-dropdown-link :href="route('daily-reports.review.index')">
@@ -341,6 +347,9 @@
                 <a href="{{ route('daily-reports.show') }}" class="block px-3 py-2 rounded-lg text-sm font-medium {{ request()->routeIs('daily-reports.show') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
                     作業日報
                 </a>
+                <a href="{{ route('daily-reports.list.index') }}" class="block px-3 py-2 rounded-lg text-sm font-medium {{ request()->routeIs('daily-reports.list.*') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
+                    作業日報一覧
+                </a>
                 <a href="{{ route('leave-requests.index') }}" class="block px-3 py-2 rounded-lg text-sm font-medium {{ request()->routeIs('leave-requests.index') || request()->routeIs('leave-requests.create') || request()->routeIs('leave-requests.show') || request()->routeIs('leave-requests.withdraw') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
                     休暇・休出申請
                 </a>
@@ -386,6 +395,9 @@
             </a>
             <a href="{{ route('daily-reports.show') }}" class="block px-3 py-2 rounded-lg text-sm font-medium {{ request()->routeIs('daily-reports.show') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
                 作業日報
+            </a>
+            <a href="{{ route('daily-reports.list.index') }}" class="block px-3 py-2 rounded-lg text-sm font-medium {{ request()->routeIs('daily-reports.list.*') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
+                作業日報一覧
             </a>
             @if (Auth::user()->is_procurement_manager)
                 <a href="{{ route('daily-reports.review.index') }}" class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium {{ request()->routeIs('daily-reports.review.*') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">

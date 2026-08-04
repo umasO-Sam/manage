@@ -86,8 +86,8 @@
                             ])) }},
                             categories: {{ \Illuminate\Support\Js::from($categories) }},
                          })">
-                        <div class="overflow-x-auto">
-                            <div :style="{ minWidth: gridWidthPx() + 'px' }">
+                        <div class="overflow-x-auto" x-ref="scrollWrap">
+                            <div :style="{ width: gridWidthPx() + 'px' }">
                                 <div class="relative h-4 mb-1 text-[10px] text-slate-400 font-mono select-none">
                                     <template x-for="t in axisTicks()" :key="'tick-' + t.at">
                                         <span class="absolute -translate-x-1/2 whitespace-nowrap" :style="{ left: tickPercent(t.at) + '%' }" x-text="t.label"></span>
@@ -123,9 +123,13 @@
                 entries: config.entries,
                 categories: config.categories,
                 categoryColors: {},
+                // 表示領域には常に7:00〜20:00が収まるようにし、それより前後の作業は
+                // 横スクロールしないと見えないようにする(初期スクロール位置は7:00に合わせる)。
+                baseStart: 7 * 60,
+                baseEnd: 20 * 60,
                 gridStart: 0,
                 gridEnd: 24 * 60,
-                pxPerMinute: 6,
+                pxPerMinute: 4,
                 // 始業・休憩・終業の正確な境界時刻。目盛りに必ず表示し、10:10や15:10のような
                 // 半端な時刻も読み取れるようにする。10分間の休憩(10:00-10:10、15:00-15:10)は
                 // 隣接する2つの目盛りが近すぎて重なるため、1つのラベルに短縮してまとめる。
@@ -146,10 +150,20 @@
 
                     const starts = this.entries.map((e) => e.start_minute);
                     const ends = this.entries.map((e) => e.end_minute);
-                    const minStart = starts.length ? Math.min(...starts) : 8 * 60;
-                    const maxEnd = ends.length ? Math.max(...ends) : 18 * 60;
-                    this.gridStart = Math.max(0, Math.floor(minStart / 60) * 60 - 60);
-                    this.gridEnd = Math.min(24 * 60, Math.ceil(maxEnd / 60) * 60 + 60);
+                    const minStart = starts.length ? Math.min(...starts) : this.baseStart;
+                    const maxEnd = ends.length ? Math.max(...ends) : this.baseEnd;
+                    // 7:00〜20:00は常に含め、それより早い/遅い作業がある場合だけ範囲を広げる。
+                    this.gridStart = Math.max(0, Math.min(this.baseStart, Math.floor(minStart / 60) * 60 - 60));
+                    this.gridEnd = Math.min(24 * 60, Math.max(this.baseEnd, Math.ceil(maxEnd / 60) * 60 + 60));
+
+                    // 表示領域の実測幅から「7:00〜20:00がちょうど収まる」px/分を求め、
+                    // それ以外の時間帯は同じ比率で伸びた分だけ横スクロールで見る形にする。
+                    this.$nextTick(() => {
+                        const wrap = this.$refs.scrollWrap;
+                        if (!wrap || wrap.clientWidth === 0) return;
+                        this.pxPerMinute = wrap.clientWidth / (this.baseEnd - this.baseStart);
+                        wrap.scrollLeft = (this.baseStart - this.gridStart) * this.pxPerMinute;
+                    });
                 },
 
                 // 1時間おきの目盛りに加えて、休憩・始業・終業などの正確な境界時刻を必ず含める。
@@ -173,9 +187,9 @@
                     return ((t - this.gridStart) / (this.gridEnd - this.gridStart)) * 100;
                 },
 
-                // 横スクロールできるよう、時間範囲に応じた最小幅(px)を確保する。
+                // 7:00〜20:00がちょうど表示領域に収まる比率(pxPerMinute)で、範囲全体の幅を求める。
                 gridWidthPx() {
-                    return Math.max(600, (this.gridEnd - this.gridStart) * this.pxPerMinute);
+                    return (this.gridEnd - this.gridStart) * this.pxPerMinute;
                 },
 
                 // 10分ごとに薄い補助線、1時間ごとにやや濃い線を重ねて表示する。
