@@ -6,6 +6,7 @@ use App\Http\Controllers\CardController;
 use App\Http\Controllers\CostAnalysisController;
 use App\Http\Controllers\CostReportController;
 use App\Http\Controllers\DailyReportController;
+use App\Http\Controllers\DailyReportReviewController;
 use App\Http\Controllers\EstimateAssistController;
 use App\Http\Controllers\HolidayController;
 use App\Http\Controllers\LaborCostController;
@@ -82,6 +83,9 @@ Route::middleware('auth')->group(function () {
         Route::post('/order-numbers', [OrderNumberController::class, 'store'])->name('order-numbers.store');
         Route::put('/order-numbers/{orderNumber}', [OrderNumberController::class, 'update'])->name('order-numbers.update');
         Route::delete('/order-numbers/{orderNumber}', [OrderNumberController::class, 'destroy'])->name('order-numbers.destroy');
+
+        Route::get('/daily-reports/review', [DailyReportReviewController::class, 'index'])->name('daily-reports.review.index');
+        Route::post('/daily-reports/review/{dailyReport}/confirm', [DailyReportReviewController::class, 'confirm'])->name('daily-reports.review.confirm');
 
         Route::get('/holidays', [HolidayController::class, 'index'])->name('holidays.index');
         Route::get('/holidays/calendar', [HolidayController::class, 'calendar'])->name('holidays.calendar');

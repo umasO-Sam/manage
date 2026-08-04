@@ -19,6 +19,7 @@
                         $calendarActive = request()->routeIs('my-calendar.*') || request()->routeIs('daily-reports.*')
                             || request()->routeIs('leave-requests.*') || request()->routeIs('work-status.*') || request()->routeIs('holidays.*');
                         $systemActive = request()->routeIs('staff.*') || request()->routeIs('order-numbers.*');
+                        $calendarPending = $pendingApprovalsCount + $pendingDailyReportReviewCount;
                     @endphp
 
                     {{-- 調達ボード --}}
@@ -58,6 +59,11 @@
                             <button class="px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors {{ $calendarActive ? 'bg-slate-200 text-slate-800' : 'text-slate-600 hover:bg-slate-50' }}">
                                 <i data-lucide="calendar-days" class="w-4 h-4"></i>
                                 <span>カレンダー</span>
+                                @if ($calendarPending > 0)
+                                    <span class="inline-flex items-center justify-center min-w-[1.125rem] h-[1.125rem] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold leading-none">
+                                        {{ $calendarPending }}
+                                    </span>
+                                @endif
                                 <i data-lucide="chevron-down" class="w-3.5 h-3.5"></i>
                             </button>
                         </x-slot>
@@ -68,9 +74,29 @@
                             <x-dropdown-link :href="route('daily-reports.show')">
                                 <i data-lucide="clipboard-list" class="w-3.5 h-3.5 inline-block align-text-bottom mr-1"></i> 作業日報
                             </x-dropdown-link>
+                            @if (Auth::user()->is_procurement_manager)
+                                <x-dropdown-link :href="route('daily-reports.review.index')">
+                                    <i data-lucide="clipboard-check" class="w-3.5 h-3.5 inline-block align-text-bottom mr-1"></i> 作業日報確認
+                                    @if ($pendingDailyReportReviewCount > 0)
+                                        <span class="inline-flex items-center justify-center min-w-[1.125rem] h-[1.125rem] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold leading-none align-text-bottom">
+                                            {{ $pendingDailyReportReviewCount }}
+                                        </span>
+                                    @endif
+                                </x-dropdown-link>
+                            @endif
                             <x-dropdown-link :href="route('leave-requests.index')">
                                 <i data-lucide="calendar-check" class="w-3.5 h-3.5 inline-block align-text-bottom mr-1"></i> 休暇・休出申請
                             </x-dropdown-link>
+                            @if (Auth::user()->is_supervisor)
+                                <x-dropdown-link :href="route('leave-requests.approvals')">
+                                    <i data-lucide="check-check" class="w-3.5 h-3.5 inline-block align-text-bottom mr-1"></i> 申請承認
+                                    @if ($pendingApprovalsCount > 0)
+                                        <span class="inline-flex items-center justify-center min-w-[1.125rem] h-[1.125rem] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold leading-none align-text-bottom">
+                                            {{ $pendingApprovalsCount }}
+                                        </span>
+                                    @endif
+                                </x-dropdown-link>
+                            @endif
                             <x-dropdown-link :href="route('work-status.index')">
                                 <i data-lucide="users-round" class="w-3.5 h-3.5 inline-block align-text-bottom mr-1"></i> 勤務状況一覧
                             </x-dropdown-link>
@@ -212,12 +238,32 @@
             <a href="{{ route('my-calendar.show') }}" class="block px-3 py-2 rounded-lg text-sm font-medium {{ request()->routeIs('my-calendar.*') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
                 個人カレンダー
             </a>
-            <a href="{{ route('daily-reports.show') }}" class="block px-3 py-2 rounded-lg text-sm font-medium {{ request()->routeIs('daily-reports.*') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
+            <a href="{{ route('daily-reports.show') }}" class="block px-3 py-2 rounded-lg text-sm font-medium {{ request()->routeIs('daily-reports.show') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
                 作業日報
             </a>
-            <a href="{{ route('leave-requests.index') }}" class="block px-3 py-2 rounded-lg text-sm font-medium {{ request()->routeIs('leave-requests.*') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
+            @if (Auth::user()->is_procurement_manager)
+                <a href="{{ route('daily-reports.review.index') }}" class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium {{ request()->routeIs('daily-reports.review.*') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
+                    <span>作業日報確認</span>
+                    @if ($pendingDailyReportReviewCount > 0)
+                        <span class="inline-flex items-center justify-center min-w-[1.125rem] h-[1.125rem] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold leading-none">
+                            {{ $pendingDailyReportReviewCount }}
+                        </span>
+                    @endif
+                </a>
+            @endif
+            <a href="{{ route('leave-requests.index') }}" class="block px-3 py-2 rounded-lg text-sm font-medium {{ request()->routeIs('leave-requests.index') || request()->routeIs('leave-requests.create') || request()->routeIs('leave-requests.show') || request()->routeIs('leave-requests.withdraw') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
                 休暇・休出申請
             </a>
+            @if (Auth::user()->is_supervisor)
+                <a href="{{ route('leave-requests.approvals') }}" class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium {{ request()->routeIs('leave-requests.approvals') || request()->routeIs('leave-requests.decide') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
+                    <span>申請承認</span>
+                    @if ($pendingApprovalsCount > 0)
+                        <span class="inline-flex items-center justify-center min-w-[1.125rem] h-[1.125rem] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold leading-none">
+                            {{ $pendingApprovalsCount }}
+                        </span>
+                    @endif
+                </a>
+            @endif
             <a href="{{ route('work-status.index') }}" class="block px-3 py-2 rounded-lg text-sm font-medium {{ request()->routeIs('work-status.*') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
                 勤務状況一覧
             </a>

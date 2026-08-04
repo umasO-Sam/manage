@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Models\LaborCost;
 use App\Models\Staff;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
@@ -33,6 +34,10 @@ class AppServiceProvider extends ServiceProvider
             $staff = auth()->user();
 
             $view->with('unreadCardCountsByWorkflow', $staff?->unreadCardCountsByWorkflow() ?? []);
+            $view->with('pendingApprovalsCount', $staff?->pendingApprovalsCount() ?? 0);
+            $view->with('pendingDailyReportReviewCount', $staff?->is_procurement_manager
+                ? LaborCost::where('is_provisional', true)->whereNotNull('daily_report_id')->distinct('daily_report_id')->count('daily_report_id')
+                : 0);
         });
     }
 }

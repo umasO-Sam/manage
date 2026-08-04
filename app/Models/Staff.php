@@ -79,6 +79,16 @@ class Staff extends Authenticatable
     }
 
     /**
+     * 自分が承認者に指定されている承認待ちの休暇・勤務申請数(ナビゲーションのバッジ表示用)。
+     */
+    public function pendingApprovalsCount(): int
+    {
+        return LeaveRequest::where('approver_id', $this->id)
+            ->where('status', LeaveRequest::STATUS_PENDING)
+            ->count();
+    }
+
+    /**
      * 有給休暇の残日数(前年度繰越分・当年度付与分の2バケツ管理)。
      * 承認済みの有給休暇申請の消化分を、前年度繰越分から優先して差し引く
      * (繰越分は失効が近いため先に使い切る想定)。
