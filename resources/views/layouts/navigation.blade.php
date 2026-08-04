@@ -35,6 +35,11 @@
                         <i data-lucide="clipboard-list" class="w-4 h-4"></i>
                         <span>作業日報</span>
                     </a>
+                    <a href="{{ route('leave-requests.index') }}"
+                       class="px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors {{ request()->routeIs('leave-requests.*') ? 'bg-slate-200 text-slate-800' : 'text-slate-600 hover:bg-slate-50' }}">
+                        <i data-lucide="calendar-check" class="w-4 h-4"></i>
+                        <span>休暇・勤務申請</span>
+                    </a>
                     @if (Auth::user()->canAccessPurchasing())
                         <x-dropdown align="left" width="56">
                             <x-slot name="trigger">
@@ -151,6 +156,9 @@
             </a>
             <a href="{{ route('daily-reports.show') }}" class="block px-3 py-2 rounded-lg text-sm font-medium {{ request()->routeIs('daily-reports.*') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
                 作業日報
+            </a>
+            <a href="{{ route('leave-requests.index') }}" class="block px-3 py-2 rounded-lg text-sm font-medium {{ request()->routeIs('leave-requests.*') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
+                休暇・勤務申請
             </a>
             @if (Auth::user()->canAccessPurchasing())
                 <div class="px-3 py-2 text-xs font-bold text-slate-400 uppercase tracking-wider">仕入管理</div>

@@ -8,6 +8,7 @@ use App\Http\Controllers\CostReportController;
 use App\Http\Controllers\DailyReportController;
 use App\Http\Controllers\EstimateAssistController;
 use App\Http\Controllers\LaborCostController;
+use App\Http\Controllers\LeaveRequestController;
 use App\Http\Controllers\OrderNumberController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\PurchaseDetailController;
@@ -38,6 +39,14 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/daily-reports', [DailyReportController::class, 'show'])->name('daily-reports.show');
     Route::post('/daily-reports', [DailyReportController::class, 'store'])->name('daily-reports.store');
+
+    Route::get('/leave-requests', [LeaveRequestController::class, 'index'])->name('leave-requests.index');
+    Route::get('/leave-requests/create', [LeaveRequestController::class, 'create'])->name('leave-requests.create');
+    Route::post('/leave-requests', [LeaveRequestController::class, 'store'])->name('leave-requests.store');
+    Route::get('/leave-requests/approvals', [LeaveRequestController::class, 'approvals'])->name('leave-requests.approvals');
+    Route::get('/leave-requests/{leaveRequest}', [LeaveRequestController::class, 'show'])->name('leave-requests.show');
+    Route::put('/leave-requests/{leaveRequest}/decide', [LeaveRequestController::class, 'decide'])->name('leave-requests.decide');
+    Route::delete('/leave-requests/{leaveRequest}', [LeaveRequestController::class, 'withdraw'])->name('leave-requests.withdraw');
 
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
