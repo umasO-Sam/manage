@@ -41,7 +41,7 @@
                             <button type="button" @click="type = 'paid_leave'"
                                     :class="type === 'paid_leave' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'"
                                     class="text-xs font-semibold px-2.5 py-1.5 rounded-lg border transition-colors">有給休暇</button>
-                            <select x-model="type"
+                            <select :value="otherLeaveTypes.includes(type) ? type : ''" @change="type = $event.target.value"
                                     :class="otherLeaveTypes.includes(type) ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'"
                                     class="text-xs font-semibold px-2.5 py-1.5 rounded-lg border transition-colors">
                                 <option value="" disabled>その他休暇 ▾</option>
