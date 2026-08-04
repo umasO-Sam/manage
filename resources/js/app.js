@@ -194,6 +194,14 @@ document.addEventListener('DOMContentLoaded', () => createIcons({ icons }));
  * preventDefault()された状態でdocumentまでバブリングしてくる（実際には送信されない）。
  * defaultPreventedを見ずに無効化すると、キャンセルしただけでボタンが操作不能のまま
  * 固まってしまうため、ここで除外する。
+ *
+ * 実際にクリックされたボタン(event.submitter)は、このイベントハンドラの中で
+ * 同期的にdisabledにしてしまうと、ブラウザがフォームデータを組み立てる時点で
+ * そのボタン自身のname/valueが送信対象から除外されてしまう(disabled要素はフォーム
+ * 送信に含まれないため)。休暇・勤務申請の承認/却下のように、複数の送信ボタンを
+ * 同じname(例: action)で区別している画面で「操作を入力してください」という
+ * 検証エラーになる不具合の原因だったため、クリックされたボタンだけは次のtickまで
+ * 無効化を遅らせ、送信データの組み立てに影響しないようにする。
  */
 document.addEventListener('submit', (event) => {
     const form = event.target;
@@ -201,11 +209,20 @@ document.addEventListener('submit', (event) => {
         return;
     }
 
-    form.querySelectorAll('button[type="submit"]').forEach((button) => {
+    const disable = (button) => {
         if (button.disabled) return;
         button.disabled = true;
         button.classList.add('opacity-60', 'cursor-not-allowed');
+    };
+
+    form.querySelectorAll('button[type="submit"]').forEach((button) => {
+        if (button === event.submitter) return;
+        disable(button);
     });
+
+    if (event.submitter) {
+        setTimeout(() => disable(event.submitter), 0);
+    }
 });
 
 /**
