@@ -4,14 +4,14 @@
     <meta charset="UTF-8">
     <title>{{ $year }} 休日表</title>
     <style>
-        @page { size: A4 landscape; margin: 8mm; }
+        @page { size: A4 portrait; margin: 8mm; }
         * { -webkit-print-color-adjust: exact; print-color-adjust: exact; box-sizing: border-box; }
         body { font-family: "Yu Gothic", "Meiryo", sans-serif; color: #1e293b; margin: 0; }
-        .page { width: 297mm; padding: 8mm; margin: 0 auto; }
+        .page { width: 210mm; padding: 8mm; margin: 0 auto; }
         .sheet-title { text-align: center; margin-bottom: 1.8mm; }
         .sheet-title .title-text { font-size: 14pt; font-weight: bold; letter-spacing: 4px; padding-bottom: 0.5mm; border-bottom: 1.2pt solid #1e293b; }
         .sheet-title .logo { font-size: 8pt; font-weight: normal; letter-spacing: 0; margin-left: 10px; color: #475569; }
-        .months-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5mm 5mm; }
+        .months-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.5mm 5mm; }
         .month-block { page-break-inside: avoid; }
         .month-heading { font-weight: bold; font-size: 7.5pt; margin-bottom: 0.3mm; color: #1e293b; }
         table.month-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
