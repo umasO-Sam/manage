@@ -18,10 +18,14 @@ use Illuminate\View\View;
  */
 class HolidayController extends Controller
 {
-    public function index(): View
+    public function index(Request $request): View
     {
+        $year = (int) $request->query('year', $this->currentFiscalYear());
+
         return view('holidays.index', [
             'holidays' => Holiday::orderBy('date')->get(),
+            'year' => $year,
+            'stats' => $this->fiscalYearStats($year),
         ]);
     }
 
@@ -53,33 +57,12 @@ class HolidayController extends Controller
             $cursor->addMonth();
         }
 
-        $fiscalStart = Carbon::create($year, 4, 21);
-        $fiscalEnd = Carbon::create($year + 1, 4, 20);
-
-        $daysOffCount = 0;
-        for ($d = $fiscalStart->copy(); $d->lte($fiscalEnd); $d->addDay()) {
-            $holiday = $holidaysByDate->get($d->format('Y-m-d'));
-            $isWeekend = in_array($d->dayOfWeek, [Carbon::SATURDAY, Carbon::SUNDAY], true);
-            $isHoliday = $holiday && in_array($holiday->type, [Holiday::TYPE_PUBLIC_HOLIDAY, Holiday::TYPE_COMPANY_HOLIDAY], true);
-            if ($isWeekend || $isHoliday) {
-                $daysOffCount++;
-            }
-        }
-
-        $recommendedCount = $holidaysByDate->filter(
-            fn (Holiday $h) => $h->type === Holiday::TYPE_RECOMMENDED_PAID_LEAVE
-                && $h->date->betweenIncluded($fiscalStart, $fiscalEnd)
-        )->count();
+        $stats = $this->fiscalYearStats($year);
 
         return view('holidays.calendar', [
             'year' => $year,
             'months' => $months,
-            'fiscalStart' => $fiscalStart,
-            'fiscalEnd' => $fiscalEnd,
-            'daysOffCount' => $daysOffCount,
-            'daysOffTarget' => 120,
-            'recommendedCount' => $recommendedCount,
-            'recommendedTarget' => 5,
+            'stats' => $stats,
         ]);
     }
 
@@ -89,6 +72,62 @@ class HolidayController extends Controller
         $boundary = Carbon::create($today->year, 4, 21);
 
         return $today->gte($boundary) ? $today->year : $today->year - 1;
+    }
+
+    /**
+     * 年度(4/21〜翌年4/20)単位で、年間休日日数の内訳(土日・祝日・会社休日、
+     * いずれも重複日はどれか1区分にのみ計上)と、有給休暇取得推奨日の設定日数を集計する。
+     *
+     * @return array{
+     *     fiscalStart: Carbon, fiscalEnd: Carbon,
+     *     weekendCount: int, publicHolidayCount: int, companyHolidayCount: int,
+     *     totalDaysOff: int, daysOffTarget: int,
+     *     recommendedCount: int, recommendedTarget: int,
+     * }
+     */
+    private function fiscalYearStats(int $year): array
+    {
+        $fiscalStart = Carbon::create($year, 4, 21);
+        $fiscalEnd = Carbon::create($year + 1, 4, 20);
+
+        $holidaysByDate = Holiday::whereBetween('date', [$fiscalStart->toDateString(), $fiscalEnd->toDateString()])
+            ->get()
+            ->keyBy(fn (Holiday $h) => $h->date->format('Y-m-d'));
+
+        $weekendCount = 0;
+        $publicHolidayCount = 0;
+        $companyHolidayCount = 0;
+
+        for ($d = $fiscalStart->copy(); $d->lte($fiscalEnd); $d->addDay()) {
+            if (in_array($d->dayOfWeek, [Carbon::SATURDAY, Carbon::SUNDAY], true)) {
+                $weekendCount++;
+
+                continue;
+            }
+
+            $holiday = $holidaysByDate->get($d->format('Y-m-d'));
+            if ($holiday?->type === Holiday::TYPE_PUBLIC_HOLIDAY) {
+                $publicHolidayCount++;
+            } elseif ($holiday?->type === Holiday::TYPE_COMPANY_HOLIDAY) {
+                $companyHolidayCount++;
+            }
+        }
+
+        $recommendedCount = $holidaysByDate->filter(
+            fn (Holiday $h) => $h->type === Holiday::TYPE_RECOMMENDED_PAID_LEAVE
+        )->count();
+
+        return [
+            'fiscalStart' => $fiscalStart,
+            'fiscalEnd' => $fiscalEnd,
+            'weekendCount' => $weekendCount,
+            'publicHolidayCount' => $publicHolidayCount,
+            'companyHolidayCount' => $companyHolidayCount,
+            'totalDaysOff' => $weekendCount + $publicHolidayCount + $companyHolidayCount,
+            'daysOffTarget' => 120,
+            'recommendedCount' => $recommendedCount,
+            'recommendedTarget' => 5,
+        ];
     }
 
     /**

@@ -41,6 +41,8 @@
                 </div>
             @endif
 
+            @include('holidays.partials.stats-panel', ['year' => $year, 'stats' => $stats])
+
             <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
                 <table class="w-full text-left border-collapse">
                     <thead>

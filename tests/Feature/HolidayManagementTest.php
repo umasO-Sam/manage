@@ -123,8 +123,8 @@ class HolidayManagementTest extends TestCase
 
         $response->assertOk();
         $response->assertSee('2026', false);
-        $response->assertViewHas('fiscalStart', fn ($date) => $date->format('Y-m-d') === '2026-04-21');
-        $response->assertViewHas('fiscalEnd', fn ($date) => $date->format('Y-m-d') === '2027-04-20');
+        $response->assertViewHas('stats', fn ($stats) => $stats['fiscalStart']->format('Y-m-d') === '2026-04-21'
+            && $stats['fiscalEnd']->format('Y-m-d') === '2027-04-20');
     }
 
     public function test_weekday_company_holiday_increases_the_days_off_count(): void
@@ -133,13 +133,13 @@ class HolidayManagementTest extends TestCase
 
         $baseline = $this->actingAs($manager)
             ->get(route('holidays.calendar', ['year' => 2026]))
-            ->viewData('daysOffCount');
+            ->viewData('stats')['totalDaysOff'];
 
         Holiday::create(['date' => '2026-08-13', 'name' => '夏季休暇', 'type' => Holiday::TYPE_COMPANY_HOLIDAY]); // 木曜日
 
         $withHoliday = $this->actingAs($manager)
             ->get(route('holidays.calendar', ['year' => 2026]))
-            ->viewData('daysOffCount');
+            ->viewData('stats')['totalDaysOff'];
 
         $this->assertSame($baseline + 1, $withHoliday);
     }
@@ -150,13 +150,13 @@ class HolidayManagementTest extends TestCase
 
         $baseline = $this->actingAs($manager)
             ->get(route('holidays.calendar', ['year' => 2026]))
-            ->viewData('daysOffCount');
+            ->viewData('stats')['totalDaysOff'];
 
         Holiday::create(['date' => '2026-08-15', 'name' => '休日', 'type' => Holiday::TYPE_COMPANY_HOLIDAY]); // 土曜日
 
         $withHoliday = $this->actingAs($manager)
             ->get(route('holidays.calendar', ['year' => 2026]))
-            ->viewData('daysOffCount');
+            ->viewData('stats')['totalDaysOff'];
 
         $this->assertSame($baseline, $withHoliday);
     }
@@ -170,6 +170,26 @@ class HolidayManagementTest extends TestCase
 
         $response = $this->actingAs($manager)->get(route('holidays.calendar', ['year' => 2026]));
 
-        $response->assertViewHas('recommendedCount', 1);
+        $response->assertViewHas('stats', fn ($stats) => $stats['recommendedCount'] === 1);
+    }
+
+    public function test_index_shows_the_fiscal_year_breakdown(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+
+        Holiday::create(['date' => '2026-08-13', 'name' => '夏季休暇', 'type' => Holiday::TYPE_COMPANY_HOLIDAY]); // 木曜日
+        Holiday::create(['date' => '2026-01-01', 'name' => '元日', 'type' => Holiday::TYPE_PUBLIC_HOLIDAY]); // 木曜日、範囲外(前年度分)
+        Holiday::create(['date' => '2026-05-01', 'name' => '推奨日', 'type' => Holiday::TYPE_RECOMMENDED_PAID_LEAVE]);
+
+        $response = $this->actingAs($manager)->get(route('holidays.index', ['year' => 2026]));
+
+        $response->assertOk();
+        $response->assertViewHas('stats', function ($stats) {
+            return $stats['companyHolidayCount'] === 1
+                && $stats['publicHolidayCount'] === 0
+                && $stats['recommendedCount'] === 1;
+        });
+        $response->assertSee('土日小計');
+        $response->assertSee('会社休日小計');
     }
 }

@@ -32,30 +32,39 @@
     <div class="page">
         <div class="no-print" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
             <div style="display: flex; gap: 8px; align-items: center;">
-                <a href="{{ route('holidays.calendar', ['year' => $year - 1]) }}" class="text-sm font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg">← {{ $year - 1 }}年度</a>
-                <span class="text-sm font-bold text-slate-800">{{ $year }}年度({{ $fiscalStart->format('Y/m/d') }}〜{{ $fiscalEnd->format('Y/m/d') }})</span>
-                <a href="{{ route('holidays.calendar', ['year' => $year + 1]) }}" class="text-sm font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg">{{ $year + 1 }}年度 →</a>
-                <a href="{{ route('holidays.index') }}" class="text-sm font-semibold text-blue-700 hover:text-blue-900 ml-2">休日マスタへ戻る</a>
+                <a href="{{ route('holidays.calendar', ['year' => $year - 1]) }}" style="font-size: 13px; font-weight: 600; color: #475569; background: #f1f5f9; padding: 6px 12px; border-radius: 8px; text-decoration: none;">← {{ $year - 1 }}年度</a>
+                <span style="font-size: 13px; font-weight: bold; color: #1e293b;">{{ $year }}年度({{ $stats['fiscalStart']->format('Y/m/d') }}〜{{ $stats['fiscalEnd']->format('Y/m/d') }})</span>
+                <a href="{{ route('holidays.calendar', ['year' => $year + 1]) }}" style="font-size: 13px; font-weight: 600; color: #475569; background: #f1f5f9; padding: 6px 12px; border-radius: 8px; text-decoration: none;">{{ $year + 1 }}年度 →</a>
+                <a href="{{ route('holidays.index') }}" style="font-size: 13px; font-weight: 600; color: #1d4ed8; margin-left: 8px;">休日マスタへ戻る</a>
             </div>
             <button onclick="window.print()" style="padding: 10px 20px; font-size: 16px; cursor: pointer;">このページを印刷・PDF保存</button>
         </div>
 
+        @php
+            $totalOk = $stats['totalDaysOff'] >= $stats['daysOffTarget'];
+            $recommendedOk = $stats['recommendedCount'] >= $stats['recommendedTarget'];
+        @endphp
         <div class="no-print" style="display: flex; gap: 16px; margin-bottom: 12px;">
-            <div style="flex: 1; padding: 12px 16px; border-radius: 12px; border: 1px solid {{ $daysOffCount >= $daysOffTarget ? '#a7f3d0' : '#fecaca' }}; background: {{ $daysOffCount >= $daysOffTarget ? '#ecfdf5' : '#fef2f2' }};">
-                <div style="font-size: 11px; color: #64748b;">年間休日日数(土日＋祝日・会社休日) / 目標{{ $daysOffTarget }}日</div>
-                <div style="font-size: 20px; font-weight: bold; color: {{ $daysOffCount >= $daysOffTarget ? '#059669' : '#dc2626' }};">
-                    {{ $daysOffCount }}日
+            <div style="flex: 1; padding: 12px 16px; border-radius: 12px; border: 1px solid {{ $totalOk ? '#a7f3d0' : '#fecaca' }}; background: {{ $totalOk ? '#ecfdf5' : '#fef2f2' }};">
+                <div style="font-size: 11px; color: #64748b;">年間休日数 / 目標{{ $stats['daysOffTarget'] }}日</div>
+                <div style="font-size: 20px; font-weight: bold; color: {{ $totalOk ? '#059669' : '#dc2626' }};">
+                    {{ $stats['totalDaysOff'] }}日
                     <span style="font-size: 12px; font-weight: normal;">
-                        ({{ $daysOffCount >= $daysOffTarget ? '目標達成 +' . ($daysOffCount - $daysOffTarget) : '目標まで残り ' . ($daysOffTarget - $daysOffCount) }}日)
+                        ({{ $totalOk ? '目標達成 +' . ($stats['totalDaysOff'] - $stats['daysOffTarget']) : '目標まで残り ' . ($stats['daysOffTarget'] - $stats['totalDaysOff']) }}日)
                     </span>
                 </div>
+                <div style="font-size: 11px; color: #475569; margin-top: 4px;">
+                    土日小計: <strong>{{ $stats['weekendCount'] }}日</strong> ／
+                    祝日小計: <strong>{{ $stats['publicHolidayCount'] }}日</strong> ／
+                    会社休日小計: <strong>{{ $stats['companyHolidayCount'] }}日</strong>
+                </div>
             </div>
-            <div style="flex: 1; padding: 12px 16px; border-radius: 12px; border: 1px solid {{ $recommendedCount >= $recommendedTarget ? '#a7f3d0' : '#fecaca' }}; background: {{ $recommendedCount >= $recommendedTarget ? '#ecfdf5' : '#fef2f2' }};">
-                <div style="font-size: 11px; color: #64748b;">有給休暇取得推奨日の設定日数 / 目標{{ $recommendedTarget }}日</div>
-                <div style="font-size: 20px; font-weight: bold; color: {{ $recommendedCount >= $recommendedTarget ? '#059669' : '#dc2626' }};">
-                    {{ $recommendedCount }}日
+            <div style="flex: 1; padding: 12px 16px; border-radius: 12px; border: 1px solid {{ $recommendedOk ? '#a7f3d0' : '#fecaca' }}; background: {{ $recommendedOk ? '#ecfdf5' : '#fef2f2' }};">
+                <div style="font-size: 11px; color: #64748b;">有給休暇取得推奨日小計 / 目標{{ $stats['recommendedTarget'] }}日</div>
+                <div style="font-size: 20px; font-weight: bold; color: {{ $recommendedOk ? '#059669' : '#dc2626' }};">
+                    {{ $stats['recommendedCount'] }}日
                     <span style="font-size: 12px; font-weight: normal;">
-                        ({{ $recommendedCount >= $recommendedTarget ? '目標達成 +' . ($recommendedCount - $recommendedTarget) : '目標まで残り ' . ($recommendedTarget - $recommendedCount) }}日)
+                        ({{ $recommendedOk ? '目標達成 +' . ($stats['recommendedCount'] - $stats['recommendedTarget']) : '目標まで残り ' . ($stats['recommendedTarget'] - $stats['recommendedCount']) }}日)
                     </span>
                 </div>
             </div>
