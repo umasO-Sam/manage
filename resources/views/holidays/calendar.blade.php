@@ -8,14 +8,14 @@
         * { -webkit-print-color-adjust: exact; print-color-adjust: exact; box-sizing: border-box; }
         body { font-family: "Yu Gothic", "Meiryo", sans-serif; color: #1e293b; margin: 0; }
         .page { width: 210mm; padding: 8mm; margin: 0 auto; }
-        .sheet-title { text-align: center; margin-bottom: 1.8mm; }
-        .sheet-title .title-text { font-size: 14pt; font-weight: bold; letter-spacing: 4px; padding-bottom: 0.5mm; border-bottom: 1.2pt solid #1e293b; }
-        .sheet-title .logo { font-size: 8pt; font-weight: normal; letter-spacing: 0; margin-left: 10px; color: #475569; }
-        .months-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.5mm 5mm; }
+        .sheet-title { text-align: center; margin-bottom: 2.2mm; }
+        .sheet-title .title-text { font-size: 15pt; font-weight: bold; letter-spacing: 4px; padding-bottom: 0.6mm; border-bottom: 1.3pt solid #1e293b; }
+        .sheet-title .logo { font-size: 8.5pt; font-weight: normal; letter-spacing: 0; margin-left: 10px; color: #475569; }
+        .months-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 2mm 5.5mm; }
         .month-block { page-break-inside: avoid; }
-        .month-heading { font-weight: bold; font-size: 7.5pt; margin-bottom: 0.3mm; color: #1e293b; }
+        .month-heading { font-weight: bold; font-size: 8pt; margin-bottom: 0.4mm; color: #1e293b; }
         table.month-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-        table.month-table th, table.month-table td { border: 0.4pt solid #94a3b8; text-align: center; padding: 0.15mm 0; line-height: 2.7mm; font-size: 6.5pt; width: 14.28%; }
+        table.month-table th, table.month-table td { border: 0.4pt solid #94a3b8; text-align: center; padding: 0.15mm 0; line-height: 2.8mm; font-size: 7.2pt; width: 14.28%; }
         table.month-table th { background-color: #eef2f7; font-weight: bold; }
         table.month-table th.sat { color: #1d4ed8; }
         table.month-table th.sun { color: #dc2626; }
@@ -28,8 +28,8 @@
            このtr.period-startのスタイルと、calendar()内のfourWeekPeriodBoundaries()の利用を
            まとめて削除する。 */
         tr.period-start td { border-top: 1.2pt dashed #000; }
-        .legend { display: flex; gap: 14px; align-items: center; font-size: 7.5pt; margin-top: 1.8mm; color: #334155; }
-        .legend .swatch { display: inline-block; width: 13px; height: 13px; line-height: 13px; text-align: center; margin-right: 4px; vertical-align: middle; font-size: 6.5pt; border-radius: 2px; }
+        .legend { display: flex; gap: 15px; align-items: center; font-size: 8pt; margin-top: 2.2mm; color: #334155; }
+        .legend .swatch { display: inline-block; width: 14px; height: 14px; line-height: 14px; text-align: center; margin-right: 4px; vertical-align: middle; font-size: 7pt; border-radius: 2px; }
         @media print {
             .no-print { display: none !important; }
             .page { padding: 0; width: 100%; }
