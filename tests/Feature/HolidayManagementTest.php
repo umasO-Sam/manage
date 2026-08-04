@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Holiday;
 use App\Models\Staff;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Tests\TestCase;
 
 class HolidayManagementTest extends TestCase
@@ -171,6 +172,31 @@ class HolidayManagementTest extends TestCase
         $response = $this->actingAs($manager)->get(route('holidays.calendar', ['year' => 2026]));
 
         $response->assertViewHas('stats', fn ($stats) => $stats['recommendedCount'] === 1);
+    }
+
+    public function test_four_week_period_boundaries_are_anchored_to_the_first_saturday_of_may(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+
+        $response = $this->actingAs($manager)->get(route('holidays.calendar', ['year' => 2026]));
+
+        $response->assertViewHas('periodBoundaries', function (array $boundaries) {
+            // 2026年5月第一土曜日は5/2。
+            if (! in_array('2026-05-02', $boundaries, true)) {
+                return false;
+            }
+
+            foreach ($boundaries as $i => $date) {
+                if (Carbon::parse($date)->dayOfWeek !== Carbon::SATURDAY) {
+                    return false;
+                }
+                if ($i > 0 && (int) Carbon::parse($boundaries[$i - 1])->diffInDays(Carbon::parse($date)) !== 28) {
+                    return false;
+                }
+            }
+
+            return true;
+        });
     }
 
     public function test_index_shows_the_fiscal_year_breakdown(): void

@@ -58,12 +58,42 @@ class HolidayController extends Controller
         }
 
         $stats = $this->fiscalYearStats($year);
+        $periodBoundaries = $this->fourWeekPeriodBoundaries($year, $displayStart, $displayEnd);
 
         return view('holidays.calendar', [
             'year' => $year,
             'months' => $months,
             'stats' => $stats,
+            'periodBoundaries' => $periodBoundaries,
         ]);
+    }
+
+    /**
+     * 4週4休の起算日(5月第一土曜日)を基準に、28日ごとの区切り日(常に土曜日)を算出する。
+     * 法改正等でこの制度表示が不要になった場合は、この算出処理と、calendar()での利用、
+     * calendar.blade.phpのtr.period-startに関するスタイル・クラス付与をまとめて削除すればよい。
+     *
+     * @return array<int, string> Y-m-d形式の区切り日一覧
+     */
+    private function fourWeekPeriodBoundaries(int $year, Carbon $displayStart, Carbon $displayEnd): array
+    {
+        $anchor = Carbon::create($year, 5, 1);
+        $anchor->addDays((Carbon::SATURDAY - $anchor->dayOfWeek + 7) % 7);
+
+        $cursor = $anchor->copy();
+        while ($cursor->gt($displayStart)) {
+            $cursor->subDays(28);
+        }
+
+        $boundaries = [];
+        while ($cursor->lte($displayEnd)) {
+            if ($cursor->gte($displayStart)) {
+                $boundaries[] = $cursor->format('Y-m-d');
+            }
+            $cursor->addDays(28);
+        }
+
+        return $boundaries;
     }
 
     private function currentFiscalYear(): int

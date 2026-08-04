@@ -17,12 +17,22 @@
         table.month-table th.sat { color: #2563eb; }
         table.month-table th.sun { color: #dc2626; }
         td.out-of-month { color: transparent; }
-        td.day-off { background-color: #fbd0d9; border-radius: 3px; }
-        td.recommended { background-color: #bfdbfe; border-radius: 3px; }
+        td.day-off { background-color: #fbd0d9; border: 1px solid #dc2626; color: #dc2626; border-radius: 3px; }
+        td.recommended { background-color: #fbd0d9; border: 1px solid #dc2626; color: #2563eb; border-radius: 3px; }
         .legend { display: flex; gap: 16px; align-items: center; font-size: 9pt; margin-top: 4mm; }
-        .legend .swatch { display: inline-block; width: 12px; height: 12px; border-radius: 2px; margin-right: 4px; vertical-align: middle; }
+        .legend .swatch { display: inline-block; width: 16px; height: 16px; line-height: 14px; text-align: center; margin-right: 4px; vertical-align: middle; font-size: 8pt; }
+        /* 4週4休の区切り(黒い一点鎖線)。CSSのborder-styleに一点鎖線が無いため、破線と点の
+           繰り返しグラデーションで近似している。法改正等で不要になれば、このtr.period-start
+           関連のスタイルと、calendar()内のfourWeekPeriodBoundaries()の利用をまとめて削除する。 */
+        tr.period-start td { position: relative; }
+        tr.period-start td::before {
+            content: '';
+            position: absolute;
+            top: -2px; left: 0; right: 0; height: 2px;
+            background-image: repeating-linear-gradient(to right, #000 0, #000 4px, transparent 4px, transparent 6px, #000 6px, #000 7px, transparent 7px, transparent 10px);
+        }
         @media print {
-            .no-print { display: none; }
+            .no-print { display: none !important; }
             body { margin: 0; }
             .page { padding: 0; width: 100%; }
         }
@@ -96,7 +106,7 @@
                         </thead>
                         <tbody>
                             @foreach ($month['weeks'] as $week)
-                                <tr>
+                                <tr @if (in_array($week[0]['date']->format('Y-m-d'), $periodBoundaries, true)) class="period-start" @endif>
                                     @foreach ($week as $day)
                                         @php
                                             $isWeekend = in_array($day['date']->dayOfWeek, [\Illuminate\Support\Carbon::SATURDAY, \Illuminate\Support\Carbon::SUNDAY], true);
@@ -118,8 +128,9 @@
         </div>
 
         <div class="legend">
-            <span><span class="swatch" style="background-color: #fbd0d9;"></span>土日・祝日・会社休日</span>
-            <span><span class="swatch" style="background-color: #bfdbfe;"></span>有給休暇取得推奨日</span>
+            <span><span class="swatch day-off">1</span>土日・祝日・会社休日</span>
+            <span><span class="swatch recommended">1</span>有給休暇取得推奨日</span>
+            <span><span style="display: inline-block; width: 16px; border-top: 2px dashed #000; margin-right: 4px; vertical-align: middle;"></span>4週4休の区切り(5月第一土曜日起算)</span>
         </div>
     </div>
 </body>
