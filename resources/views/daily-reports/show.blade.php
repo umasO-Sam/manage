@@ -127,33 +127,34 @@
                                     <span class="text-xs font-bold text-slate-700">表示単位</span>
                                     <label class="flex items-center gap-1 text-xs text-slate-600 cursor-pointer">
                                         <input type="radio" name="granularity" value="60" x-model.number="granularity"
-                                               @change="dragStartIndex = null; dragCurrentIndex = null">
+                                               @change="clearSelection()">
                                         1時間
                                     </label>
                                     <label class="flex items-center gap-1 text-xs text-slate-600 cursor-pointer">
                                         <input type="radio" name="granularity" value="10" x-model.number="granularity"
-                                               @change="dragStartIndex = null; dragCurrentIndex = null">
+                                               @change="clearSelection()">
                                         10分
                                     </label>
                                 </div>
                             </div>
-                            <div class="flex items-center gap-2" x-show="dragStartIndex !== null" x-cloak>
+                            <div class="flex items-center gap-2" x-show="hasSelection()" x-cloak>
                                 <span class="text-xs font-bold text-blue-700" x-text="pendingRangeLabel()"></span>
                                 <button type="button" @click="applyDrag()" :disabled="!isSelectionValid()"
                                         class="text-xs font-bold px-3 py-1.5 rounded-lg bg-blue-600 text-white disabled:opacity-40">反映</button>
-                                <button type="button" @click="dragStartIndex = null; dragCurrentIndex = null"
+                                <button type="button" @click="clearSelection()"
                                         class="text-xs font-bold px-3 py-1.5 rounded-lg border border-slate-300 text-slate-600">選択解除</button>
                             </div>
                         </div>
                         <p class="text-[11px] text-slate-400">
                             「終日」は8:00〜17:10を選択中の内容で埋めます（休憩はそのまま残ります）。ドラッグ選択が休憩をまたいだ場合も休憩部分は上書きされません。<br>
                             休憩時間を変更する場合、下部（本日の入力内容）の対象となる休憩時間を「×」で削除してから入力してください。<br>
-                            10分未満の作業登録は「時刻入力」から行ってください。
+                            10分未満の作業登録は「時刻入力」から行ってください。<br>
+                            Ctrlキーを押しながらなぞると、離れた時間帯を追加で選択できます。
                         </p>
                         <div x-ref="grid" class="border border-slate-200 rounded-lg overflow-hidden select-none max-h-[60vh] overflow-y-auto"
-                             @mouseup.window="dragging = false" @mouseleave="dragging = false">
+                             @mouseup.window="endDrag()" @mouseleave="endDrag()">
                             <template x-for="i in slotIndexes" :key="i">
-                                <div @mousedown.prevent="startDrag(i)" @mouseenter="dragOver(i)" @mouseup="dragging = false"
+                                <div @mousedown.prevent="startDrag(i, $event)" @mouseenter="dragOver(i)" @mouseup="endDrag()"
                                      :class="slotClass(i)" :style="slotBackgroundStyle(i)"
                                      class="flex items-center h-6 border-b border-slate-100 cursor-pointer text-[11px] px-1 gap-2">
                                     <span class="w-24 shrink-0 font-mono text-slate-400"
@@ -252,8 +253,13 @@
                 // ラベルとしても出てこない。
                 fixedBoundaries: [8 * 60, 10 * 60, 10 * 60 + 10, 12 * 60 + 10, 13 * 60, 15 * 60, 15 * 60 + 10, 17 * 60 + 10],
                 dragging: false,
-                dragStartIndex: null,
-                dragCurrentIndex: null,
+                dragAnchor: null,
+                dragCurrent: null,
+                // Ctrlキーを押しながらのなぞり操作で追加された、離れた時間帯を含む
+                // 確定済みの選択スロット(インデックス)の集合。「反映」を押すまでは
+                // 内容を書き込まず、ハイライトだけの状態で保持する。
+                selectedIndices: new Set(),
+                categoryColors: {},
                 selection: { type: 'category', categoryId: null, freeText: '', orderNo: '' },
 
                 init() {
@@ -265,6 +271,12 @@
                         ];
                         this.nextId = 4;
                     }
+                    // 分類ごとに少しずつ違う色を割り当てる(青は「なぞって選択中」用に予約、
+                    // 灰・黄はそれぞれ休憩・その他で固定のため使わない)。
+                    const palette = ['#a7f3d0', '#99f6e4', '#a5f3fc', '#c7d2fe', '#ddd6fe', '#e9d5ff', '#f5d0fe', '#fbcfe8', '#fecdd3', '#fed7aa', '#d9f99d', '#bbf7d0'];
+                    this.categories.forEach((cat, idx) => {
+                        this.categoryColors[cat.id] = palette[idx % palette.length];
+                    });
                     this.$nextTick(() => this.scrollToDefaultStart());
                 },
 
@@ -414,7 +426,7 @@
                     if (!entry) return '#ffffff';
                     if (entry.is_break) return '#cbd5e1';
                     if (entry.is_other) return '#fde68a';
-                    return '#a7f3d0';
+                    return this.categoryColors[entry.category_id] || '#a7f3d0';
                 },
 
                 isSlotFullyCovered(i) {
@@ -434,29 +446,39 @@
                     return [...new Set(segments.map((s) => this.entryLabel(s.entry)))].join('・');
                 },
 
-                isDragging(i) {
-                    if (this.dragStartIndex === null) return false;
-                    const lo = Math.min(this.dragStartIndex, this.dragCurrentIndex);
-                    const hi = Math.max(this.dragStartIndex, this.dragCurrentIndex);
+                // 現在進行中のなぞり操作(まだ確定していない範囲)。
+                isInCurrentDrag(i) {
+                    if (this.dragAnchor === null) return false;
+                    const lo = Math.min(this.dragAnchor, this.dragCurrent);
+                    const hi = Math.max(this.dragAnchor, this.dragCurrent);
                     return i >= lo && i <= hi;
                 },
 
-                slotClass(i) {
-                    if (this.isDragging(i)) return 'bg-blue-300 ring-2 ring-inset ring-blue-600';
-                    const entry = this.coveredEntry(i);
-                    if (!entry) return 'bg-white hover:bg-slate-50';
-                    if (entry.is_break) return 'bg-slate-300';
-                    if (entry.is_other) return 'bg-amber-200';
-                    return 'bg-emerald-200';
+                // Ctrlで追加済みの確定済みスロット + 現在進行中のなぞり範囲、両方を合わせた選択状態。
+                isSelected(i) {
+                    return this.selectedIndices.has(i) || this.isInCurrentDrag(i);
                 },
 
-                // 部分的にしか重ならないスロットだけ、実際に埋まっている範囲に比例した
-                // グラデーションを描画する(完全に埋まっている・何も無い・ドラッグ中は
-                // slotClass側の単色で表現するのでここでは何もしない)。
+                hasSelection() {
+                    return this.selectedIndices.size > 0 || this.dragAnchor !== null;
+                },
+
+                slotClass(i) {
+                    if (this.isSelected(i)) return 'bg-blue-300 ring-2 ring-inset ring-blue-600';
+                    if (this.slotSegments(i).length === 0) return 'bg-white hover:bg-slate-50';
+                    return '';
+                },
+
+                // 選択中は青一色(slotClass)で表現するのでここでは何もしない。それ以外は、
+                // 完全に埋まっているスロットは単色、部分的にしか重ならないスロットは
+                // 実際に埋まっている範囲に比例したグラデーションを描画する。
                 slotBackgroundStyle(i) {
-                    if (this.isDragging(i)) return {};
+                    if (this.isSelected(i)) return {};
                     const segments = this.slotSegments(i);
-                    if (segments.length === 0 || this.isSlotFullyCovered(i)) return {};
+                    if (segments.length === 0) return {};
+                    if (this.isSlotFullyCovered(i)) {
+                        return { backgroundColor: this.entryColor(segments[0].entry) };
+                    }
 
                     const start = this.slotStart(i);
                     const width = this.slotEnd(i) - start;
@@ -475,30 +497,87 @@
                     return { backgroundImage: `linear-gradient(to right, ${stops.join(', ')})` };
                 },
 
-                startDrag(i) {
+                // Ctrlキーを押しながらの開始でなければ、まず既存の選択をクリアしてから
+                // 新しいなぞり操作を始める。Ctrl押下時は既存の選択を残したまま追加する。
+                startDrag(i, event) {
                     this.dragging = true;
-                    this.dragStartIndex = i;
-                    this.dragCurrentIndex = i;
+                    if (!event || (!event.ctrlKey && !event.metaKey)) {
+                        this.selectedIndices = new Set();
+                    }
+                    this.dragAnchor = i;
+                    this.dragCurrent = i;
                 },
 
                 dragOver(i) {
-                    if (this.dragging) this.dragCurrentIndex = i;
+                    if (this.dragging) this.dragCurrent = i;
                 },
 
+                // 進行中のなぞり範囲を確定済みの選択集合に合流させる。
+                endDrag() {
+                    if (this.dragAnchor !== null) {
+                        const lo = Math.min(this.dragAnchor, this.dragCurrent);
+                        const hi = Math.max(this.dragAnchor, this.dragCurrent);
+                        for (let i = lo; i <= hi; i++) this.selectedIndices.add(i);
+                    }
+                    this.dragAnchor = null;
+                    this.dragCurrent = null;
+                    this.dragging = false;
+                },
+
+                clearSelection() {
+                    this.selectedIndices = new Set();
+                    this.dragAnchor = null;
+                    this.dragCurrent = null;
+                },
+
+                // 選択中の全スロット(離れた範囲を含む)を、連続する区間ごとにまとめて
+                // 「HH:MM〜HH:MM」形式で表示する。
                 pendingRangeLabel() {
-                    if (this.dragStartIndex === null) return '';
-                    const lo = Math.min(this.dragStartIndex, this.dragCurrentIndex);
-                    const hi = Math.max(this.dragStartIndex, this.dragCurrentIndex);
-                    return this.formatMinute(this.slotStart(lo)) + '〜' + this.formatMinute(this.slotEnd(hi));
+                    const all = new Set(this.selectedIndices);
+                    if (this.dragAnchor !== null) {
+                        const lo = Math.min(this.dragAnchor, this.dragCurrent);
+                        const hi = Math.max(this.dragAnchor, this.dragCurrent);
+                        for (let i = lo; i <= hi; i++) all.add(i);
+                    }
+                    const sorted = [...all].sort((a, b) => a - b);
+                    if (sorted.length === 0) return '';
+
+                    const labels = [];
+                    let runStart = sorted[0];
+                    let prev = sorted[0];
+                    for (let k = 1; k <= sorted.length; k++) {
+                        const cur = sorted[k];
+                        if (cur === undefined || cur !== prev + 1) {
+                            labels.push(this.formatMinute(this.slotStart(runStart)) + '〜' + this.formatMinute(this.slotEnd(prev)));
+                            runStart = cur;
+                        }
+                        if (cur !== undefined) prev = cur;
+                    }
+                    return labels.join('、');
                 },
 
+                // 選択中の全スロットを連続区間ごとにまとめ、区間ごとにcommitRangeを適用する。
                 applyDrag() {
-                    if (this.dragStartIndex === null || !this.isSelectionValid()) return;
-                    const lo = Math.min(this.dragStartIndex, this.dragCurrentIndex);
-                    const hi = Math.max(this.dragStartIndex, this.dragCurrentIndex);
-                    this.commitRange(this.slotStart(lo), this.slotEnd(hi));
-                    this.dragStartIndex = null;
-                    this.dragCurrentIndex = null;
+                    this.endDrag();
+                    if (this.selectedIndices.size === 0 || !this.isSelectionValid()) return;
+
+                    const sorted = [...this.selectedIndices].sort((a, b) => a - b);
+                    const runs = [];
+                    let runStart = sorted[0];
+                    let prev = sorted[0];
+                    for (let k = 1; k <= sorted.length; k++) {
+                        const cur = sorted[k];
+                        if (cur === undefined || cur !== prev + 1) {
+                            runs.push([runStart, prev]);
+                            runStart = cur;
+                        }
+                        if (cur !== undefined) prev = cur;
+                    }
+
+                    runs.forEach(([loIdx, hiIdx]) => {
+                        this.commitRange(this.slotStart(loIdx), this.slotEnd(hiIdx));
+                    });
+                    this.selectedIndices = new Set();
                 },
 
                 // 既存の休憩(is_break)エントリは、なぞって選択・終日ボタンのどちらで
