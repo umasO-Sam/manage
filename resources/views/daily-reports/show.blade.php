@@ -82,17 +82,21 @@
                     <div class="flex flex-wrap gap-1.5">
                         <template x-for="cat in categories" :key="cat.id">
                             <button type="button" @click="selectCategory(cat)"
+                                    :style="selection.type === 'category' && selection.categoryId === cat.id
+                                        ? { backgroundColor: categoryColors[cat.id], borderColor: categoryColors[cat.id] } : {}"
                                     :class="selection.type === 'category' && selection.categoryId === cat.id
-                                        ? 'bg-emerald-600 text-white border-emerald-600'
+                                        ? 'text-slate-800 font-bold'
                                         : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'"
                                     class="text-xs font-semibold px-2.5 py-1.5 rounded-lg border transition-colors"
                                     x-text="cat.label"></button>
                         </template>
                         <button type="button" @click="selectOther()"
-                                :class="selection.type === 'other' ? 'bg-amber-500 text-white border-amber-500' : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'"
+                                :style="selection.type === 'other' ? { backgroundColor: otherColor, borderColor: otherColor } : {}"
+                                :class="selection.type === 'other' ? 'text-slate-800 font-bold' : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'"
                                 class="text-xs font-semibold px-2.5 py-1.5 rounded-lg border transition-colors">その他：自由記入</button>
                         <button type="button" @click="selectBreak()"
-                                :class="selection.type === 'break' ? 'bg-slate-600 text-white border-slate-600' : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'"
+                                :style="selection.type === 'break' ? { backgroundColor: breakColor, borderColor: breakColor } : {}"
+                                :class="selection.type === 'break' ? 'text-slate-800 font-bold' : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'"
                                 class="text-xs font-semibold px-2.5 py-1.5 rounded-lg border transition-colors">休憩</button>
                     </div>
 
@@ -260,6 +264,8 @@
                 // 内容を書き込まず、ハイライトだけの状態で保持する。
                 selectedIndices: new Set(),
                 categoryColors: {},
+                otherColor: '#fde68a',
+                breakColor: '#cbd5e1',
                 selection: { type: 'category', categoryId: null, freeText: '', orderNo: '' },
 
                 init() {
@@ -424,8 +430,8 @@
 
                 entryColor(entry) {
                     if (!entry) return '#ffffff';
-                    if (entry.is_break) return '#cbd5e1';
-                    if (entry.is_other) return '#fde68a';
+                    if (entry.is_break) return this.breakColor;
+                    if (entry.is_other) return this.otherColor;
                     return this.categoryColors[entry.category_id] || '#a7f3d0';
                 },
 
@@ -645,12 +651,38 @@
                     while (this.entries.length < 3) this.addTimeRow();
                 },
 
-                applySelectionToRow(entry) {
+                assignSelectionTo(entry) {
                     entry.order_no = this.selection.type === 'break' ? null : (this.selection.orderNo || null);
                     entry.category_id = this.selection.type === 'category' ? this.selection.categoryId : null;
                     entry.is_other = this.selection.type === 'other';
                     entry.free_text = this.selection.type === 'other' ? this.selection.freeText : null;
                     entry.is_break = this.selection.type === 'break';
+                },
+
+                // 時刻未入力の行はまだ重なり判定ができないので、そのまま選択中の内容を
+                // セットするだけにする。開始・終了が入力済みの行は、なぞって選択と同じ
+                // commitRange()を通すことで、休憩と重なる場合は休憩を必ず残し(休憩を優先)、
+                // 休憩以外の既存内容と重なる場合は上書き前に確認するようにする。
+                applySelectionToRow(entry) {
+                    const start = entry.start_minute;
+                    const end = entry.end_minute;
+
+                    if (start === null || end === null || end <= start) {
+                        this.assignSelectionTo(entry);
+                        return;
+                    }
+
+                    const overlapsOtherContent = this.entries.some((e) => e.id !== entry.id && !e.is_break
+                        && e.start_minute !== null && e.end_minute !== null
+                        && e.start_minute < end && e.end_minute > start
+                        && (e.category_id !== null || e.is_other || e.order_no));
+
+                    if (overlapsOtherContent && !confirm('この時間帯には既に別の内容が入力されています。上書きしてよろしいですか？')) {
+                        return;
+                    }
+
+                    this.entries = this.entries.filter((e) => e.id !== entry.id);
+                    this.commitRange(start, end);
                 },
 
                 removeEntry(id) {
