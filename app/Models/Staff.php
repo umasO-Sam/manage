@@ -91,11 +91,30 @@ class Staff extends Authenticatable
     }
 
     /**
-     * administratorのアカウントはシステム管理専用で、administrator以外は編集・削除できない。
+     * 権限のはしごの高さ。数字が大きいほど強い。
+     * 経理資材担当・営業担当・一般社員・上長はいずれも1（互いに編集できる）。
+     */
+    public function permissionLevel(): int
+    {
+        return match (true) {
+            (bool) $this->is_administrator => 4,
+            (bool) $this->is_fund_manager => 3,
+            (bool) $this->is_executive => 2,
+            default => 1,
+        };
+    }
+
+    /**
+     * 対象アカウントを編集・削除できるか。自分より上の権限のアカウントには一切触れない。
+     *
+     * パスワードを再設定できる＝そのアカウントでログインできる、ということなので、
+     * 「フラグの付け外しだけを禁止して氏名やパスワードは編集できる」形にすると
+     * 経理資材担当が役員・資金管理者になりすませてしまう(権限昇格の抜け道になる)。
+     * 同じ高さ同士は互いに編集できる(役員は役員を、資金管理者は資金管理者を編集する運用)。
      */
     public function canEditAccount(self $target): bool
     {
-        return ! $target->is_administrator || (bool) $this->is_administrator;
+        return $this->permissionLevel() >= $target->permissionLevel();
     }
 
     /**

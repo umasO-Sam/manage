@@ -132,6 +132,8 @@ class StaffController extends Controller
 
     public function edit(Staff $staff): View
     {
+        abort_unless(Auth::user()->canEditAccount($staff), 403, 'このアカウントは自分より上の権限のため編集できません。');
+
         return view('staff.edit', ['staff' => $staff]);
     }
 
@@ -158,9 +160,10 @@ class StaffController extends Controller
         /** @var Staff $actor */
         $actor = Auth::user();
 
-        // administratorのアカウントはシステム管理専用で、administrator以外は編集できない。
+        // 自分より上の権限のアカウントは編集できない(パスワードを再設定できると
+        // そのアカウントでログインできてしまい、権限昇格の抜け道になるため)。
         if (! $actor->canEditAccount($staff)) {
-            return back()->withErrors(['role' => 'administratorのアカウントはadministratorのみ編集できます。']);
+            return back()->withErrors(['role' => 'このアカウントは自分より上の権限のため編集できません。']);
         }
 
         $flags = $this->permittedFlags($request->all(), $actor, $staff);
@@ -235,9 +238,9 @@ class StaffController extends Controller
                 continue;
             }
 
-            // administratorのアカウントはadministrator以外が触れない。
+            // 自分より上の権限のアカウントは編集できない。
             if (! $actor->canEditAccount($staff)) {
-                $errors[] = "{$staff->name}: administratorのアカウントはadministratorのみ編集できます。";
+                $errors[] = "{$staff->name}: このアカウントは自分より上の権限のため編集できません。";
 
                 continue;
             }
@@ -314,9 +317,9 @@ class StaffController extends Controller
             return back()->withErrors(['delete' => '自分自身のアカウントは削除できません。']);
         }
 
-        // administratorのアカウントはシステム管理専用で、administrator以外は削除できない。
+        // 自分より上の権限のアカウントは削除できない。
         if (! $actor->canEditAccount($staff)) {
-            return back()->withErrors(['delete' => 'administratorのアカウントはadministratorのみ削除できます。']);
+            return back()->withErrors(['delete' => 'このアカウントは自分より上の権限のため削除できません。']);
         }
 
         // 資材管理担当者は自分自身の削除禁止だけで0人化を防げる(削除できるのが資材管理担当者以上のため)が、

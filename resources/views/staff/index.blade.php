@@ -108,20 +108,26 @@
                             </div>
                             <div class="mt-4 pt-3 border-t border-slate-100 flex justify-between items-center">
                                 <span class="text-slate-400 text-[11px]">ID: #{{ $staff->id }}</span>
+                                {{-- 自分より上の権限のアカウントは編集・削除できない(パスワードを再設定できると
+                                     そのアカウントでログインできてしまうため)。 --}}
                                 <div class="flex gap-2">
-                                    @if ($staff->id !== Auth::id())
-                                        <form method="POST" action="{{ route('staff.destroy', $staff) }}"
-                                              onsubmit="return confirm('「{{ $staff->name }}」を削除します。この操作は取り消せません。よろしいですか？');">
-                                            @csrf
-                                            @method('DELETE')
-                                            <button type="submit" class="text-xs bg-red-50 hover:bg-red-100 text-red-700 font-semibold py-1 px-3 rounded-lg border border-red-200 transition-colors">
-                                                削除
-                                            </button>
-                                        </form>
+                                    @if (Auth::user()->canEditAccount($staff))
+                                        @if ($staff->id !== Auth::id())
+                                            <form method="POST" action="{{ route('staff.destroy', $staff) }}"
+                                                  onsubmit="return confirm('「{{ $staff->name }}」を削除します。この操作は取り消せません。よろしいですか？');">
+                                                @csrf
+                                                @method('DELETE')
+                                                <button type="submit" class="text-xs bg-red-50 hover:bg-red-100 text-red-700 font-semibold py-1 px-3 rounded-lg border border-red-200 transition-colors">
+                                                    削除
+                                                </button>
+                                            </form>
+                                        @endif
+                                        <a href="{{ route('staff.edit', $staff) }}" class="text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold py-1 px-3 rounded-lg border border-blue-200 transition-colors">
+                                            編集
+                                        </a>
+                                    @else
+                                        <span class="text-[11px] text-slate-400">上位権限のため編集不可</span>
                                     @endif
-                                    <a href="{{ route('staff.edit', $staff) }}" class="text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold py-1 px-3 rounded-lg border border-blue-200 transition-colors">
-                                        編集
-                                    </a>
                                 </div>
                             </div>
                         </div>
@@ -161,40 +167,43 @@
                                 </thead>
                                 <tbody class="divide-y divide-slate-100">
                                     @foreach ($staffList as $staff)
-                                        <tr class="hover:bg-slate-50">
+                                        {{-- 自分より上の権限のアカウントは直接編集の対象外。入力欄をdisabledにすると
+                                             その行のupdates[]自体が送信されないため、サーバー側の拒否にも届かない。 --}}
+                                        @php($canEditRow = Auth::user()->canEditAccount($staff))
+                                        <tr class="hover:bg-slate-50 {{ $canEditRow ? '' : 'bg-slate-50/60' }}">
                                             <td class="p-2.5">
                                                 <span x-show="!editMode" class="font-semibold">{{ $staff->name }}</span>
-                                                <input x-show="editMode" x-cloak type="text" name="updates[{{ $staff->id }}][name]"
+                                                <input x-show="editMode" x-cloak @disabled(! $canEditRow) type="text" name="updates[{{ $staff->id }}][name]"
                                                        value="{{ $staff->name }}" class="w-full min-w-[120px] text-xs border rounded px-1.5 py-1 border-slate-300">
                                             </td>
                                             <td class="p-2.5">
                                                 <span x-show="!editMode">{{ $staff->department }}</span>
-                                                <input x-show="editMode" x-cloak type="text" name="updates[{{ $staff->id }}][department]"
+                                                <input x-show="editMode" x-cloak @disabled(! $canEditRow) type="text" name="updates[{{ $staff->id }}][department]"
                                                        value="{{ $staff->department }}" class="w-full min-w-[100px] text-xs border rounded px-1.5 py-1 border-slate-300">
                                             </td>
                                             <td class="p-2.5">
                                                 <span x-show="!editMode" class="font-mono">{{ $staff->display_order }}</span>
-                                                <input x-show="editMode" x-cloak type="number" min="0" max="9999" name="updates[{{ $staff->id }}][display_order]"
+                                                <input x-show="editMode" x-cloak @disabled(! $canEditRow) type="number" min="0" max="9999" name="updates[{{ $staff->id }}][display_order]"
                                                        value="{{ $staff->display_order }}" class="w-16 text-xs border rounded px-1.5 py-1 border-slate-300">
                                             </td>
                                             <td class="p-2.5">
                                                 <span x-show="!editMode" class="font-mono">{{ $staff->sid }}</span>
-                                                <input x-show="editMode" x-cloak type="number" name="updates[{{ $staff->id }}][sid]"
+                                                <input x-show="editMode" x-cloak @disabled(! $canEditRow) type="number" name="updates[{{ $staff->id }}][sid]"
                                                        value="{{ $staff->sid }}" class="w-20 text-xs border rounded px-1.5 py-1 border-slate-300">
                                             </td>
                                             <td class="p-2.5">
                                                 <span x-show="!editMode" class="font-mono">{{ $staff->login_id }}</span>
-                                                <input x-show="editMode" x-cloak type="text" name="updates[{{ $staff->id }}][login_id]"
+                                                <input x-show="editMode" x-cloak @disabled(! $canEditRow) type="text" name="updates[{{ $staff->id }}][login_id]"
                                                        value="{{ $staff->login_id }}" class="w-full min-w-[120px] font-mono text-xs border rounded px-1.5 py-1 border-slate-300">
                                             </td>
                                             <td class="p-2.5">
                                                 <span x-show="!editMode">{{ $staff->email }}</span>
-                                                <input x-show="editMode" x-cloak type="email" name="updates[{{ $staff->id }}][email]"
+                                                <input x-show="editMode" x-cloak @disabled(! $canEditRow) type="email" name="updates[{{ $staff->id }}][email]"
                                                        value="{{ $staff->email }}" class="w-full min-w-[180px] text-xs border rounded px-1.5 py-1 border-slate-300">
                                             </td>
                                             <td class="p-2.5">
                                                 <span x-show="!editMode">{{ $staff->roleLabel() }}</span>
-                                                <select x-show="editMode" x-cloak name="updates[{{ $staff->id }}][role]"
+                                                <select x-show="editMode" x-cloak @disabled(! $canEditRow) name="updates[{{ $staff->id }}][role]"
                                                         class="w-full min-w-[140px] text-xs border rounded px-1 py-1 border-slate-300">
                                                     @foreach (\App\Models\Staff::ROLE_LABELS as $value => $label)
                                                         <option value="{{ $value }}" @selected($staff->role === $value)>{{ $label }}</option>
@@ -203,25 +212,29 @@
                                             </td>
                                             <td class="p-2.5 text-center">
                                                 <span x-show="!editMode">{{ $staff->is_supervisor ? '○' : '' }}</span>
-                                                <input x-show="editMode" x-cloak type="checkbox" name="updates[{{ $staff->id }}][is_supervisor]" value="1"
+                                                <input x-show="editMode" x-cloak @disabled(! $canEditRow) type="checkbox" name="updates[{{ $staff->id }}][is_supervisor]" value="1"
                                                        @checked($staff->is_supervisor) class="rounded border-slate-300">
                                             </td>
                                             <td class="p-2.5">
                                                 <span x-show="!editMode" class="font-mono">{{ $staff->paid_leave_granted_current_year }}</span>
-                                                <input x-show="editMode" x-cloak type="number" step="0.5" min="0" max="99.9" name="updates[{{ $staff->id }}][paid_leave_granted_current_year]"
+                                                <input x-show="editMode" x-cloak @disabled(! $canEditRow) type="number" step="0.5" min="0" max="99.9" name="updates[{{ $staff->id }}][paid_leave_granted_current_year]"
                                                        value="{{ $staff->paid_leave_granted_current_year }}" class="w-20 text-xs border rounded px-1.5 py-1 border-slate-300">
                                             </td>
                                             <td class="p-2.5">
                                                 <span x-show="!editMode" class="font-mono">{{ $staff->paid_leave_granted_last_year }}</span>
-                                                <input x-show="editMode" x-cloak type="number" step="0.5" min="0" max="99.9" name="updates[{{ $staff->id }}][paid_leave_granted_last_year]"
+                                                <input x-show="editMode" x-cloak @disabled(! $canEditRow) type="number" step="0.5" min="0" max="99.9" name="updates[{{ $staff->id }}][paid_leave_granted_last_year]"
                                                        value="{{ $staff->paid_leave_granted_last_year }}" class="w-20 text-xs border rounded px-1.5 py-1 border-slate-300">
                                             </td>
                                             <td class="p-2.5 font-mono text-slate-500">{{ $paidLeaveBalances[$staff->id]['remainingTotal'] }}</td>
                                             <td class="p-2.5">
                                                 <div class="flex gap-2">
-                                                    <a href="{{ route('staff.edit', $staff) }}" class="text-blue-700 hover:text-blue-900 font-semibold">編集</a>
-                                                    @if ($staff->id !== Auth::id())
-                                                        <button type="submit" form="staff-destroy-{{ $staff->id }}" class="text-red-700 hover:text-red-900 font-semibold">削除</button>
+                                                    @if ($canEditRow)
+                                                        <a href="{{ route('staff.edit', $staff) }}" class="text-blue-700 hover:text-blue-900 font-semibold">編集</a>
+                                                        @if ($staff->id !== Auth::id())
+                                                            <button type="submit" form="staff-destroy-{{ $staff->id }}" class="text-red-700 hover:text-red-900 font-semibold">削除</button>
+                                                        @endif
+                                                    @else
+                                                        <span class="text-[11px] text-slate-400 whitespace-nowrap">上位権限のため編集不可</span>
                                                     @endif
                                                 </div>
                                             </td>

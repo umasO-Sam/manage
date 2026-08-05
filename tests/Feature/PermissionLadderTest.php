@@ -134,6 +134,51 @@ class PermissionLadderTest extends TestCase
         $this->assertFalse($target->is_administrator);
     }
 
+    /**
+     * パスワードを再設定できる＝そのアカウントでログインできる、ということなので、
+     * 自分より上の権限のアカウントは氏名すら編集できない（権限昇格の抜け道を塞ぐ）。
+     */
+    public function test_accounts_above_the_actor_cannot_be_edited(): void
+    {
+        $manager = $this->manager();
+
+        foreach ([$this->executive(), $this->fundManager(), $this->administrator()] as $target) {
+            $this->actingAs($manager)
+                ->put(route('staff.update', $target), $this->payload($target, ['name' => '書き換え']))
+                ->assertSessionHasErrors('role');
+
+            $this->assertNotSame('書き換え', $target->fresh()->name);
+        }
+
+        // 編集フォーム自体も開けない。
+        $this->actingAs($manager)->get(route('staff.edit', $this->executive()))->assertForbidden();
+    }
+
+    public function test_same_level_accounts_can_edit_each_other(): void
+    {
+        $executiveA = $this->executive();
+        $executiveB = $this->executive();
+
+        $this->actingAs($executiveA)
+            ->put(route('staff.update', $executiveB), $this->payload($executiveB, ['name' => '役員B改']))
+            ->assertRedirect();
+
+        $this->assertSame('役員B改', $executiveB->fresh()->name);
+    }
+
+    public function test_a_fund_manager_can_edit_an_executive(): void
+    {
+        $executive = $this->executive();
+
+        $this->actingAs($this->fundManager())
+            ->put(route('staff.update', $executive), $this->payload($executive, ['name' => '役員改', 'paid_leave_granted_current_year' => 12]))
+            ->assertRedirect();
+
+        $executive->refresh();
+        $this->assertSame('役員改', $executive->name);
+        $this->assertSame(12.0, (float) $executive->paid_leave_granted_current_year);
+    }
+
     public function test_administrator_accounts_cannot_be_edited_by_others(): void
     {
         $admin = $this->administrator();
@@ -201,18 +246,18 @@ class PermissionLadderTest extends TestCase
 
     public function test_a_flag_the_actor_cannot_grant_is_left_untouched_rather_than_cleared(): void
     {
-        $manager = $this->manager();
-        $target = Staff::factory()->create(['is_executive' => true, 'is_fund_manager' => true]);
+        $executive = $this->executive();
+        // 役員は役員を編集できるが、資金管理者フラグは触れない。
+        $target = Staff::factory()->create(['is_executive' => true]);
 
-        // 経理資材担当が氏名だけ直す。役員・資金管理者のチェックは画面に出ないので送信されない。
-        $this->actingAs($manager)
-            ->put(route('staff.update', $target), $this->payload($target, ['name' => '氏名変更']))
+        $this->actingAs($executive)
+            ->put(route('staff.update', $target), $this->payload($target, ['name' => '氏名変更', 'is_executive' => '1']))
             ->assertRedirect();
 
         $target->refresh();
         $this->assertSame('氏名変更', $target->name);
         $this->assertTrue($target->is_executive);
-        $this->assertTrue($target->is_fund_manager);
+        $this->assertFalse($target->is_fund_manager);
     }
 
     public function test_administrators_are_treated_as_procurement_managers(): void
