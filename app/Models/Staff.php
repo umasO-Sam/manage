@@ -121,37 +121,77 @@ class Staff extends Authenticatable
 
     /**
      * 有給休暇の残日数(前年度繰越分・当年度付与分の2バケツ管理)。
-     * 承認済みの有給休暇申請の消化分を、前年度繰越分から優先して差し引く
-     * (繰越分は失効が近いため先に使い切る想定)。
+     *
+     * 消化分は「当年度(4/21〜翌4/20、36協定・休日マスタと同じ年度区切り)に開始する
+     * 有給休暇申請」だけを数える。年度を区切らずに全期間を合計すると、勤続年数が
+     * 増えるほど過去の消化分が積み上がり、残日数が不当に0へ張り付いてしまうため。
+     *
+     * 承認待ちの申請も消化見込みとして残日数から差し引く。承認前は残数が減らないと、
+     * 残5日の状態で5日の申請を何本でも出せてしまい、承認時点で付与日数を超過するため。
      *
      * @return array{grantedLastYear: float, grantedCurrentYear: float, grantedTotal: float,
-     *     consumed: float, remainingLastYear: float, remainingCurrentYear: float, remainingTotal: float}
+     *     consumed: float, pending: float, remainingLastYear: float, remainingCurrentYear: float,
+     *     remainingTotal: float}
      */
     public function paidLeaveBalance(): array
     {
-        $grantedLastYear = (float) ($this->paid_leave_granted_last_year ?? 0);
-        $grantedCurrentYear = (float) ($this->paid_leave_granted_current_year ?? 0);
+        return static::paidLeaveBalancesFor(collect([$this]))[$this->id];
+    }
 
-        $consumed = (float) $this->leaveRequests()
+    /**
+     * 複数人分の有給休暇残日数を、集計クエリ1本でまとめて求める(担当者一覧のように
+     * 全社員分を並べる画面で1人1クエリになるのを避けるため)。
+     *
+     * @param  \Illuminate\Support\Collection<int, Staff>  $staffList
+     * @return array<int, array<string, float>> staff_id => 残日数の内訳
+     */
+    public static function paidLeaveBalancesFor(\Illuminate\Support\Collection $staffList): array
+    {
+        [$fiscalStart, $fiscalEnd] = app(\App\Services\WorkTimeComplianceService::class)->fiscalYearPeriod(now());
+
+        $ids = $staffList->pluck('id')->all();
+
+        $totals = $ids === [] ? collect() : LeaveRequest::whereIn('staff_id', $ids)
             ->where('type', 'paid_leave')
-            ->where('status', LeaveRequest::STATUS_APPROVED)
-            ->sum('day_count');
+            ->whereIn('status', [LeaveRequest::STATUS_APPROVED, LeaveRequest::STATUS_PENDING])
+            ->whereDate('start_date', '>=', $fiscalStart->toDateString())
+            ->whereDate('start_date', '<=', $fiscalEnd->toDateString())
+            ->selectRaw('staff_id, status, SUM(day_count) as days')
+            ->groupBy('staff_id', 'status')
+            ->get()
+            ->groupBy('staff_id');
 
-        $consumedFromLastYear = min($consumed, $grantedLastYear);
-        $consumedFromCurrentYear = max(0.0, $consumed - $grantedLastYear);
+        $result = [];
 
-        $remainingLastYear = max(0.0, $grantedLastYear - $consumedFromLastYear);
-        $remainingCurrentYear = max(0.0, $grantedCurrentYear - $consumedFromCurrentYear);
+        foreach ($staffList as $staff) {
+            $rows = $totals->get($staff->id) ?? collect();
+            $consumed = (float) ($rows->firstWhere('status', LeaveRequest::STATUS_APPROVED)->days ?? 0);
+            $pending = (float) ($rows->firstWhere('status', LeaveRequest::STATUS_PENDING)->days ?? 0);
 
-        return [
-            'grantedLastYear' => $grantedLastYear,
-            'grantedCurrentYear' => $grantedCurrentYear,
-            'grantedTotal' => $grantedLastYear + $grantedCurrentYear,
-            'consumed' => $consumed,
-            'remainingLastYear' => $remainingLastYear,
-            'remainingCurrentYear' => $remainingCurrentYear,
-            'remainingTotal' => $remainingLastYear + $remainingCurrentYear,
-        ];
+            $grantedLastYear = (float) ($staff->paid_leave_granted_last_year ?? 0);
+            $grantedCurrentYear = (float) ($staff->paid_leave_granted_current_year ?? 0);
+
+            // 繰越分は失効が近いため先に使い切る想定で、前年度繰越分から差し引く。
+            $used = $consumed + $pending;
+            $usedFromLastYear = min($used, $grantedLastYear);
+            $usedFromCurrentYear = max(0.0, $used - $grantedLastYear);
+
+            $remainingLastYear = max(0.0, $grantedLastYear - $usedFromLastYear);
+            $remainingCurrentYear = max(0.0, $grantedCurrentYear - $usedFromCurrentYear);
+
+            $result[$staff->id] = [
+                'grantedLastYear' => $grantedLastYear,
+                'grantedCurrentYear' => $grantedCurrentYear,
+                'grantedTotal' => $grantedLastYear + $grantedCurrentYear,
+                'consumed' => $consumed,
+                'pending' => $pending,
+                'remainingLastYear' => $remainingLastYear,
+                'remainingCurrentYear' => $remainingCurrentYear,
+                'remainingTotal' => $remainingLastYear + $remainingCurrentYear,
+            ];
+        }
+
+        return $result;
     }
 
     /**

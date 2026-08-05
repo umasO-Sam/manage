@@ -80,6 +80,9 @@
                         有給休暇の残日数:
                         <strong class="text-slate-900">{{ $paidLeaveBalance['remainingTotal'] }}日</strong>
                         (前年度繰越 {{ $paidLeaveBalance['remainingLastYear'] }}日 ／ 当年度 {{ $paidLeaveBalance['remainingCurrentYear'] }}日)
+                        @if ($paidLeaveBalance['pending'] > 0)
+                            <span class="text-amber-700">※承認待ちの{{ $paidLeaveBalance['pending'] }}日分を差し引いた残数です</span>
+                        @endif
                     </div>
                     <div>
                         <x-input-label value="対象日" />

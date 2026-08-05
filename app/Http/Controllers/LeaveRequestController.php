@@ -12,6 +12,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\ValidationException;
@@ -333,18 +334,21 @@ class LeaveRequestController extends Controller
             'rejection_reason' => ['nullable', 'string', 'max:2000', 'required_if:action,reject'],
         ]);
 
-        $leaveRequest->update([
-            'status' => $data['action'] === 'approve' ? LeaveRequest::STATUS_APPROVED : LeaveRequest::STATUS_REJECTED,
-            'rejection_reason' => $data['action'] === 'reject' ? $data['rejection_reason'] : null,
-            'approved_at' => now(),
-        ]);
+        // 状態更新と操作ログは必ず対で残す(片方だけ成立して履歴が欠けるのを防ぐ)。
+        DB::transaction(function () use ($leaveRequest, $data) {
+            $leaveRequest->update([
+                'status' => $data['action'] === 'approve' ? LeaveRequest::STATUS_APPROVED : LeaveRequest::STATUS_REJECTED,
+                'rejection_reason' => $data['action'] === 'reject' ? $data['rejection_reason'] : null,
+                'approved_at' => now(),
+            ]);
 
-        OperationLog::record(
-            $data['action'] === 'approve' ? OperationLog::ACTION_LEAVE_REQUEST_APPROVE : OperationLog::ACTION_LEAVE_REQUEST_REJECT,
-            $leaveRequest,
-            $leaveRequest->staff_id,
-            $data['action'] === 'reject' ? $data['rejection_reason'] : null
-        );
+            OperationLog::record(
+                $data['action'] === 'approve' ? OperationLog::ACTION_LEAVE_REQUEST_APPROVE : OperationLog::ACTION_LEAVE_REQUEST_REJECT,
+                $leaveRequest,
+                $leaveRequest->staff_id,
+                $data['action'] === 'reject' ? $data['rejection_reason'] : null
+            );
+        });
 
         $this->sendNotification(
             $leaveRequest->staff->email,

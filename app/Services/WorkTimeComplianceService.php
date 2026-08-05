@@ -6,6 +6,7 @@ use App\Models\Holiday;
 use App\Models\LaborCost;
 use App\Models\Staff;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 
 /**
  * 労働時間の週・月集計と、36協定(時間外労働)の目安となる警告値を計算する。
@@ -15,6 +16,10 @@ use Illuminate\Support\Carbon;
  * 期間内で合計する(週40時間の上限のみ、週の実働合計から直接計算する)。
  * 正確な法定休日の判定や暦日ベースの月間法定労働時間までは踏み込まない、
  * 実務上の目安としての近似値である。
+ *
+ * 月次シリーズの計算は、対象期間全体を1回のクエリでまとめて取得してからPHP側で
+ * 月ごとに振り分ける。月ごとにクエリを投げると12か月分で数十本のクエリになり、
+ * 作業日報画面・作業日報一覧が目に見えて遅くなるため。
  */
 class WorkTimeComplianceService
 {
@@ -85,16 +90,36 @@ class WorkTimeComplianceService
      */
     public function workedMinutesByDate(Staff $staff, Carbon $start, Carbon $end): array
     {
+        return $this->workedMinutesByStaffAndDate([$staff->id], $start, $end)[$staff->id] ?? [];
+    }
+
+    /**
+     * 複数人分の実働分数を1回のクエリでまとめて取得する。
+     *
+     * @param  array<int, int>  $staffIds
+     * @return array<int, array<string, int>> staff_id => [work_date => 分]
+     */
+    public function workedMinutesByStaffAndDate(array $staffIds, Carbon $start, Carbon $end): array
+    {
+        if ($staffIds === []) {
+            return [];
+        }
+
         // work_dateはdateキャストのため保存値は "Y-m-d H:i:s" 形式になる。whereBetween に
         // 単純な日付文字列を渡すと文字列比較で末日分が漏れるため、whereDate で比較する。
-        return LaborCost::where('staff_id', $staff->id)
+        $rows = LaborCost::whereIn('staff_id', $staffIds)
             ->whereDate('work_date', '>=', $start->toDateString())
             ->whereDate('work_date', '<=', $end->toDateString())
-            ->selectRaw('work_date, SUM(work_hours * 60 + work_minutes) as minutes')
-            ->groupBy('work_date')
-            ->get()
-            ->mapWithKeys(fn ($row) => [Carbon::parse($row->work_date)->format('Y-m-d') => (int) $row->minutes])
-            ->all();
+            ->selectRaw('staff_id, work_date, SUM(work_hours * 60 + work_minutes) as minutes')
+            ->groupBy('staff_id', 'work_date')
+            ->get();
+
+        $result = [];
+        foreach ($rows as $row) {
+            $result[(int) $row->staff_id][Carbon::parse($row->work_date)->format('Y-m-d')] = (int) $row->minutes;
+        }
+
+        return $result;
     }
 
     public function workedMinutesForPeriod(Staff $staff, Carbon $start, Carbon $end): int
@@ -103,15 +128,27 @@ class WorkTimeComplianceService
     }
 
     /**
+     * 期間内の休日マスタを日付キーで返す。
+     *
+     * @return Collection<string, Holiday>
+     */
+    public function holidaysByDate(Carbon $start, Carbon $end): Collection
+    {
+        return Holiday::whereDate('date', '>=', $start->toDateString())
+            ->whereDate('date', '<=', $end->toDateString())
+            ->get()->keyBy(fn (Holiday $h) => $h->date->format('Y-m-d'));
+    }
+
+    /**
      * 土日・祝日・会社休日かどうか(有給休暇取得推奨日は対象外)。
      */
-    public function isRestDay(Carbon $date, ?\Illuminate\Support\Collection $holidaysByDate = null): bool
+    public function isRestDay(Carbon $date, ?Collection $holidaysByDate = null): bool
     {
         if (in_array($date->dayOfWeek, [Carbon::SATURDAY, Carbon::SUNDAY], true)) {
             return true;
         }
 
-        $holidaysByDate ??= Holiday::whereDate('date', $date->toDateString())->get()->keyBy(fn (Holiday $h) => $h->date->format('Y-m-d'));
+        $holidaysByDate ??= $this->holidaysByDate($date, $date);
         $holiday = $holidaysByDate->get($date->format('Y-m-d'));
 
         return in_array($holiday?->type, [Holiday::TYPE_PUBLIC_HOLIDAY, Holiday::TYPE_COMPANY_HOLIDAY], true);
@@ -123,45 +160,97 @@ class WorkTimeComplianceService
     public function overtimeMinutesForPeriod(Staff $staff, Carbon $start, Carbon $end): int
     {
         $workedByDate = $this->workedMinutesByDate($staff, $start, $end);
-        if (empty($workedByDate)) {
+        if ($workedByDate === []) {
             return 0;
         }
 
-        $holidaysByDate = Holiday::whereDate('date', '>=', $start->toDateString())
-            ->whereDate('date', '<=', $end->toDateString())
-            ->get()->keyBy(fn (Holiday $h) => $h->date->format('Y-m-d'));
-
-        $total = 0;
-        foreach ($workedByDate as $dateString => $minutes) {
-            $date = Carbon::parse($dateString);
-            $total += $this->isRestDay($date, $holidaysByDate) ? $minutes : max(0, $minutes - self::DAILY_LEGAL_MINUTES);
-        }
-
-        return $total;
+        return $this->aggregate($workedByDate, $start, $end, $this->holidaysByDate($start, $end))['overtimeMinutes'];
     }
 
     /**
      * 指定日を含む20日締め月から遡って$count か月分の残業時間を、直近月から順に返す。
      *
-     * @return array<int, array{start: Carbon, end: Carbon, workedMinutes: int, overtimeMinutes: int}>
+     * @return array<int, array{start: Carbon, end: Carbon, workedMinutes: int, overtimeMinutes: int, holidayWorkMinutes: int}>
      */
     public function monthlyOvertimeSeries(Staff $staff, Carbon $referenceDate, int $count): array
     {
-        [$start] = $this->monthPeriod($referenceDate);
-        $series = [];
+        return $this->monthlyOvertimeSeriesForStaff([$staff->id], $referenceDate, $count)[$staff->id] ?? [];
+    }
 
-        for ($i = 0; $i < $count; $i++) {
-            $monthAnchor = $start->copy()->subMonthsNoOverflow($i);
-            [$periodStart, $periodEnd] = $this->monthPeriod($monthAnchor);
-            $series[] = [
-                'start' => $periodStart,
-                'end' => $periodEnd,
-                'workedMinutes' => $this->workedMinutesForPeriod($staff, $periodStart, $periodEnd),
-                'overtimeMinutes' => $this->overtimeMinutesForPeriod($staff, $periodStart, $periodEnd),
-            ];
+    /**
+     * 複数人分の月次残業シリーズを、対象期間全体1クエリ + 休日マスタ1クエリでまとめて計算する。
+     *
+     * @param  array<int, int>  $staffIds
+     * @return array<int, array<int, array{start: Carbon, end: Carbon, workedMinutes: int, overtimeMinutes: int, holidayWorkMinutes: int}>>
+     */
+    public function monthlyOvertimeSeriesForStaff(array $staffIds, Carbon $referenceDate, int $count): array
+    {
+        if ($staffIds === [] || $count < 1) {
+            return [];
         }
 
-        return $series;
+        [$latestStart] = $this->monthPeriod($referenceDate);
+
+        $periods = [];
+        for ($i = 0; $i < $count; $i++) {
+            $periods[] = $this->monthPeriod($latestStart->copy()->subMonthsNoOverflow($i));
+        }
+
+        $spanStart = $periods[$count - 1][0];
+        $spanEnd = $periods[0][1];
+
+        $workedByStaff = $this->workedMinutesByStaffAndDate($staffIds, $spanStart, $spanEnd);
+        $holidaysByDate = $this->holidaysByDate($spanStart, $spanEnd);
+
+        $result = [];
+        foreach ($staffIds as $staffId) {
+            $byDate = $workedByStaff[$staffId] ?? [];
+            $series = [];
+            foreach ($periods as [$periodStart, $periodEnd]) {
+                $series[] = [
+                    'start' => $periodStart,
+                    'end' => $periodEnd,
+                    ...$this->aggregate($byDate, $periodStart, $periodEnd, $holidaysByDate),
+                ];
+            }
+            $result[$staffId] = $series;
+        }
+
+        return $result;
+    }
+
+    /**
+     * 日別実働分数のうち指定期間に入る分を、実働・残業・休日労働に集計する。
+     *
+     * @param  array<string, int>  $workedByDate
+     * @param  Collection<string, Holiday>  $holidaysByDate
+     * @return array{workedMinutes: int, overtimeMinutes: int, holidayWorkMinutes: int}
+     */
+    private function aggregate(array $workedByDate, Carbon $start, Carbon $end, Collection $holidaysByDate): array
+    {
+        $from = $start->toDateString();
+        $to = $end->toDateString();
+
+        $worked = 0;
+        $overtime = 0;
+        $holidayWork = 0;
+
+        foreach ($workedByDate as $dateString => $minutes) {
+            if ($dateString < $from || $dateString > $to) {
+                continue;
+            }
+
+            $worked += $minutes;
+
+            if ($this->isRestDay(Carbon::parse($dateString), $holidaysByDate)) {
+                $overtime += $minutes;
+                $holidayWork += $minutes;
+            } else {
+                $overtime += max(0, $minutes - self::DAILY_LEGAL_MINUTES);
+            }
+        }
+
+        return ['workedMinutes' => $worked, 'overtimeMinutes' => $overtime, 'holidayWorkMinutes' => $holidayWork];
     }
 
     /**
@@ -169,6 +258,7 @@ class WorkTimeComplianceService
      *
      * @return array{
      *     monthOvertimeMinutes: int,
+     *     monthHolidayWorkMinutes: int,
      *     hardCapRemainingMinutes: int,
      *     hardCapExceeded: bool,
      *     specialClauseMonthsUsedThisFiscalYear: int,
@@ -181,41 +271,62 @@ class WorkTimeComplianceService
      */
     public function specialClauseSummary(Staff $staff, Carbon $referenceDate): array
     {
+        return $this->specialClauseSummariesForStaff([$staff->id], $referenceDate)[$staff->id];
+    }
+
+    /**
+     * 複数人分の特別条項サマリを、月次シリーズ1回分のクエリでまとめて計算する。
+     *
+     * @param  array<int, int>  $staffIds
+     * @return array<int, array<string, mixed>>
+     */
+    public function specialClauseSummariesForStaff(array $staffIds, Carbon $referenceDate): array
+    {
         [$fiscalStart, $fiscalEnd] = $this->fiscalYearPeriod($referenceDate);
 
-        // 年度開始月から当月までの最大12か月分を計算する。
-        $monthsSinceFiscalStart = $fiscalStart->diffInMonths($this->monthPeriod($referenceDate)[0]) + 1;
-        $fiscalSeries = $this->monthlyOvertimeSeries($staff, $referenceDate, max(1, min(12, $monthsSinceFiscalStart)));
+        // 年度開始月から当月までの最大12か月分と、複数月平均の判定に使う直近6か月分の
+        // 両方を1回のシリーズ取得でまかなう。
+        $fiscalMonths = max(1, min(12, $fiscalStart->diffInMonths($this->monthPeriod($referenceDate)[0]) + 1));
+        $series = $this->monthlyOvertimeSeriesForStaff($staffIds, $referenceDate, max(6, $fiscalMonths));
 
-        $monthOvertimeMinutes = $fiscalSeries[0]['overtimeMinutes'] ?? 0;
+        $result = [];
+        foreach ($staffIds as $staffId) {
+            $months = $series[$staffId] ?? [];
+            $fiscalSeries = array_slice($months, 0, $fiscalMonths);
+            $sixMonthSeries = array_slice($months, 0, 6);
 
-        $specialClauseMonthsUsed = collect($fiscalSeries)
-            ->filter(fn (array $m) => $m['overtimeMinutes'] > self::SPECIAL_CLAUSE_MONTHLY_MINUTES)
-            ->count();
+            $monthOvertimeMinutes = $fiscalSeries[0]['overtimeMinutes'] ?? 0;
 
-        $sixMonthSeries = $this->monthlyOvertimeSeries($staff, $referenceDate, 6);
-        $worstAverage = null;
-        for ($n = 2; $n <= 6; $n++) {
-            $window = array_slice($sixMonthSeries, 0, $n);
-            if (count($window) < $n) {
-                break;
+            $specialClauseMonthsUsed = collect($fiscalSeries)
+                ->filter(fn (array $m) => $m['overtimeMinutes'] > self::SPECIAL_CLAUSE_MONTHLY_MINUTES)
+                ->count();
+
+            $worstAverage = null;
+            for ($n = 2; $n <= 6; $n++) {
+                $window = array_slice($sixMonthSeries, 0, $n);
+                if (count($window) < $n) {
+                    break;
+                }
+                $average = (int) round(array_sum(array_column($window, 'overtimeMinutes')) / $n);
+                if ($average > self::MULTI_MONTH_AVERAGE_CAP_MINUTES && ($worstAverage === null || $average > $worstAverage['averageMinutes'])) {
+                    $worstAverage = ['months' => $n, 'averageMinutes' => $average];
+                }
             }
-            $average = (int) round(array_sum(array_column($window, 'overtimeMinutes')) / $n);
-            if ($average > self::MULTI_MONTH_AVERAGE_CAP_MINUTES && ($worstAverage === null || $average > $worstAverage['averageMinutes'])) {
-                $worstAverage = ['months' => $n, 'averageMinutes' => $average];
-            }
+
+            $result[$staffId] = [
+                'monthOvertimeMinutes' => $monthOvertimeMinutes,
+                'monthHolidayWorkMinutes' => $fiscalSeries[0]['holidayWorkMinutes'] ?? 0,
+                'hardCapRemainingMinutes' => max(0, self::MONTHLY_HARD_CAP_MINUTES - $monthOvertimeMinutes),
+                'hardCapExceeded' => $monthOvertimeMinutes >= self::MONTHLY_HARD_CAP_MINUTES,
+                'specialClauseMonthsUsedThisFiscalYear' => $specialClauseMonthsUsed,
+                'specialClauseMonthsRemaining' => max(0, self::SPECIAL_CLAUSE_MAX_MONTHS_PER_FISCAL_YEAR - $specialClauseMonthsUsed),
+                'specialClauseLimitReached' => $specialClauseMonthsUsed >= self::SPECIAL_CLAUSE_MAX_MONTHS_PER_FISCAL_YEAR,
+                'fiscalYearStart' => $fiscalStart,
+                'fiscalYearEnd' => $fiscalEnd,
+                'worstAverage' => $worstAverage,
+            ];
         }
 
-        return [
-            'monthOvertimeMinutes' => $monthOvertimeMinutes,
-            'hardCapRemainingMinutes' => max(0, self::MONTHLY_HARD_CAP_MINUTES - $monthOvertimeMinutes),
-            'hardCapExceeded' => $monthOvertimeMinutes >= self::MONTHLY_HARD_CAP_MINUTES,
-            'specialClauseMonthsUsedThisFiscalYear' => $specialClauseMonthsUsed,
-            'specialClauseMonthsRemaining' => max(0, self::SPECIAL_CLAUSE_MAX_MONTHS_PER_FISCAL_YEAR - $specialClauseMonthsUsed),
-            'specialClauseLimitReached' => $specialClauseMonthsUsed >= self::SPECIAL_CLAUSE_MAX_MONTHS_PER_FISCAL_YEAR,
-            'fiscalYearStart' => $fiscalStart,
-            'fiscalYearEnd' => $fiscalEnd,
-            'worstAverage' => $worstAverage,
-        ];
+        return $result;
     }
 }

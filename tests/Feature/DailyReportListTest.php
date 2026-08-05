@@ -46,7 +46,7 @@ class DailyReportListTest extends TestCase
         $this->actingAs($staff)->get(route('daily-reports.list.index'))->assertForbidden();
     }
 
-    public function test_shows_35_days_from_one_week_ago_to_four_weeks_ahead(): void
+    public function test_shows_the_past_three_weeks_ending_today(): void
     {
         $manager = Staff::factory()->procurementManager()->create();
 
@@ -54,8 +54,35 @@ class DailyReportListTest extends TestCase
 
         $response->assertOk();
         $response->assertViewHas('dates', function (array $dates) {
-            return $dates[0] === '2026-08-03' && end($dates) === '2026-09-06' && count($dates) === 35;
+            return $dates[0] === '2026-07-21' && end($dates) === '2026-08-10' && count($dates) === 21;
         });
+    }
+
+    public function test_shows_36_agreement_indicators_per_staff(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        $staff = Staff::factory()->create(['name' => '残業太郎']);
+
+        // 当月(7/21〜8/20)に単月100時間超の残業を作る: 平日8時間+8時間を14日分。
+        for ($i = 0; $i < 14; $i++) {
+            $date = \Illuminate\Support\Carbon::parse('2026-07-21')->addDays($i);
+            if (in_array($date->dayOfWeek, [0, 6], true)) {
+                continue;
+            }
+            LaborCost::create([
+                'work_date' => $date->format('Y-m-d'), 'staff_id' => $staff->id,
+                'work_hours' => 20, 'work_minutes' => 0, 'is_overtime' => false, 'is_provisional' => false,
+            ]);
+        }
+
+        $response = $this->actingAs($manager)->get(route('daily-reports.list.index'));
+
+        $response->assertOk();
+        $response->assertViewHas('complianceByStaff', function (array $map) use ($staff) {
+            return ($map[$staff->id]['hardCapExceeded'] ?? false) === true
+                && ($map[$staff->id]['level'] ?? null) === 'danger';
+        });
+        $response->assertSee('危険');
     }
 
     public function test_shows_blue_marker_for_labor_costs_registered_from_purchase_input(): void
@@ -124,7 +151,7 @@ class DailyReportListTest extends TestCase
         $response->assertSee('確認待ち');
     }
 
-    public function test_review_link_shown_to_managers_and_supervisors(): void
+    public function test_review_link_shown_only_to_managers(): void
     {
         $manager = Staff::factory()->procurementManager()->create();
         $supervisor = Staff::factory()->create(['is_supervisor' => true]);
@@ -132,8 +159,9 @@ class DailyReportListTest extends TestCase
         $this->actingAs($manager)->get(route('daily-reports.list.index'))
             ->assertSee(route('daily-reports.review.index', ['date' => '2026-08-10']), false);
 
+        // 作業日報確認は資材管理担当者の業務のため、上長には導線を出さない。
         $this->actingAs($supervisor)->get(route('daily-reports.list.index'))
-            ->assertSee(route('daily-reports.review.index', ['date' => '2026-08-10']), false);
+            ->assertDontSee(route('daily-reports.review.index', ['date' => '2026-08-10']), false);
     }
 
     public function test_staff_are_grouped_by_department(): void

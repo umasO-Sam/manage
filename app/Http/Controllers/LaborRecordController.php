@@ -4,7 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Models\CategoryCode;
 use App\Models\LaborCost;
+use App\Models\OperationLog;
 use App\Models\Staff;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
@@ -62,9 +64,58 @@ class LaborRecordController extends Controller
             'records' => $records,
             'staffList' => Staff::orderedForRoster()->get(),
             'categories' => $this->categoriesUsedInLaborCosts(),
+            // 絞り込み用(実際に使われている分類のみ)とは別に、修正時は全分類から選べるようにする。
+            'editableCategories' => CategoryCode::orderBy('code')->get(),
             'filters' => compact('dateFrom', 'dateTo', 'staffId', 'categoryId', 'orderNo', 'source'),
             'pageTotalMinutes' => $totalMinutes,
         ]);
+    }
+
+    /**
+     * 確定済み人工レコードを1件修正する。作業日報由来のレコードもここで直接直せるが、
+     * その日報が再提出されると syncLaborCosts() により作り直されて修正内容は失われる
+     * (画面上でもその旨を注意書きしている)。
+     */
+    public function update(Request $request, LaborCost $laborRecord): RedirectResponse
+    {
+        $data = $request->validate([
+            'work_date' => ['required', 'date'],
+            'staff_id' => ['required', 'integer', 'exists:staff,id'],
+            'order_no' => ['nullable', 'string', 'max:255'],
+            'category_id' => ['nullable', 'integer', 'exists:category_codes,id'],
+            'work_hours' => ['required', 'integer', 'min:0', 'max:99'],
+            'work_minutes' => ['required', 'integer', 'min:0', 'max:59'],
+            'is_overtime' => ['nullable', 'boolean'],
+            'note' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        if ((int) $data['work_hours'] === 0 && (int) $data['work_minutes'] === 0) {
+            return back()->withErrors(['labor_record' => '作業時間が0のレコードは登録できません。削除する場合は削除ボタンを使ってください。']);
+        }
+
+        // 担当者を付け替えた場合、労務費の算出に使う役職荷重も新しい担当者のものに合わせる。
+        $staff = Staff::find($data['staff_id']);
+
+        $laborRecord->update([
+            ...$data,
+            'is_overtime' => $request->boolean('is_overtime'),
+            'position_weight_cache' => $staff?->position_weight,
+        ]);
+
+        OperationLog::record(OperationLog::ACTION_LABOR_RECORD_UPDATE, $laborRecord, $laborRecord->staff_id);
+
+        return back()->with('status', 'labor-record-updated');
+    }
+
+    public function destroy(LaborCost $laborRecord): RedirectResponse
+    {
+        $ownerStaffId = $laborRecord->staff_id;
+
+        OperationLog::record(OperationLog::ACTION_LABOR_RECORD_DELETE, $laborRecord, $ownerStaffId);
+
+        $laborRecord->delete();
+
+        return back()->with('status', 'labor-record-deleted');
     }
 
     /**

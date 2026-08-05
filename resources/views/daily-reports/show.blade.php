@@ -29,9 +29,6 @@
         })">
         <div class="max-w-4xl mx-auto sm:px-6 lg:px-8 space-y-6">
 
-            @if (session('status') === 'daily-report-saved')
-                <div class="p-3 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-800 text-sm">下書きを保存しました。</div>
-            @endif
             @if (session('status') === 'daily-report-submitted')
                 <div class="p-3 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-800 text-sm">日報を提出しました。資材管理担当者の確認後、正式な人工データとして反映されます。</div>
             @endif
@@ -77,10 +74,6 @@
             <form method="POST" action="{{ route('daily-reports.store') }}" class="space-y-4">
                 @csrf
                 <input type="hidden" name="work_date" value="{{ $workDate }}">
-                {{-- ページ共通のapp.jsが送信ボタンをsubmitイベント内でdisabledにするため、ボタン自身の
-                     name/value(submitterの値)はネイティブのフォーム送信データから除外されてしまう。
-                     そのためsubmit/submitイベントより前に発火する@clickでhidden inputへ値を書き込む。 --}}
-                <input type="hidden" name="submit" x-ref="submitFlag" value="0">
 
                 <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
                     <div>
@@ -237,6 +230,31 @@
                     </div>
                 </div>
 
+                {{-- 提出後に資材管理担当者が見る「作業日報確認」と同じ横並び表示を、入力中もそのまま
+                     確認できるようにする。entriesを直接参照しているため反映のたびに自動で更新される。 --}}
+                <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                    <h3 class="text-xs font-bold text-slate-700 mb-2">日報プレビュー（作業日報確認と同じ表示）</h3>
+                    <div class="overflow-x-auto" x-ref="previewWrap">
+                        <div :style="{ width: previewWidthPx() + 'px' }">
+                            <div class="relative h-4 mb-1 text-[10px] text-slate-400 font-mono select-none">
+                                <template x-for="t in previewTicks()" :key="'ptick-' + t.at">
+                                    <span class="absolute -translate-x-1/2 whitespace-nowrap" :style="{ left: previewPercent(t.at) + '%' }" x-text="t.label"></span>
+                                </template>
+                            </div>
+                            <div class="relative h-12 border border-slate-200 rounded-lg overflow-hidden select-none" :style="previewBackgroundStyle()">
+                                <template x-for="(seg, idx) in previewSegments()" :key="'pseg-' + idx">
+                                    <div class="absolute top-0 bottom-0 flex items-start px-1 py-0.5 text-[10px] leading-tight text-slate-800 border-r border-white/70 overflow-hidden"
+                                         :style="{ left: previewPercent(seg.from) + '%', width: (previewPercent(seg.to) - previewPercent(seg.from)) + '%', backgroundColor: seg.color }"
+                                         :title="seg.label + '（' + formatMinute(seg.from) + '〜' + formatMinute(seg.to) + '）'">
+                                        <span class="line-clamp-2 break-words" x-text="seg.label"></span>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+                    </div>
+                    <p x-show="previewSegments().length === 0" class="text-xs text-slate-400 mt-1">まだ入力がありません。</p>
+                </div>
+
                 <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-2">
                     <h3 class="text-xs font-bold text-slate-700">労働時間集計</h3>
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
@@ -323,9 +341,8 @@
 
                 @php($isResubmit = $report->exists && $report->isSubmitted())
                 <div class="flex justify-end gap-2">
-                    <button type="submit" @click="$refs.submitFlag.value = '0'" class="px-5 py-2.5 rounded-lg font-bold text-sm border border-slate-300 text-slate-700 bg-white hover:bg-slate-50">下書き保存</button>
                     <button type="submit"
-                            @click="if (! confirm('{{ $isResubmit ? '修正内容を提出します。よろしいですか？' : '作業日報を提出します。よろしいですか？' }}')) { $event.preventDefault(); } else { $refs.submitFlag.value = '1'; }"
+                            @click="if (! confirm('{{ $isResubmit ? '修正内容を提出します。よろしいですか？' : '作業日報を提出します。よろしいですか？' }}')) { $event.preventDefault(); }"
                             class="px-5 py-2.5 rounded-lg font-bold text-sm bg-blue-600 text-white hover:bg-blue-700">{{ $isResubmit ? '修正提出' : '提出' }}</button>
                 </div>
             </form>
@@ -395,7 +412,14 @@
                     this.categories.forEach((cat, idx) => {
                         this.categoryColors[cat.id] = palette[idx % palette.length];
                     });
-                    this.$nextTick(() => this.scrollToDefaultStart());
+                    this.$nextTick(() => {
+                        this.scrollToDefaultStart();
+                        this.measurePreviewScale();
+                    });
+                    window.addEventListener('resize', () => this.measurePreviewScale());
+                    // 入力が7:00より前・20:00より後に広がるとプレビューの範囲自体が変わるため、
+                    // 反映のたびに既定の表示位置(7:00)へスクロールを合わせ直す。
+                    this.$watch('entries', () => this.$nextTick(() => this.syncPreviewScroll()));
                 },
 
                 scrollToDefaultStart() {
@@ -912,6 +936,94 @@
 
                 monthOvertimeExcessMinutes() {
                     return Math.max(0, this.monthOvertimeMinutes() - 3600);
+                },
+
+                // --- 日報プレビュー(作業日報確認 daily-reports/review/index.blade.php と同じ横並び表示) ---
+                // 表示領域には常に7:00〜20:00が収まるようにし、それより前後の作業は横スクロールで見る。
+                previewBaseStart: 7 * 60,
+                previewBaseEnd: 20 * 60,
+                previewPxPerMinute: 4,
+                // 始業・休憩・終業の正確な境界時刻。10分間の休憩(10:00-10:10、15:00-15:10)は
+                // 隣接する目盛りが重なるため1つのラベルにまとめる(確認画面と同じ)。
+                previewBoundaryTicks: [
+                    { at: 8 * 60, label: '8:00' },
+                    { at: 10 * 60, label: '10:00~10' },
+                    { at: 12 * 60 + 10, label: '12:10' },
+                    { at: 13 * 60, label: '13:00' },
+                    { at: 15 * 60, label: '15:00~10' },
+                    { at: 17 * 60 + 10, label: '17:10' },
+                ],
+
+                get previewStart() {
+                    const starts = this.validEntries().map((e) => e.start_minute);
+                    const minStart = starts.length ? Math.min(...starts) : this.previewBaseStart;
+                    return Math.max(0, Math.min(this.previewBaseStart, Math.floor(minStart / 60) * 60 - 60));
+                },
+
+                get previewEnd() {
+                    const ends = this.validEntries().map((e) => e.end_minute);
+                    const maxEnd = ends.length ? Math.max(...ends) : this.previewBaseEnd;
+                    return Math.min(24 * 60, Math.max(this.previewBaseEnd, Math.ceil(maxEnd / 60) * 60 + 60));
+                },
+
+                // 表示領域の実測幅から「7:00〜20:00がちょうど収まる」px/分を求める。
+                measurePreviewScale() {
+                    const wrap = this.$refs.previewWrap;
+                    if (!wrap || wrap.clientWidth === 0) return;
+                    this.previewPxPerMinute = wrap.clientWidth / (this.previewBaseEnd - this.previewBaseStart);
+                    this.syncPreviewScroll();
+                },
+
+                syncPreviewScroll() {
+                    const wrap = this.$refs.previewWrap;
+                    if (!wrap) return;
+                    wrap.scrollLeft = (this.previewBaseStart - this.previewStart) * this.previewPxPerMinute;
+                },
+
+                previewWidthPx() {
+                    return (this.previewEnd - this.previewStart) * this.previewPxPerMinute;
+                },
+
+                previewPercent(t) {
+                    return ((t - this.previewStart) / (this.previewEnd - this.previewStart)) * 100;
+                },
+
+                previewTicks() {
+                    const ticks = [];
+                    for (let t = Math.ceil(this.previewStart / 60) * 60; t <= this.previewEnd; t += 60) {
+                        // 毎時目盛りと境界目盛りが近接するとラベルが重なるため、境界側を優先して残す。
+                        if (this.previewBoundaryTicks.some((b) => Math.abs(b.at - t) < 30)) continue;
+                        ticks.push({ at: t, label: this.formatMinute(t) });
+                    }
+                    this.previewBoundaryTicks
+                        .filter((b) => b.at >= this.previewStart && b.at <= this.previewEnd)
+                        .forEach((b) => ticks.push(b));
+
+                    return ticks.sort((a, b) => a.at - b.at);
+                },
+
+                // 10分ごとに薄い補助線、1時間ごとにやや濃い線を重ねて表示する。
+                previewBackgroundStyle() {
+                    const total = this.previewEnd - this.previewStart;
+                    if (total <= 0) return {};
+                    const tenMinPct = (10 / total) * 100;
+                    const hourPct = (60 / total) * 100;
+                    return {
+                        backgroundImage: `repeating-linear-gradient(to right, rgba(15,23,42,0.07) 0, rgba(15,23,42,0.07) 1px, transparent 1px, transparent ${tenMinPct}%), `
+                            + `repeating-linear-gradient(to right, rgba(15,23,42,0.2) 0, rgba(15,23,42,0.2) 1px, transparent 1px, transparent ${hourPct}%)`,
+                    };
+                },
+
+                previewSegments() {
+                    return this.validEntries()
+                        .filter((e) => e.end_minute > this.previewStart && e.start_minute < this.previewEnd)
+                        .map((e) => ({
+                            from: Math.max(e.start_minute, this.previewStart),
+                            to: Math.min(e.end_minute, this.previewEnd),
+                            color: this.entryColor(e),
+                            label: this.entryLabel(e),
+                        }))
+                        .sort((a, b) => a.from - b.from);
                 },
 
                 formatDuration(minutes) {

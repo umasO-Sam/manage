@@ -96,8 +96,6 @@ class DailyReportController extends Controller
             'entries.*.leave_type' => ['nullable', 'in:'.implode(',', array_keys(DailyReportEntry::LEAVE_TYPES))],
         ]);
 
-        $isSubmit = $request->boolean('submit');
-
         $report = $this->findReport(Auth::id(), $validated['work_date'])
             ?? DailyReport::create(['staff_id' => Auth::id(), 'work_date' => $validated['work_date']]);
 
@@ -108,7 +106,7 @@ class DailyReportController extends Controller
         // サーバー側でも二重にチェックする)。
         $categoriesRequiringOrderNo = CategoryCode::whereNotIn('code', [69, 70, 71])->pluck('id')->all();
 
-        DB::transaction(function () use ($report, $validated, $isSubmit, $categoriesRequiringOrderNo) {
+        DB::transaction(function () use ($report, $validated, $categoriesRequiringOrderNo) {
             $report->remarks = $validated['remarks'] ?? null;
             $report->entries()->delete();
 
@@ -140,30 +138,27 @@ class DailyReportController extends Controller
                 ]);
             }
 
-            if ($isSubmit) {
-                $report->submitted_at = now();
-                // 差し戻された日報を修正して再提出した場合、差し戻し状態は解消する
-                // (再提出のたびに以前の差し戻し理由が残り続けるのを防ぐため)。
-                $report->rejected_at = null;
-                $report->rejection_reason = null;
-            }
+            // 下書き保存は廃止し、保存＝提出に一本化した(2026-08-05)。以前は下書き保存の
+            // 経路だけがsyncLaborCosts()を呼ばず、エントリだけが差し替わって人工データが
+            // 提出時点の内容のまま取り残される不具合があった。
+            $report->submitted_at = now();
+            // 差し戻された日報を修正して再提出した場合、差し戻し状態は解消する
+            // (再提出のたびに以前の差し戻し理由が残り続けるのを防ぐため)。
+            $report->rejected_at = null;
+            $report->rejection_reason = null;
             $report->save();
 
-            if ($isSubmit) {
-                $this->syncLaborCosts($report);
-            }
+            $this->syncLaborCosts($report);
         });
 
-        if ($isSubmit) {
-            OperationLog::record(
-                $wasSubmittedBefore ? OperationLog::ACTION_DAILY_REPORT_RESUBMIT : OperationLog::ACTION_DAILY_REPORT_SUBMIT,
-                $report,
-                $report->staff_id
-            );
-        }
+        OperationLog::record(
+            $wasSubmittedBefore ? OperationLog::ACTION_DAILY_REPORT_RESUBMIT : OperationLog::ACTION_DAILY_REPORT_SUBMIT,
+            $report,
+            $report->staff_id
+        );
 
         return redirect()->route('daily-reports.show', ['date' => $report->work_date->format('Y-m-d')])
-            ->with('status', $isSubmit ? 'daily-report-submitted' : 'daily-report-saved');
+            ->with('status', 'daily-report-submitted');
     }
 
     /**

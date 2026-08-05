@@ -9,7 +9,32 @@
     <div class="py-8">
         <div class="max-w-full mx-auto sm:px-6 lg:px-8 space-y-4">
 
-            <p class="text-xs text-slate-500">今日を基準に前1週間・先4週間（35日分）を表示しています。</p>
+            <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between gap-3 flex-wrap">
+                <div class="flex items-center gap-2">
+                    <a href="{{ route('work-status.index', ['date' => $prevAnchor]) }}"
+                       class="px-3 py-1.5 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-50 text-xs font-bold whitespace-nowrap">
+                        ← 前の4週間
+                    </a>
+                    <a href="{{ route('work-status.index', ['date' => $nextAnchor]) }}"
+                       class="px-3 py-1.5 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-50 text-xs font-bold whitespace-nowrap">
+                        次の4週間 →
+                    </a>
+                    <a href="{{ route('work-status.index') }}"
+                       class="px-3 py-1.5 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-50 text-xs font-bold whitespace-nowrap">
+                        今日へ
+                    </a>
+                </div>
+                <div class="flex items-center gap-2">
+                    <label class="text-xs font-bold text-slate-600">基準日</label>
+                    <input type="date" value="{{ $anchor }}"
+                           onchange="location.href = '{{ route('work-status.index') }}?date=' + this.value"
+                           class="border rounded-lg p-1.5 border-slate-300 text-xs font-bold">
+                </div>
+            </div>
+
+            <p class="text-xs text-slate-500">
+                基準日（{{ \Illuminate\Support\Carbon::parse($anchor)->format('Y/m/d') }}）から前1週間・先4週間（35日分・{{ $rangeLabel }}）を表示しています。
+            </p>
 
             <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-x-auto">
                 <table class="border-collapse text-xs">

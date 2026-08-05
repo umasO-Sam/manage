@@ -32,6 +32,10 @@ class OperationLog extends Model
 
     public const ACTION_LEAVE_REQUEST_REJECT = 'leave_request_reject';
 
+    public const ACTION_LABOR_RECORD_UPDATE = 'labor_record_update';
+
+    public const ACTION_LABOR_RECORD_DELETE = 'labor_record_delete';
+
     /** @var array<string, string> action値 => 表示名 */
     public const ACTIONS = [
         self::ACTION_DAILY_REPORT_SUBMIT => '作業日報を提出',
@@ -42,6 +46,8 @@ class OperationLog extends Model
         self::ACTION_LEAVE_REQUEST_WITHDRAW => '申請を取消',
         self::ACTION_LEAVE_REQUEST_APPROVE => '申請を承認',
         self::ACTION_LEAVE_REQUEST_REJECT => '申請を却下',
+        self::ACTION_LABOR_RECORD_UPDATE => '人工レコードを修正',
+        self::ACTION_LABOR_RECORD_DELETE => '人工レコードを削除',
     ];
 
     public function staff(): BelongsTo

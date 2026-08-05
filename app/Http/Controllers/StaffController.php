@@ -26,7 +26,13 @@ class StaffController extends Controller
 {
     public function index(): View
     {
-        return view('staff.index', ['staffList' => Staff::orderedForRoster()->get()]);
+        $staffList = Staff::orderedForRoster()->get();
+
+        return view('staff.index', [
+            'staffList' => $staffList,
+            // 1行ずつpaidLeaveBalance()を呼ぶと担当者の人数だけクエリが増えるため、まとめて取得する。
+            'paidLeaveBalances' => Staff::paidLeaveBalancesFor($staffList),
+        ]);
     }
 
     public function create(): View
@@ -76,6 +82,7 @@ class StaffController extends Controller
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'department' => ['required', 'string', 'max:255'],
+            'display_order' => ['nullable', 'integer', 'min:0', 'max:9999'],
             'sid' => ['nullable', 'integer', 'min:0', Rule::unique('staff', 'sid')->ignore($staff->id)],
             'login_id' => ['required', 'string', 'max:255', Rule::unique('staff', 'login_id')->ignore($staff->id)],
             'email' => ['required', 'string', 'email', 'max:255', Rule::unique('staff', 'email')->ignore($staff->id)],

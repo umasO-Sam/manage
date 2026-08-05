@@ -136,7 +136,7 @@ class LeaveRequestTest extends TestCase
         $approver = Staff::factory()->create(['is_supervisor' => true]);
 
         LeaveRequest::create([
-            'staff_id' => $staff->id, 'type' => 'paid_leave', 'start_date' => '2026-04-01', 'end_date' => '2026-04-05',
+            'staff_id' => $staff->id, 'type' => 'paid_leave', 'start_date' => '2026-05-01', 'end_date' => '2026-05-05',
             'granularity' => 'full_day', 'day_count' => 5.0, 'approver_id' => $approver->id, 'status' => LeaveRequest::STATUS_APPROVED,
         ]);
 
@@ -147,21 +147,48 @@ class LeaveRequestTest extends TestCase
         $this->assertSame(8.0, $balance['remainingTotal']);
     }
 
-    public function test_paid_leave_balance_ignores_pending_and_rejected_requests(): void
+    public function test_paid_leave_balance_deducts_pending_requests_but_ignores_rejected(): void
     {
         $staff = Staff::factory()->create(['paid_leave_granted_current_year' => 10]);
         $approver = Staff::factory()->create(['is_supervisor' => true]);
 
         LeaveRequest::create([
-            'staff_id' => $staff->id, 'type' => 'paid_leave', 'start_date' => '2026-04-01', 'end_date' => '2026-04-01',
+            'staff_id' => $staff->id, 'type' => 'paid_leave', 'start_date' => '2026-05-01', 'end_date' => '2026-05-01',
             'granularity' => 'full_day', 'day_count' => 1.0, 'approver_id' => $approver->id, 'status' => LeaveRequest::STATUS_PENDING,
         ]);
         LeaveRequest::create([
-            'staff_id' => $staff->id, 'type' => 'paid_leave', 'start_date' => '2026-04-02', 'end_date' => '2026-04-02',
+            'staff_id' => $staff->id, 'type' => 'paid_leave', 'start_date' => '2026-05-02', 'end_date' => '2026-05-02',
             'granularity' => 'full_day', 'day_count' => 1.0, 'approver_id' => $approver->id, 'status' => LeaveRequest::STATUS_REJECTED,
         ]);
 
-        $this->assertSame(10.0, $staff->paidLeaveBalance()['remainingTotal']);
+        $balance = $staff->paidLeaveBalance();
+
+        // 承認待ちは「消化見込み」として残数から差し引く(承認前に残数を超える申請を
+        // 何本も出せてしまうのを防ぐため)。却下済みは残数に影響しない。
+        $this->assertSame(1.0, $balance['pending']);
+        $this->assertSame(0.0, $balance['consumed']);
+        $this->assertSame(9.0, $balance['remainingTotal']);
+    }
+
+    public function test_paid_leave_balance_only_counts_the_current_fiscal_year(): void
+    {
+        $staff = Staff::factory()->create(['paid_leave_granted_current_year' => 10]);
+        $approver = Staff::factory()->create(['is_supervisor' => true]);
+
+        // 年度(4/21〜翌4/20)より前に消化した分は当年度の残数から差し引かない。
+        LeaveRequest::create([
+            'staff_id' => $staff->id, 'type' => 'paid_leave', 'start_date' => '2026-04-01', 'end_date' => '2026-04-01',
+            'granularity' => 'full_day', 'day_count' => 1.0, 'approver_id' => $approver->id, 'status' => LeaveRequest::STATUS_APPROVED,
+        ]);
+        LeaveRequest::create([
+            'staff_id' => $staff->id, 'type' => 'paid_leave', 'start_date' => '2026-05-01', 'end_date' => '2026-05-01',
+            'granularity' => 'full_day', 'day_count' => 2.0, 'approver_id' => $approver->id, 'status' => LeaveRequest::STATUS_APPROVED,
+        ]);
+
+        $balance = $staff->paidLeaveBalance();
+
+        $this->assertSame(2.0, $balance['consumed']);
+        $this->assertSame(8.0, $balance['remainingTotal']);
     }
 
     public function test_ceremonial_leave_marriage_auto_fills_five_days(): void

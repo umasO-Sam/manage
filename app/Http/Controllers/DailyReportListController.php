@@ -6,22 +6,28 @@ use App\Models\DailyReport;
 use App\Models\Holiday;
 use App\Models\LaborCost;
 use App\Models\Staff;
+use App\Services\WorkTimeComplianceService;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\View\View;
 
 /**
- * 作業日報一覧。勤務状況一覧と同じ表示方法(今日を基準に前1週間・先4週間(35日)を横軸に、
- * 全社員(部署順・表示順)を縦軸に一覧表示)で、各日の作業日報が提出・確認されているかを
- * 確認する画面。ルート側のsupervisor.or.managerミドルウェアにより
- * 資材管理担当者・上長のみがアクセスでき、常に全社員分を表示する。
+ * 作業日報一覧。勤務状況一覧と同じ表示方法(全社員を部署順・表示順に縦軸、日付を横軸)で、
+ * 過去3週間(今日を含む21日分)の各日の作業日報が提出・確認されているかを確認する画面。
+ * 右側には人別に、特別条項付き36協定の絶対上限に抵触しそうな兆候(当月の時間外労働・
+ * うち休日労働・年度内の月45時間超の回数・複数月平均・取得済み有給)を並べる。
+ * ルート側のsupervisor.or.managerミドルウェアにより資材管理担当者・上長のみがアクセスできる。
  */
 class DailyReportListController extends Controller
 {
-    public function index(): View
+    /** 表示する日数(過去3週間)。 */
+    private const RANGE_DAYS = 21;
+
+    public function index(WorkTimeComplianceService $compliance): View
     {
         $today = Carbon::today();
-        $rangeStart = $today->copy()->subDays(7);
-        $rangeEnd = $today->copy()->addDays(27);
+        $rangeStart = $today->copy()->subDays(self::RANGE_DAYS - 1);
+        $rangeEnd = $today->copy();
 
         $dates = [];
         for ($d = $rangeStart->copy(); $d->lte($rangeEnd); $d->addDay()) {
@@ -37,11 +43,57 @@ class DailyReportListController extends Controller
         return view('daily-reports.list.index', [
             'dates' => $dates,
             'today' => $today->format('Y-m-d'),
+            'rangeLabel' => $rangeStart->format('Y/m/d').'〜'.$rangeEnd->format('Y/m/d'),
             'holidaysByDate' => $holidaysByDate,
             'staffGroups' => $staffList->groupBy('department'),
             'statusByStaffAndDate' => $this->buildDailyReportStatusByStaffAndDate($rangeStart, $rangeEnd, $staffList),
             'purchaseInputByStaffAndDate' => $this->buildPurchaseInputByStaffAndDate($rangeStart, $rangeEnd, $staffList),
+            'complianceByStaff' => $this->buildComplianceByStaff($staffList, $today, $compliance),
+            'monthLabel' => $compliance->monthPeriod($today)[0]->format('m/d').'〜'.$compliance->monthPeriod($today)[1]->format('m/d'),
         ]);
+    }
+
+    /**
+     * 36協定の兆候表示に使う人別サマリ。全社員分をまとめて計算する
+     * (1人ずつ計算すると社員数×十数本のクエリになるため)。
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function buildComplianceByStaff(Collection $staffList, Carbon $today, WorkTimeComplianceService $compliance): array
+    {
+        $summaries = $compliance->specialClauseSummariesForStaff($staffList->pluck('id')->all(), $today);
+        $balances = Staff::paidLeaveBalancesFor($staffList);
+
+        $result = [];
+
+        foreach ($staffList as $staff) {
+            $summary = $summaries[$staff->id] ?? null;
+            if ($summary === null) {
+                continue;
+            }
+
+            $balance = $balances[$staff->id] ?? null;
+
+            // 危険: 単月100時間到達・複数月平均80時間超・特別条項6か月使い切り
+            // 注意: 単月80時間超(100時間まで残り20時間を切った)・特別条項の残り1か月
+            $isDanger = $summary['hardCapExceeded']
+                || $summary['worstAverage'] !== null
+                || $summary['specialClauseLimitReached'];
+            $isWarning = ! $isDanger && (
+                $summary['monthOvertimeMinutes'] > WorkTimeComplianceService::MULTI_MONTH_AVERAGE_CAP_MINUTES
+                || $summary['specialClauseMonthsRemaining'] <= 1
+            );
+
+            $result[$staff->id] = [
+                ...$summary,
+                'level' => $isDanger ? 'danger' : ($isWarning ? 'warning' : 'ok'),
+                'paidLeaveConsumed' => $balance['consumed'] ?? 0.0,
+                'paidLeavePending' => $balance['pending'] ?? 0.0,
+                'paidLeaveRemaining' => $balance['remainingTotal'] ?? 0.0,
+            ];
+        }
+
+        return $result;
     }
 
     /**
@@ -50,7 +102,7 @@ class DailyReportListController extends Controller
      *
      * @return array<int, array<string, bool>> staff_id => [work_date => true]
      */
-    private function buildPurchaseInputByStaffAndDate(Carbon $rangeStart, Carbon $rangeEnd, \Illuminate\Support\Collection $staffList): array
+    private function buildPurchaseInputByStaffAndDate(Carbon $rangeStart, Carbon $rangeEnd, Collection $staffList): array
     {
         $rows = LaborCost::whereNull('daily_report_id')
             ->where('is_provisional', false)
@@ -70,7 +122,7 @@ class DailyReportListController extends Controller
     /**
      * @return array<int, array<string, string>> staff_id => [work_date => draft|pending_confirmation|rejected|confirmed]
      */
-    private function buildDailyReportStatusByStaffAndDate(Carbon $rangeStart, Carbon $rangeEnd, \Illuminate\Support\Collection $staffList): array
+    private function buildDailyReportStatusByStaffAndDate(Carbon $rangeStart, Carbon $rangeEnd, Collection $staffList): array
     {
         $reports = DailyReport::whereDate('work_date', '>=', $rangeStart->toDateString())
             ->whereDate('work_date', '<=', $rangeEnd->toDateString())

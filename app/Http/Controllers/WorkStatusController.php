@@ -5,27 +5,33 @@ namespace App\Http\Controllers;
 use App\Models\Holiday;
 use App\Models\LeaveRequest;
 use App\Models\Staff;
+use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 
 /**
- * 勤務状況一覧。今日を基準に前1週間・先4週間(35日)を横軸に、全社員(部署順・表示順)を
- * 縦軸に一覧表示する。休暇・休日出勤の種別のみを表示する(作業日報の提出・確認状況は
- * 作業日報一覧画面で確認する)。一般社員・営業担当には種別のみを、上長・資材管理担当者
- * には承認状況の色分けもあわせて表示する。
+ * 勤務状況一覧。基準日(既定は今日)から前1週間・先4週間(35日)を横軸に、全社員(部署順・表示順)を
+ * 縦軸に一覧表示する。基準日は4週間(28日)単位で前後に動かせるほか、日付を直接指定して飛べる。
+ * 休暇・休日出勤の種別のみを表示する(作業日報の提出・確認状況は作業日報一覧画面で確認する)。
+ * 一般社員・営業担当には種別のみを、上長・資材管理担当者には承認状況の色分けもあわせて表示する。
  */
 class WorkStatusController extends Controller
 {
-    public function index(): View
+    /** 前後に動かす単位(4週間)。 */
+    private const SHIFT_DAYS = 28;
+
+    public function index(Request $request): View
     {
         /** @var Staff $viewer */
         $viewer = Auth::user();
         $isPrivileged = $viewer->is_procurement_manager || $viewer->is_supervisor;
 
         $today = Carbon::today();
-        $rangeStart = $today->copy()->subDays(7);
-        $rangeEnd = $today->copy()->addDays(27);
+        $anchor = $this->parseDate($request->query('date')) ?? $today->copy();
+
+        $rangeStart = $anchor->copy()->subDays(7);
+        $rangeEnd = $anchor->copy()->addDays(27);
 
         $dates = [];
         for ($d = $rangeStart->copy(); $d->lte($rangeEnd); $d->addDay()) {
@@ -39,11 +45,31 @@ class WorkStatusController extends Controller
         return view('work-status.index', [
             'dates' => $dates,
             'today' => $today->format('Y-m-d'),
+            'anchor' => $anchor->format('Y-m-d'),
+            'prevAnchor' => $anchor->copy()->subDays(self::SHIFT_DAYS)->format('Y-m-d'),
+            'nextAnchor' => $anchor->copy()->addDays(self::SHIFT_DAYS)->format('Y-m-d'),
+            'rangeLabel' => $rangeStart->format('Y/m/d').'〜'.$rangeEnd->format('Y/m/d'),
             'holidaysByDate' => $holidaysByDate,
             'staffGroups' => Staff::orderedForRoster()->get()->groupBy('department'),
             'leaveEntriesByStaffAndDate' => $this->buildLeaveEntriesByStaffAndDate($rangeStart, $rangeEnd),
             'isPrivileged' => $isPrivileged,
         ]);
+    }
+
+    /**
+     * 不正な日付指定は無視して既定(今日)に戻す。
+     */
+    private function parseDate(?string $date): ?Carbon
+    {
+        if (! $date) {
+            return null;
+        }
+
+        try {
+            return Carbon::createFromFormat('Y-m-d', $date)->startOfDay();
+        } catch (\Exception) {
+            return null;
+        }
     }
 
     /**

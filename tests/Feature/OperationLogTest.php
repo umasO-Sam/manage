@@ -45,7 +45,10 @@ class OperationLogTest extends TestCase
         $this->assertSame(OperationLog::ACTION_DAILY_REPORT_RESUBMIT, $log->action);
     }
 
-    public function test_saving_a_draft_does_not_record_a_log(): void
+    /**
+     * 下書き保存は廃止したため、submitフラグの有無にかかわらず保存＝提出として記録される。
+     */
+    public function test_saving_without_the_submit_flag_still_records_a_submit_log(): void
     {
         $staff = Staff::factory()->create();
 
@@ -54,7 +57,7 @@ class OperationLogTest extends TestCase
             'entries' => [],
         ])->assertRedirect();
 
-        $this->assertSame(0, OperationLog::count());
+        $this->assertSame(OperationLog::ACTION_DAILY_REPORT_SUBMIT, OperationLog::sole()->action);
     }
 
     public function test_confirming_a_report_records_a_confirm_log_owned_by_the_reporter(): void

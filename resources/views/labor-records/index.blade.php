@@ -13,6 +13,20 @@
                 作業日報の確認で確定した人工レコードと、仕入管理のデータ入力で登録した人工レコードを表示しています。
             </p>
 
+            @if (session('status') === 'labor-record-updated')
+                <div class="p-3 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-800 text-sm">人工レコードを修正しました。</div>
+            @endif
+            @if (session('status') === 'labor-record-deleted')
+                <div class="p-3 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-800 text-sm">人工レコードを削除しました。</div>
+            @endif
+            @if ($errors->any())
+                <div class="p-3 rounded-xl bg-red-50 border border-red-100 text-red-800 text-sm">
+                    @foreach ($errors->all() as $error)
+                        <p>{{ $error }}</p>
+                    @endforeach
+                </div>
+            @endif
+
             <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
 
                 <form method="GET" action="{{ route('labor-records.index') }}"
@@ -90,10 +104,13 @@
                                         <th class="p-2.5 text-right whitespace-nowrap">人工</th>
                                         <th class="p-2.5 whitespace-nowrap">登録元</th>
                                         <th class="p-2.5">補足</th>
+                                        <th class="p-2.5 whitespace-nowrap text-center">操作</th>
                                     </tr>
                                 </thead>
-                                <tbody class="divide-y divide-slate-100">
-                                    @forelse ($records as $record)
+                                {{-- 「修正」を押すと直下に編集フォームの行を開く。1レコード=1tbodyにすることで、
+                                     表示行と編集行を同じAlpineスコープ(editing)にまとめている。 --}}
+                                @forelse ($records as $record)
+                                    <tbody class="divide-y divide-slate-100 border-b border-slate-100" x-data="{ editing: false }">
                                         <tr class="hover:bg-blue-50">
                                             <td class="p-2.5 whitespace-nowrap">{{ $record->work_date?->format('Y/m/d') }}</td>
                                             <td class="p-2.5 font-bold whitespace-nowrap">{{ $record->staff?->name ?? '-' }}</td>
@@ -114,13 +131,94 @@
                                                 @endif
                                             </td>
                                             <td class="p-2.5 text-slate-500">{{ $record->note }}</td>
+                                            <td class="p-2.5 whitespace-nowrap text-center">
+                                                <div class="flex items-center gap-1 justify-center">
+                                                    <button type="button" @click="editing = ! editing"
+                                                            class="px-2 py-1 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-50 font-bold">修正</button>
+                                                    <form method="POST" action="{{ route('labor-records.destroy', $record) }}"
+                                                          onsubmit="return confirm('この人工レコードを削除します。よろしいですか？');">
+                                                        @csrf
+                                                        @method('DELETE')
+                                                        <button type="submit"
+                                                                class="px-2 py-1 rounded-lg border border-red-300 text-red-600 hover:bg-red-50 font-bold">削除</button>
+                                                    </form>
+                                                </div>
+                                            </td>
                                         </tr>
-                                    @empty
+                                        <tr x-show="editing" x-cloak class="bg-slate-50">
+                                            <td colspan="9" class="p-3">
+                                                <form method="POST" action="{{ route('labor-records.update', $record) }}"
+                                                      class="flex flex-wrap items-end gap-3">
+                                                    @csrf
+                                                    @method('PUT')
+                                                    <label class="block">
+                                                        <span class="block text-[11px] font-bold text-slate-600 mb-0.5">作業日</span>
+                                                        <input type="date" name="work_date" value="{{ $record->work_date?->format('Y-m-d') }}"
+                                                               class="border rounded-lg p-1.5 border-slate-300 text-xs" required>
+                                                    </label>
+                                                    <label class="block">
+                                                        <span class="block text-[11px] font-bold text-slate-600 mb-0.5">担当者</span>
+                                                        <select name="staff_id" class="border rounded-lg p-1.5 border-slate-300 text-xs" required>
+                                                            @foreach ($staffList as $person)
+                                                                <option value="{{ $person->id }}" @selected($record->staff_id === $person->id)>{{ $person->name }}</option>
+                                                            @endforeach
+                                                        </select>
+                                                    </label>
+                                                    <label class="block">
+                                                        <span class="block text-[11px] font-bold text-slate-600 mb-0.5">注番</span>
+                                                        <input type="text" name="order_no" value="{{ $record->order_no }}"
+                                                               class="border rounded-lg p-1.5 border-slate-300 text-xs font-mono w-40">
+                                                    </label>
+                                                    <label class="block">
+                                                        <span class="block text-[11px] font-bold text-slate-600 mb-0.5">分類</span>
+                                                        <select name="category_id" class="border rounded-lg p-1.5 border-slate-300 text-xs">
+                                                            <option value="">未分類</option>
+                                                            @foreach ($editableCategories as $category)
+                                                                <option value="{{ $category->id }}" @selected($record->category_id === $category->id)>{{ $category->code }}：{{ $category->item_name }}</option>
+                                                            @endforeach
+                                                        </select>
+                                                    </label>
+                                                    <label class="block">
+                                                        <span class="block text-[11px] font-bold text-slate-600 mb-0.5">時間</span>
+                                                        <input type="number" name="work_hours" min="0" max="99" value="{{ $record->work_hours }}"
+                                                               class="border rounded-lg p-1.5 border-slate-300 text-xs w-16" required>
+                                                    </label>
+                                                    <label class="block">
+                                                        <span class="block text-[11px] font-bold text-slate-600 mb-0.5">分</span>
+                                                        <input type="number" name="work_minutes" min="0" max="59" value="{{ $record->work_minutes }}"
+                                                               class="border rounded-lg p-1.5 border-slate-300 text-xs w-16" required>
+                                                    </label>
+                                                    <label class="flex items-center gap-1 text-xs font-bold text-slate-600 pb-1.5">
+                                                        <input type="hidden" name="is_overtime" value="0">
+                                                        <input type="checkbox" name="is_overtime" value="1" @checked($record->is_overtime)>
+                                                        時間外
+                                                    </label>
+                                                    <label class="block flex-1 min-w-[10rem]">
+                                                        <span class="block text-[11px] font-bold text-slate-600 mb-0.5">補足</span>
+                                                        <input type="text" name="note" value="{{ $record->note }}"
+                                                               class="border rounded-lg p-1.5 border-slate-300 text-xs w-full">
+                                                    </label>
+                                                    <div class="flex items-center gap-2 pb-0.5">
+                                                        <button type="submit" class="px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-bold hover:bg-blue-700">保存</button>
+                                                        <button type="button" @click="editing = false"
+                                                                class="px-3 py-1.5 rounded-lg border border-slate-300 text-slate-600 text-xs font-bold">取消</button>
+                                                    </div>
+                                                    @if ($record->daily_report_id)
+                                                        <p class="w-full text-[11px] text-amber-700">
+                                                            このレコードは作業日報から生成されています。本人が同じ日の日報を修正提出すると、この修正内容は日報の内容で作り直されます。
+                                                        </p>
+                                                    @endif
+                                                </form>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                @empty
+                                    <tbody>
                                         <tr>
-                                            <td colspan="8" class="p-8 text-center text-slate-400">該当する人工レコードはありません。</td>
+                                            <td colspan="9" class="p-8 text-center text-slate-400">該当する人工レコードはありません。</td>
                                         </tr>
-                                    @endforelse
-                                </tbody>
+                                    </tbody>
+                                @endforelse
                             </table>
                         </div>
                     </div>

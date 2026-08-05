@@ -64,10 +64,10 @@ Route::middleware('auth')->group(function () {
     Route::delete('/leave-requests/{leaveRequest}', [LeaveRequestController::class, 'withdraw'])->name('leave-requests.withdraw');
 
     // 他の社員の勤怠・原価情報をまとめて見る画面は資材管理担当者・上長限定。
+    // 作業日報確認(review)は人工データの確定を伴う資材管理担当者の業務のため、
+    // このグループではなくprocurement.managerグループに置く。
     Route::middleware('supervisor.or.manager')->group(function () {
         Route::get('/daily-reports/list', [DailyReportListController::class, 'index'])->name('daily-reports.list.index');
-        Route::get('/daily-reports/review', [DailyReportReviewController::class, 'index'])->name('daily-reports.review.index');
-        Route::post('/daily-reports/review/{dailyReport}/decide', [DailyReportReviewController::class, 'decide'])->name('daily-reports.review.decide');
         Route::get('/operation-logs', [OperationLogController::class, 'index'])->name('operation-logs.index');
         Route::get('/purchasing/cost-report', [CostReportController::class, 'index'])->name('purchasing.cost-report.index');
         Route::get('/purchasing/cost-report/results', [CostReportController::class, 'results'])->name('purchasing.cost-report.results');
@@ -88,6 +88,9 @@ Route::middleware('auth')->group(function () {
 
     // データ入力・注文書・明細書・原価一覧・レコード編集・担当者管理は資材管理担当者限定。
     Route::middleware('procurement.manager')->group(function () {
+        Route::get('/daily-reports/review', [DailyReportReviewController::class, 'index'])->name('daily-reports.review.index');
+        Route::post('/daily-reports/review/{dailyReport}/decide', [DailyReportReviewController::class, 'decide'])->name('daily-reports.review.decide');
+
         Route::get('/staff', [StaffController::class, 'index'])->name('staff.index');
         Route::get('/staff/create', [StaffController::class, 'create'])->name('staff.create');
         Route::post('/staff', [StaffController::class, 'store'])->name('staff.store');
@@ -103,6 +106,8 @@ Route::middleware('auth')->group(function () {
         Route::delete('/order-numbers/{orderNumber}', [OrderNumberController::class, 'destroy'])->name('order-numbers.destroy');
 
         Route::get('/labor-records', [LaborRecordController::class, 'index'])->name('labor-records.index');
+        Route::put('/labor-records/{laborRecord}', [LaborRecordController::class, 'update'])->name('labor-records.update');
+        Route::delete('/labor-records/{laborRecord}', [LaborRecordController::class, 'destroy'])->name('labor-records.destroy');
 
         Route::get('/holidays', [HolidayController::class, 'index'])->name('holidays.index');
         Route::get('/holidays/calendar', [HolidayController::class, 'calendar'])->name('holidays.calendar');

@@ -216,7 +216,7 @@
                                                 <input x-show="editMode" x-cloak type="number" step="0.5" min="0" max="99.9" name="updates[{{ $staff->id }}][paid_leave_granted_last_year]"
                                                        value="{{ $staff->paid_leave_granted_last_year }}" class="w-20 text-xs border rounded px-1.5 py-1 border-slate-300">
                                             </td>
-                                            <td class="p-2.5 font-mono text-slate-500">{{ $staff->paidLeaveBalance()['remainingTotal'] }}</td>
+                                            <td class="p-2.5 font-mono text-slate-500">{{ $paidLeaveBalances[$staff->id]['remainingTotal'] }}</td>
                                             <td class="p-2.5">
                                                 <div class="flex gap-2">
                                                     <a href="{{ route('staff.edit', $staff) }}" class="text-blue-700 hover:text-blue-900 font-semibold">編集</a>

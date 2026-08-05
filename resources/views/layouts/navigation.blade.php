@@ -11,8 +11,10 @@
                     <span class="font-bold text-lg tracking-tight text-slate-900 hidden sm:inline">{{ config('app.name') }}</span>
                 </a>
 
+                {{-- 横並びメニューはlg(1024px)以上でのみ表示する。md(768px)まで粘ると
+                     メニュー項目が右端で見切れるため、見切れる前にバーガーへ切り替える。 --}}
                 <!-- Navigation Links -->
-                <div class="hidden md:flex space-x-1 ml-8">
+                <div class="hidden lg:flex space-x-1 ml-8">
                     @php
                         $viewer = Auth::user();
                         // 権限区分。上長(is_supervisor)はロールとは独立したフラグで、
@@ -118,7 +120,8 @@
                             <x-dropdown-link :href="route('daily-reports.show')">
                                 <i data-lucide="clipboard-list" class="w-3.5 h-3.5 inline-block align-text-bottom mr-1"></i> 作業日報
                             </x-dropdown-link>
-                            @if ($isSupervisorOrManager)
+                            {{-- 作業日報確認は人工データの確定操作を伴うため資材管理担当者のみ --}}
+                            @if ($isManager)
                                 <x-dropdown-link :href="route('daily-reports.review.index')">
                                     <i data-lucide="clipboard-check" class="w-3.5 h-3.5 inline-block align-text-bottom mr-1"></i> 作業日報確認
                                     @if ($pendingDailyReportReviewCount > 0)
@@ -127,6 +130,8 @@
                                         </span>
                                     @endif
                                 </x-dropdown-link>
+                            @endif
+                            @if ($isSupervisorOrManager)
                                 <x-dropdown-link :href="route('daily-reports.list.index')">
                                     <i data-lucide="list-checks" class="w-3.5 h-3.5 inline-block align-text-bottom mr-1"></i> 作業日報一覧
                                 </x-dropdown-link>
@@ -264,7 +269,7 @@
             </div>
 
             <!-- Hamburger -->
-            <div class="-me-2 flex items-center md:hidden">
+            <div class="-me-2 flex items-center lg:hidden">
                 <button @click="open = ! open" class="inline-flex items-center justify-center p-2 rounded-md text-slate-400 hover:text-slate-500 hover:bg-slate-100 focus:outline-none transition duration-150 ease-in-out">
                     <svg class="h-6 w-6" stroke="currentColor" fill="none" viewBox="0 0 24 24">
                         <path :class="{'hidden': open, 'inline-flex': ! open }" class="inline-flex" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
@@ -275,8 +280,12 @@
         </div>
     </div>
 
+    {{-- 展開したメニュー自体を画面高からヘッダー分を引いた高さで区切り、メニュー内で
+         直接スクロールできるようにする(背後のページをスクロールしないと下の項目に
+         届かない状態を解消するため)。overscroll-containで背後への伝播も止める。 --}}
     <!-- Responsive Navigation Menu -->
-    <div :class="{'block': open, 'hidden': ! open}" class="hidden md:hidden border-t border-slate-200">
+    <div :class="{'block': open, 'hidden': ! open}"
+         class="hidden lg:hidden border-t border-slate-200 max-h-[calc(100vh-4rem)] overflow-y-auto overscroll-contain">
         <div class="pt-2 pb-3 space-y-1 px-2">
             {{-- 調達ボード: 一般社員は各ボードを直接表示し、それ以外は見出し付きでまとめる --}}
             @if ($isGeneral)
@@ -332,7 +341,7 @@
             <a href="{{ route('daily-reports.show') }}" class="block px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap {{ request()->routeIs('daily-reports.show') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
                 作業日報
             </a>
-            @if ($isSupervisorOrManager)
+            @if ($isManager)
                 <a href="{{ route('daily-reports.review.index') }}" class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap {{ request()->routeIs('daily-reports.review.*') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
                     <span>作業日報確認</span>
                     @if ($pendingDailyReportReviewCount > 0)
@@ -341,6 +350,8 @@
                         </span>
                     @endif
                 </a>
+            @endif
+            @if ($isSupervisorOrManager)
                 <a href="{{ route('daily-reports.list.index') }}" class="block px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap {{ request()->routeIs('daily-reports.list.*') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
                     作業日報一覧
                 </a>

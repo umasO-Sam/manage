@@ -49,6 +49,10 @@ class LaborCostController extends Controller
             $q = LaborCost::query();
             if (! $includeProvisional) {
                 $q->where('is_provisional', false);
+            } else {
+                // 差し戻し中の作業日報から生成された仮登録は確認・確定の対象外。
+                $q->where(fn ($w) => $w->where('is_provisional', false)
+                    ->orWhereDoesntHave('dailyReport', fn ($r) => $r->whereNotNull('rejected_at')));
             }
             if ($dateFrom !== '') {
                 $q->where('work_date', '>=', $dateFrom);
@@ -122,8 +126,12 @@ class LaborCostController extends Controller
             'ids.*' => ['integer', 'exists:labor_costs,id'],
         ]);
 
+        // 差し戻し中の作業日報から生成されたレコードは確定できない。本人が修正・再提出すると
+        // syncLaborCosts()で作り直されるため、差し戻し中の内容をここで確定すると
+        // 「差し戻したはずの内容が正式な人工データとして残る」状態になってしまう。
         LaborCost::whereIn('id', $validated['ids'])
             ->where('is_provisional', true)
+            ->whereDoesntHave('dailyReport', fn ($r) => $r->whereNotNull('rejected_at'))
             ->update(['is_provisional' => false]);
 
         return back()->with('status', 'labor-confirmed');

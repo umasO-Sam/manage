@@ -40,6 +40,29 @@ class DailyReportTest extends TestCase
         $response->assertSee('修正提出');
     }
 
+    public function test_show_screen_includes_the_horizontal_report_preview(): void
+    {
+        $staff = Staff::factory()->create();
+
+        $response = $this->actingAs($staff)->get(route('daily-reports.show', ['date' => '2026-08-03']));
+
+        $response->assertOk();
+        // 本日の入力内容と労働時間集計の間に、作業日報確認と同じ横並び表示を挟む。
+        $response->assertSee('日報プレビュー');
+        $response->assertSeeInOrder(['本日の入力内容', '日報プレビュー', '労働時間集計']);
+        $response->assertSee('previewSegments()', false);
+    }
+
+    public function test_show_screen_no_longer_offers_draft_save(): void
+    {
+        $staff = Staff::factory()->create();
+
+        $response = $this->actingAs($staff)->get(route('daily-reports.show', ['date' => '2026-08-03']));
+
+        $response->assertOk();
+        $response->assertDontSee('下書き保存');
+    }
+
     public function test_show_screen_includes_the_work_time_summary_panel(): void
     {
         $staff = Staff::factory()->create();
@@ -82,7 +105,11 @@ class DailyReportTest extends TestCase
         $response->assertSee('注番が間違っています');
     }
 
-    public function test_draft_save_does_not_generate_labor_costs(): void
+    /**
+     * 下書き保存は廃止し、保存＝提出に一本化した(2026-08-05)。以前は下書き保存の経路だけが
+     * syncLaborCosts()を通らず、日報の内容と人工データが恒久的に食い違う不具合があった。
+     */
+    public function test_saving_always_submits_and_generates_labor_costs(): void
     {
         $staff = Staff::factory()->create();
         $category = CategoryCode::create(['code' => 59, 'major_category' => '製造', 'sub_category' => '機械', 'item_name' => '機械製造']);
@@ -96,9 +123,39 @@ class DailyReportTest extends TestCase
 
         $report = DailyReport::where('staff_id', $staff->id)->whereDate('work_date', '2026-08-03')->first();
         $this->assertNotNull($report);
-        $this->assertNull($report->submitted_at);
+        $this->assertNotNull($report->submitted_at);
         $this->assertSame(1, $report->entries()->count());
-        $this->assertSame(0, LaborCost::count());
+        $this->assertSame(1, LaborCost::where('daily_report_id', $report->id)->count());
+    }
+
+    /**
+     * 提出済みの日報を編集して再度保存した場合も、人工データが必ず新しい内容で作り直される。
+     */
+    public function test_editing_a_submitted_report_keeps_labor_costs_in_sync(): void
+    {
+        $staff = Staff::factory()->create();
+        $category = CategoryCode::create(['code' => 59, 'major_category' => '製造', 'sub_category' => '機械', 'item_name' => '機械製造']);
+
+        $this->actingAs($staff)->post(route('daily-reports.store'), [
+            'work_date' => '2026-08-03',
+            'entries' => [
+                ['start_minute' => 480, 'end_minute' => 600, 'order_no' => 'AB123-N01', 'category_id' => $category->id],
+            ],
+        ])->assertRedirect();
+
+        // 2時間 → 4時間に修正して保存し直す。
+        $this->actingAs($staff)->post(route('daily-reports.store'), [
+            'work_date' => '2026-08-03',
+            'entries' => [
+                ['start_minute' => 480, 'end_minute' => 720, 'order_no' => 'AB123-N01', 'category_id' => $category->id],
+            ],
+        ])->assertRedirect();
+
+        $report = DailyReport::where('staff_id', $staff->id)->whereDate('work_date', '2026-08-03')->first();
+        $row = LaborCost::where('daily_report_id', $report->id)->sole();
+
+        $this->assertSame(4, $row->work_hours);
+        $this->assertSame(0, $row->work_minutes);
     }
 
     public function test_submitting_groups_entries_and_creates_provisional_labor_costs(): void

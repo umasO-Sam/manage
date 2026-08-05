@@ -9,6 +9,7 @@ use App\Models\OperationLog;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 /**
@@ -58,27 +59,32 @@ class DailyReportReviewController extends Controller
             'rejection_reason' => ['nullable', 'string', 'max:2000', 'required_if:action,reject'],
         ]);
 
+        // 状態更新と操作ログは必ず対で残す(片方だけ成立して履歴が欠けるのを防ぐ)。
         if ($data['action'] === 'confirm') {
-            LaborCost::where('daily_report_id', $dailyReport->id)
-                ->where('is_provisional', true)
-                ->update(['is_provisional' => false]);
+            DB::transaction(function () use ($dailyReport) {
+                LaborCost::where('daily_report_id', $dailyReport->id)
+                    ->where('is_provisional', true)
+                    ->update(['is_provisional' => false]);
 
-            OperationLog::record(OperationLog::ACTION_DAILY_REPORT_CONFIRM, $dailyReport, $dailyReport->staff_id);
+                OperationLog::record(OperationLog::ACTION_DAILY_REPORT_CONFIRM, $dailyReport, $dailyReport->staff_id);
+            });
 
             return back()->with('status', 'daily-report-confirmed');
         }
 
-        $dailyReport->update([
-            'rejected_at' => now(),
-            'rejection_reason' => $data['rejection_reason'],
-        ]);
+        DB::transaction(function () use ($dailyReport, $data) {
+            $dailyReport->update([
+                'rejected_at' => now(),
+                'rejection_reason' => $data['rejection_reason'],
+            ]);
 
-        OperationLog::record(
-            OperationLog::ACTION_DAILY_REPORT_REJECT,
-            $dailyReport,
-            $dailyReport->staff_id,
-            $data['rejection_reason']
-        );
+            OperationLog::record(
+                OperationLog::ACTION_DAILY_REPORT_REJECT,
+                $dailyReport,
+                $dailyReport->staff_id,
+                $data['rejection_reason']
+            );
+        });
 
         return back()->with('status', 'daily-report-rejected');
     }
