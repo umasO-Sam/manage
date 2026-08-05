@@ -20,6 +20,8 @@
                         // 権限区分。上長(is_supervisor)はロールとは独立したフラグで、
                         // 資材管理担当者と同じく他社員の勤怠・原価をまとめて閲覧できる。
                         $isManager = $viewer->is_procurement_manager;
+                        // ＩＤ管理は権限付与のために役員・資金管理者も使う。
+                        $canManageStaff = $viewer->canManageStaff();
                         $isSupervisorOrManager = $viewer->isSupervisorOrManager();
                         $isGeneral = $viewer->role === \App\Models\Staff::ROLE_GENERAL && ! $viewer->is_supervisor;
 
@@ -215,8 +217,8 @@
                         </x-dropdown>
                     @endif
 
-                    {{-- システム管理: 資材管理担当者のみ --}}
-                    @if ($isManager)
+                    {{-- システム管理: ＩＤ管理は経理資材担当・役員・資金管理者、注番管理は経理資材担当のみ --}}
+                    @if ($canManageStaff || $isManager)
                         <x-dropdown align="left" width="56">
                             <x-slot name="trigger">
                                 <button class="px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 whitespace-nowrap transition-colors {{ $systemActive ? 'bg-slate-200 text-slate-800' : 'text-slate-600 hover:bg-slate-50' }}">
@@ -226,12 +228,16 @@
                                 </button>
                             </x-slot>
                             <x-slot name="content">
-                                <x-dropdown-link :href="route('staff.index')">
-                                    <i data-lucide="users" class="w-3.5 h-3.5 inline-block align-text-bottom mr-1"></i> ＩＤ管理
-                                </x-dropdown-link>
-                                <x-dropdown-link :href="route('order-numbers.index')">
-                                    <i data-lucide="hash" class="w-3.5 h-3.5 inline-block align-text-bottom mr-1"></i> 注番管理
-                                </x-dropdown-link>
+                                @if ($canManageStaff)
+                                    <x-dropdown-link :href="route('staff.index')">
+                                        <i data-lucide="users" class="w-3.5 h-3.5 inline-block align-text-bottom mr-1"></i> ＩＤ管理
+                                    </x-dropdown-link>
+                                @endif
+                                @if ($isManager)
+                                    <x-dropdown-link :href="route('order-numbers.index')">
+                                        <i data-lucide="hash" class="w-3.5 h-3.5 inline-block align-text-bottom mr-1"></i> 注番管理
+                                    </x-dropdown-link>
+                                @endif
                             </x-slot>
                         </x-dropdown>
                     @endif
@@ -423,15 +429,19 @@
                 @endif
             @endif
 
-            {{-- システム管理: 資材管理担当者のみ --}}
-            @if ($isManager)
+            {{-- システム管理: ＩＤ管理は経理資材担当・役員・資金管理者、注番管理は経理資材担当のみ --}}
+            @if ($canManageStaff || $isManager)
                 <div class="px-3 py-2 text-xs font-bold text-slate-400 uppercase tracking-wider">システム管理</div>
-                <a href="{{ route('staff.index') }}" class="block px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap {{ request()->routeIs('staff.*') ? 'bg-slate-100 text-blue-600' : 'text-slate-600' }}">
-                    ＩＤ管理
-                </a>
-                <a href="{{ route('order-numbers.index') }}" class="block px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap {{ request()->routeIs('order-numbers.*') ? 'bg-slate-100 text-blue-600' : 'text-slate-600' }}">
-                    注番管理
-                </a>
+                @if ($canManageStaff)
+                    <a href="{{ route('staff.index') }}" class="block px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap {{ request()->routeIs('staff.*') ? 'bg-slate-100 text-blue-600' : 'text-slate-600' }}">
+                        ＩＤ管理
+                    </a>
+                @endif
+                @if ($isManager)
+                    <a href="{{ route('order-numbers.index') }}" class="block px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap {{ request()->routeIs('order-numbers.*') ? 'bg-slate-100 text-blue-600' : 'text-slate-600' }}">
+                        注番管理
+                    </a>
+                @endif
             @endif
         </div>
 

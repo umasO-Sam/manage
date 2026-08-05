@@ -86,11 +86,9 @@ Route::middleware('auth')->group(function () {
         Route::get('/purchasing/estimate', [EstimateAssistController::class, 'index'])->name('purchasing.estimate.index');
     });
 
-    // データ入力・注文書・明細書・原価一覧・レコード編集・担当者管理は資材管理担当者限定。
-    Route::middleware('procurement.manager')->group(function () {
-        Route::get('/daily-reports/review', [DailyReportReviewController::class, 'index'])->name('daily-reports.review.index');
-        Route::post('/daily-reports/review/{dailyReport}/decide', [DailyReportReviewController::class, 'decide'])->name('daily-reports.review.decide');
-
+    // 担当者管理(ＩＤ管理)は経理資材担当・役員・資金管理者が使う。
+    // 「誰にどのフラグを付けられるか」は StaffController 側で個別に制御する。
+    Route::middleware('staff.manager')->group(function () {
         Route::get('/staff', [StaffController::class, 'index'])->name('staff.index');
         Route::get('/staff/create', [StaffController::class, 'create'])->name('staff.create');
         Route::post('/staff', [StaffController::class, 'store'])->name('staff.store');
@@ -98,6 +96,12 @@ Route::middleware('auth')->group(function () {
         Route::put('/staff/{staff}', [StaffController::class, 'update'])->name('staff.update');
         Route::post('/staff/bulk-update', [StaffController::class, 'bulkUpdate'])->name('staff.bulk-update');
         Route::delete('/staff/{staff}', [StaffController::class, 'destroy'])->name('staff.destroy');
+    });
+
+    // データ入力・注文書・明細書・原価一覧・レコード編集は資材管理担当者限定。
+    Route::middleware('procurement.manager')->group(function () {
+        Route::get('/daily-reports/review', [DailyReportReviewController::class, 'index'])->name('daily-reports.review.index');
+        Route::post('/daily-reports/review/{dailyReport}/decide', [DailyReportReviewController::class, 'decide'])->name('daily-reports.review.decide');
 
         Route::get('/order-numbers', [OrderNumberController::class, 'index'])->name('order-numbers.index');
         Route::get('/order-numbers/create', [OrderNumberController::class, 'create'])->name('order-numbers.create');

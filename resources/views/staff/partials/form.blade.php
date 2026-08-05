@@ -85,12 +85,39 @@
     <x-input-error class="mt-2" :messages="$errors->get('role')" />
 </div>
 
-<div>
+@php($actor = Auth::user())
+
+{{-- 権限フラグはロールに重ねて付与する。付与できる範囲は
+     経理資材担当 ＜ 役員 ＜ 資金管理者 ＜ administrator の入れ子で、
+     自分より上のフラグは操作できないようにする(サーバー側でも同じ判定で落とす)。 --}}
+<div class="space-y-2">
     <label class="flex items-center gap-2 text-sm">
         <input type="checkbox" name="is_supervisor" value="1" @checked(old('is_supervisor', $staff?->is_supervisor))>
         上長（休暇・休出申請の承認者として選べる担当者）
     </label>
-    <x-input-error class="mt-2" :messages="$errors->get('is_supervisor')" />
+    <x-input-error :messages="$errors->get('is_supervisor')" />
+
+    <label class="flex items-center gap-2 text-sm {{ $actor->canGrantExecutive() ? '' : 'text-slate-400' }}">
+        <input type="checkbox" name="is_executive" value="1"
+               @checked(old('is_executive', $staff?->is_executive)) @disabled(! $actor->canGrantExecutive())>
+        役員（物件管理ボードを利用でき、役員フラグを付与できる）
+    </label>
+
+    <label class="flex items-center gap-2 text-sm {{ $actor->canGrantFundManager() ? '' : 'text-slate-400' }}">
+        <input type="checkbox" name="is_fund_manager" value="1"
+               @checked(old('is_fund_manager', $staff?->is_fund_manager)) @disabled(! $actor->canGrantFundManager())>
+        資金管理者（取引先一覧を扱え、入金済カードを非表示にできる）
+    </label>
+
+    <label class="flex items-center gap-2 text-sm {{ $actor->canGrantAdministrator() ? '' : 'text-slate-400' }}">
+        <input type="checkbox" name="is_administrator" value="1"
+               @checked(old('is_administrator', $staff?->is_administrator)) @disabled(! $actor->canGrantAdministrator())>
+        administrator（システム管理用。すべての機能を利用でき、administratorのみが編集できる）
+    </label>
+
+    @unless ($actor->canGrantAdministrator())
+        <p class="text-[11px] text-slate-400">灰色の項目は、自分より上の権限のため変更できません。</p>
+    @endunless
 </div>
 
 <div class="grid grid-cols-2 gap-4">

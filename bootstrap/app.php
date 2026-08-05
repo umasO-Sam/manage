@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\EnsureProcurementManager;
 use App\Http\Middleware\EnsurePurchasingViewer;
+use App\Http\Middleware\EnsureStaffManager;
 use App\Http\Middleware\EnsureSupervisorOrManager;
 use App\Http\Middleware\RequirePasswordChange;
 use Illuminate\Foundation\Application;
@@ -19,6 +20,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'procurement.manager' => EnsureProcurementManager::class,
             'purchasing.viewer' => EnsurePurchasingViewer::class,
+            'staff.manager' => EnsureStaffManager::class,
             'supervisor.or.manager' => EnsureSupervisorOrManager::class,
         ]);
         $middleware->web(append: [

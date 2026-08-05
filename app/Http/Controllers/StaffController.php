@@ -18,12 +18,66 @@ use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 /**
- * 担当者一覧管理。セルフサインアップは行わず、資材管理担当者だけが
+ * 担当者一覧管理。セルフサインアップは行わず、担当者管理の権限を持つ人だけが
  * 手動でアカウントを発行・パスワードを再設定する運用（構想仕様書 08 参照）。
- * アクセス制御は routes/web.php の procurement.manager ミドルウェアで行う。
+ * 画面へのアクセス制御は routes/web.php の staff.manager ミドルウェアで行う。
+ *
+ * 付与できる権限は 経理資材担当 ＜ 役員 ＜ 資金管理者 ＜ administrator の入れ子で、
+ * 自分より上のフラグは付け外しできない（画面上でも操作できないようにしたうえで、
+ * 直接編集や改ざんされたリクエストに備えてサーバー側でも必ず落とす）。
  */
 class StaffController extends Controller
 {
+    /** フラグ名 => 0人になったときに困る理由。降格・削除時に最後の1人を守る。 */
+    private const PROTECTED_FLAGS = [
+        'is_fund_manager' => '資金管理者が0人になるため、この操作はできません。取引先一覧に誰もアクセスできなくなります。',
+        'is_administrator' => 'administratorが0人になるため、この操作はできません。システム管理用の権限を誰も付与できなくなります。',
+    ];
+
+    /**
+     * 実行者が付与を許されているフラグだけを反映する。許されていないフラグは
+     * 対象の現在値（新規作成時はfalse）のまま据え置く。
+     *
+     * @param  array<string, mixed>  $input  チェックボックスは未チェック時にキー自体が
+     *                                       送信されないため、存在しない＝falseとして扱う。
+     * @return array<string, bool>
+     */
+    private function permittedFlags(array $input, Staff $actor, ?Staff $target = null): array
+    {
+        $submitted = fn (string $key) => filter_var($input[$key] ?? false, FILTER_VALIDATE_BOOLEAN);
+
+        return [
+            'is_supervisor' => $submitted('is_supervisor'),
+            'is_executive' => $actor->canGrantExecutive()
+                ? $submitted('is_executive') : (bool) $target?->is_executive,
+            'is_fund_manager' => $actor->canGrantFundManager()
+                ? $submitted('is_fund_manager') : (bool) $target?->is_fund_manager,
+            'is_administrator' => $actor->canGrantAdministrator()
+                ? $submitted('is_administrator') : (bool) $target?->is_administrator,
+        ];
+    }
+
+    /**
+     * 保護対象のフラグを最後の1人から外そうとしていないか。問題があればメッセージを返す。
+     *
+     * @param  array<string, bool>  $flags
+     */
+    private function protectedFlagError(Staff $target, array $flags): ?string
+    {
+        foreach (self::PROTECTED_FLAGS as $flag => $message) {
+            if ($target->$flag && ! ($flags[$flag] ?? false) && ! $this->otherStaffHasFlag($flag, $target->id)) {
+                return $message;
+            }
+        }
+
+        return null;
+    }
+
+    private function otherStaffHasFlag(string $flag, int $exceptId): bool
+    {
+        return Staff::where($flag, true)->where('id', '!=', $exceptId)->exists();
+    }
+
     public function index(): View
     {
         $staffList = Staff::orderedForRoster()->get();
@@ -53,6 +107,9 @@ class StaffController extends Controller
             'role' => ['required', Rule::in(array_keys(Staff::ROLE_LABELS))],
             'password' => ['required', Password::defaults(), new NotSimilarToLoginId($request->input('login_id'))],
             'is_supervisor' => ['nullable', 'boolean'],
+            'is_executive' => ['nullable', 'boolean'],
+            'is_fund_manager' => ['nullable', 'boolean'],
+            'is_administrator' => ['nullable', 'boolean'],
             'paid_leave_granted_current_year' => ['nullable', 'numeric', 'min:0', 'max:99.9'],
             'paid_leave_granted_last_year' => ['nullable', 'numeric', 'min:0', 'max:99.9'],
         ]);
@@ -64,7 +121,7 @@ class StaffController extends Controller
                 ...$data,
                 'display_order' => $data['display_order'] ?? 0,
                 'password' => Hash::make($data['password']),
-                'is_supervisor' => $request->boolean('is_supervisor'),
+                ...$this->permittedFlags($request->all(), Auth::user()),
             ]);
         } catch (UniqueConstraintViolationException) {
             throw ValidationException::withMessages(['login_id' => 'このログインID・メールアドレス・SIDのいずれかはすでに使用されています。']);
@@ -91,12 +148,29 @@ class StaffController extends Controller
             'role' => ['required', Rule::in(array_keys(Staff::ROLE_LABELS))],
             'password' => ['nullable', Password::defaults(), new NotSimilarToLoginId($request->input('login_id'))],
             'is_supervisor' => ['nullable', 'boolean'],
+            'is_executive' => ['nullable', 'boolean'],
+            'is_fund_manager' => ['nullable', 'boolean'],
+            'is_administrator' => ['nullable', 'boolean'],
             'paid_leave_granted_current_year' => ['nullable', 'numeric', 'min:0', 'max:99.9'],
             'paid_leave_granted_last_year' => ['nullable', 'numeric', 'min:0', 'max:99.9'],
         ]);
 
+        /** @var Staff $actor */
+        $actor = Auth::user();
+
+        // administratorのアカウントはシステム管理専用で、administrator以外は編集できない。
+        if (! $actor->canEditAccount($staff)) {
+            return back()->withErrors(['role' => 'administratorのアカウントはadministratorのみ編集できます。']);
+        }
+
+        $flags = $this->permittedFlags($request->all(), $actor, $staff);
+
+        if ($error = $this->protectedFlagError($staff, $flags)) {
+            return back()->withErrors(['role' => $error]);
+        }
+
         // 最後の1人を降格すると、担当者管理・注番管理に誰もアクセスできなくなるため禁止する。
-        if ($staff->is_procurement_manager && $data['role'] !== Staff::ROLE_PROCUREMENT_MANAGER) {
+        if ($staff->role === Staff::ROLE_PROCUREMENT_MANAGER && $data['role'] !== Staff::ROLE_PROCUREMENT_MANAGER) {
             $otherManagers = Staff::where('role', Staff::ROLE_PROCUREMENT_MANAGER)
                 ->where('id', '!=', $staff->id)
                 ->exists();
@@ -117,7 +191,7 @@ class StaffController extends Controller
             'login_id' => $data['login_id'],
             'email' => $data['email'],
             'role' => $data['role'],
-            'is_supervisor' => $request->boolean('is_supervisor'),
+            ...$flags,
             'paid_leave_granted_current_year' => $data['paid_leave_granted_current_year'] ?? null,
             'paid_leave_granted_last_year' => $data['paid_leave_granted_last_year'] ?? null,
         ]);
@@ -149,12 +223,22 @@ class StaffController extends Controller
         $updates = (array) $request->input('updates', []);
         $staffMembers = Staff::whereIn('id', array_keys($updates))->get()->keyBy('id');
 
+        /** @var Staff $actor */
+        $actor = Auth::user();
+
         $validatedById = [];
         $errors = [];
 
         foreach ($updates as $id => $fields) {
             $staff = $staffMembers->get((int) $id);
             if (! $staff) {
+                continue;
+            }
+
+            // administratorのアカウントはadministrator以外が触れない。
+            if (! $actor->canEditAccount($staff)) {
+                $errors[] = "{$staff->name}: administratorのアカウントはadministratorのみ編集できます。";
+
                 continue;
             }
 
@@ -167,6 +251,9 @@ class StaffController extends Controller
                 'email' => ['required', 'string', 'email', 'max:255', Rule::unique('staff', 'email')->ignore($staff->id)],
                 'role' => ['required', Rule::in(array_keys(Staff::ROLE_LABELS))],
                 'is_supervisor' => ['nullable', 'boolean'],
+                'is_executive' => ['nullable', 'boolean'],
+                'is_fund_manager' => ['nullable', 'boolean'],
+                'is_administrator' => ['nullable', 'boolean'],
                 'paid_leave_granted_current_year' => ['nullable', 'numeric', 'min:0', 'max:99.9'],
                 'paid_leave_granted_last_year' => ['nullable', 'numeric', 'min:0', 'max:99.9'],
             ]);
@@ -181,10 +268,19 @@ class StaffController extends Controller
 
             // チェックボックスは未チェック時にキー自体が送信されないため、
             // validated()に含めるだけでは常にtrueにしかならない。明示的にboolean化する。
+            // 権限フラグは実行者が付与を許されているものだけを反映する。
+            $flags = $this->permittedFlags((array) $fields, $actor, $staff);
+
+            if ($error = $this->protectedFlagError($staff, $flags)) {
+                $errors[] = "{$staff->name}: {$error}";
+
+                continue;
+            }
+
             $validatedById[$staff->id] = [
                 ...$validator->validated(),
                 'display_order' => $validator->validated()['display_order'] ?? 0,
-                'is_supervisor' => $request->boolean("updates.{$id}.is_supervisor"),
+                ...$flags,
             ];
         }
 
@@ -211,11 +307,22 @@ class StaffController extends Controller
 
     public function destroy(Staff $staff): RedirectResponse
     {
-        // 削除操作自体がprocurement.managerミドルウェアで資材管理担当者に限定されているため、
-        // 「自分自身」以外を削除する時点で実行者は必ずもう1人の資材管理担当者として存在する。
-        // よって「資材管理担当者が0人になる」ケースは自分自身の削除禁止だけで防げる。
+        /** @var Staff $actor */
+        $actor = Auth::user();
+
         if ($staff->id === Auth::id()) {
             return back()->withErrors(['delete' => '自分自身のアカウントは削除できません。']);
+        }
+
+        // administratorのアカウントはシステム管理専用で、administrator以外は削除できない。
+        if (! $actor->canEditAccount($staff)) {
+            return back()->withErrors(['delete' => 'administratorのアカウントはadministratorのみ削除できます。']);
+        }
+
+        // 資材管理担当者は自分自身の削除禁止だけで0人化を防げる(削除できるのが資材管理担当者以上のため)が、
+        // 資金管理者・administratorは削除実行者と別人でも0人になりうるため個別に守る。
+        if ($error = $this->protectedFlagError($staff, ['is_fund_manager' => false, 'is_administrator' => false])) {
+            return back()->withErrors(['delete' => $error]);
         }
 
         try {

@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
-#[Fillable(['name', 'department', 'display_order', 'sid', 'timecard_wid', 'login_id', 'email', 'role', 'is_labor_target', 'position_weight', 'password', 'must_change_password', 'hire_date', 'paid_leave_granted_current_year', 'paid_leave_granted_last_year', 'is_supervisor'])]
+#[Fillable(['name', 'department', 'display_order', 'sid', 'timecard_wid', 'login_id', 'email', 'role', 'is_labor_target', 'position_weight', 'password', 'must_change_password', 'hire_date', 'paid_leave_granted_current_year', 'paid_leave_granted_last_year', 'is_supervisor', 'is_executive', 'is_fund_manager', 'is_administrator'])]
 #[Hidden(['password', 'remember_token'])]
 class Staff extends Authenticatable
 {
@@ -47,15 +47,63 @@ class Staff extends Authenticatable
             'must_change_password' => 'boolean',
             'hire_date' => 'date',
             'is_supervisor' => 'boolean',
+            'is_executive' => 'boolean',
+            'is_fund_manager' => 'boolean',
+            'is_administrator' => 'boolean',
         ];
     }
 
     /**
      * カードの移動・仕入管理でのレコード編集・担当者管理を行える資材管理担当者かどうか。
+     * administratorはすべての機能を使えるため、常に真として扱う。
      */
     public function getIsProcurementManagerAttribute(): bool
     {
-        return $this->role === self::ROLE_PROCUREMENT_MANAGER;
+        return $this->role === self::ROLE_PROCUREMENT_MANAGER || $this->is_administrator;
+    }
+
+    /**
+     * 担当者管理(ＩＤ管理)を開ける立場かどうか。
+     * 経理資材担当に加え、役員・資金管理者も権限の付与・変更のためにこの画面を使う。
+     */
+    public function canManageStaff(): bool
+    {
+        return $this->is_procurement_manager || (bool) $this->is_executive || (bool) $this->is_fund_manager;
+    }
+
+    /**
+     * 権限付与のはしご: 経理資材担当 ＜ 役員 ＜ 資金管理者 ＜ administrator。
+     * 自分より上のフラグは付け外しできない。
+     */
+    public function canGrantExecutive(): bool
+    {
+        return (bool) $this->is_executive || (bool) $this->is_fund_manager || (bool) $this->is_administrator;
+    }
+
+    public function canGrantFundManager(): bool
+    {
+        return (bool) $this->is_fund_manager || (bool) $this->is_administrator;
+    }
+
+    public function canGrantAdministrator(): bool
+    {
+        return (bool) $this->is_administrator;
+    }
+
+    /**
+     * administratorのアカウントはシステム管理専用で、administrator以外は編集・削除できない。
+     */
+    public function canEditAccount(self $target): bool
+    {
+        return ! $target->is_administrator || (bool) $this->is_administrator;
+    }
+
+    /**
+     * 取引先一覧(銀行・取引区分・締め日・支払条件)を扱えるのは資金管理者とadministratorのみ。
+     */
+    public function canManageBusinessPartners(): bool
+    {
+        return (bool) $this->is_fund_manager || (bool) $this->is_administrator;
     }
 
     /**
