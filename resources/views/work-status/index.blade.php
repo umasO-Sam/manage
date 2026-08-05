@@ -39,7 +39,7 @@
                         @foreach ($staffGroups as $department => $staffInGroup)
                             @foreach ($staffInGroup as $staff)
                                 @php $rowIndex++; @endphp
-                                <tr class="{{ $rowIndex % 2 === 0 ? 'bg-slate-50' : 'bg-white' }} hover:bg-blue-50 {{ $loop->first && ! $loop->parent->first ? 'border-t-2 border-t-slate-400' : '' }}">
+                                <tr class="{{ $rowIndex % 2 === 0 ? 'bg-slate-50' : 'bg-white' }} hover:bg-blue-50 {{ $loop->first && ! $loop->parent->first ? 'border-t-4 border-t-slate-700' : '' }}">
                                     @if ($loop->first)
                                         <td rowspan="{{ $staffInGroup->count() }}"
                                             class="sticky left-0 z-10 bg-slate-50 text-center font-semibold text-slate-600 border-r border-slate-200 align-middle w-6"
