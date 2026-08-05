@@ -58,7 +58,20 @@
                 </div>
             @endif
 
+            {{-- 簡易表示の切り替えはツールバーとボードの両方から参照するため、
+                 2つをまとめて1つのAlpineスコープに入れる。設定はlocalStorageに保存し、
+                 購入手配・見積依頼のどちらのボードでも同じ状態を引き継ぐ。 --}}
+            <div x-data="{ compact: localStorage.getItem('boardCompactView') === '1' }"
+                 x-init="$watch('compact', (value) => localStorage.setItem('boardCompactView', value ? '1' : '0'))">
+
             <div class="flex flex-wrap justify-end items-center gap-2 mb-4">
+                <button type="button" @click="compact = ! compact"
+                        class="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full border transition-colors"
+                        :class="compact ? '{{ $accent['button'] }} text-white border-transparent' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'">
+                    <i data-lucide="rows-3" class="w-3.5 h-3.5"></i>
+                    <span>簡易表示</span>
+                </button>
+
                 <a href="{{ route('cards.index', [$workflowType, 'only_mine' => $onlyMine ? null : 1, 'order_no' => $orderNo !== '' ? $orderNo : null]) }}"
                    class="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full border transition-colors {{ $onlyMine ? $accent['button'].' text-white border-transparent' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50' }}">
                     <i data-lucide="user" class="w-3.5 h-3.5"></i>
@@ -131,7 +144,29 @@
                                     @dragend="draggedCardId = null; draggedFromStage = null; dragOverStage = null"
                                 >
                                     @php($unread = $card->unreadStatusFor(Auth::user()))
-                                    <a href="{{ route('cards.show', $card) }}" class="block" draggable="false">
+
+                                    {{-- 簡易表示: 注番+未確認バッジ / 品名 / 作成日時+依頼者 の3行だけを出す --}}
+                                    <a href="{{ route('cards.show', $card) }}" class="block space-y-1" draggable="false" x-show="compact" x-cloak>
+                                        <div class="flex items-center gap-1.5 flex-wrap">
+                                            <span class="text-xs font-mono font-bold px-2 py-0.5 rounded {{ $index === $workflowType->lastStageIndex() ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-700' }}">{{ $card->orderNumber->code }}</span>
+                                            @if ($unread === 'unconfirmed')
+                                                <span class="inline-flex items-center gap-0.5 text-[10px] font-bold text-red-700 bg-red-50 border border-red-100 px-1.5 py-0.5 rounded-full">
+                                                    <i data-lucide="eye-off" class="w-3 h-3"></i>未確認
+                                                </span>
+                                            @elseif ($unread === 'new_comment')
+                                                <span class="inline-flex items-center gap-0.5 text-[10px] font-bold text-blue-700 bg-blue-50 border border-blue-100 px-1.5 py-0.5 rounded-full">
+                                                    <i data-lucide="message-circle" class="w-3 h-3"></i>新着コメント
+                                                </span>
+                                            @endif
+                                        </div>
+                                        <h3 class="font-bold text-slate-950 text-sm truncate">{{ $card->item_name }}</h3>
+                                        <div class="flex justify-between items-center gap-2 text-[11px] text-slate-500">
+                                            <span>{{ $card->created_at?->format('Y/m/d H:i') }}</span>
+                                            <span class="font-medium text-slate-700 truncate">{{ $card->creator->name }}</span>
+                                        </div>
+                                    </a>
+
+                                    <a href="{{ route('cards.show', $card) }}" class="block" draggable="false" x-show="! compact">
                                         <div class="flex justify-between items-start gap-2 mb-2">
                                             <div class="flex items-center gap-1.5 flex-wrap">
                                                 <span class="text-xs font-mono font-bold px-2 py-0.5 rounded {{ $index === $workflowType->lastStageIndex() ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-700' }}">{{ $card->orderNumber->code }}</span>
@@ -209,7 +244,7 @@
                                     </a>
 
                                     @if (Auth::user()->is_procurement_manager && ($canAdvance || $index > 0))
-                                        <div class="mt-2 flex gap-1.5">
+                                        <div class="mt-2 flex gap-1.5" x-show="! compact">
                                             @if ($index > 0)
                                                 <form method="POST" action="{{ route('cards.revert', $card) }}" onsubmit="return confirm('このカードを1段階前に差し戻します。よろしいですか？');">
                                                     @csrf
@@ -230,7 +265,7 @@
                                     @endif
 
                                     @if ($index === $workflowType->lastStageIndex() && Auth::user()->is_procurement_manager)
-                                        <div class="mt-2 flex items-center justify-between text-[10px] text-slate-500">
+                                        <div class="mt-2 flex items-center justify-between text-[10px] text-slate-500" x-show="! compact">
                                             <span class="flex items-center gap-1 text-slate-400">
                                                 <i data-lucide="clock" class="w-3.5 h-3.5"></i>
                                                 {{ $workflowType->retention_days }}日で自動非表示
@@ -255,6 +290,8 @@
                         </div>
                     </div>
                 @endforeach
+            </div>
+
             </div>
 
             @if (! Auth::user()->is_procurement_manager)

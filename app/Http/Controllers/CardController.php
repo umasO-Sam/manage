@@ -251,16 +251,70 @@ class CardController extends Controller
     {
         $this->authorize('advance', $card);
 
+        /** @var Staff $staff */
+        $staff = $request->user();
+
+        $error = $this->advanceStage($card, $staff);
+
+        if ($error !== null) {
+            return back()->withErrors(['stage' => $error]);
+        }
+
+        return back()->with('status', 'card-moved');
+    }
+
+    /**
+     * 購入手配ボードの新規依頼カードを手配中に進め、そのまま内容を引き継いだ
+     * 仕入管理のデータ入力画面へ遷移する。登録自体はこの時点では行わず、
+     * 入力画面で作業者が内容を確認・補完して登録する。
+     */
+    public function advanceToInput(Request $request, Card $card): RedirectResponse
+    {
+        $this->authorize('advance', $card);
+
+        if ($card->workflowType->slug !== 'purchase' || $card->current_stage !== 0) {
+            return back()->withErrors(['stage' => 'この操作は購入手配ボードの新規依頼カードでのみ行えます。']);
+        }
+
+        /** @var Staff $staff */
+        $staff = $request->user();
+
+        $error = $this->advanceStage($card, $staff);
+
+        if ($error !== null) {
+            return back()->withErrors(['stage' => $error]);
+        }
+
+        // データ入力画面の各項目はold()で値を復元するため、カードの内容を直前の入力として
+        // 渡すだけでフォームに反映される（分類・単価・商社名などは作業者が入力する）。
+        return redirect()->route('purchasing.input')
+            ->with('status', 'card-advanced-to-input')
+            ->with('advanced_card_order_no', $card->orderNumber->code)
+            ->withInput([
+                'form_type' => 'purchase',
+                'item_code' => $card->orderNumber->code,
+                'machine_no' => $card->machine_number,
+                'item_name' => $card->item_name,
+                'dimensions' => $card->model_number,
+                'manufacturer' => $card->manufacturer,
+                'order_qty' => $card->quantity,
+                'unit' => $card->unit,
+            ]);
+    }
+
+    /**
+     * カードを1段階進め、ステージ履歴の記録と依頼者への通知までを行う。
+     * 成功した場合はnull、進められなかった場合は画面に出すエラーメッセージを返す。
+     */
+    private function advanceStage(Card $card, Staff $staff): ?string
+    {
         $workflowType = $card->workflowType;
         $currentStage = $card->current_stage;
         $nextStage = $currentStage + 1;
 
         if ($nextStage > $workflowType->lastStageIndex()) {
-            return back()->withErrors(['stage' => 'このカードはすでに最終段階です。']);
+            return 'このカードはすでに最終段階です。';
         }
-
-        /** @var Staff $staff */
-        $staff = $request->user();
 
         // current_stageが読み取り時のままの場合のみ更新する（連打・複数タブによる
         // 同時操作でステージ履歴・通知メールが二重に生成されるのを防ぐ）。
@@ -285,7 +339,7 @@ class CardController extends Controller
         });
 
         if (! $moved) {
-            return back()->withErrors(['stage' => '他の操作でカードの状態が変わったため移動できませんでした。画面を更新してください。']);
+            return '他の操作でカードの状態が変わったため移動できませんでした。画面を更新してください。';
         }
 
         $actorLabel = $workflowType->actorLabel($nextStage);
@@ -296,7 +350,7 @@ class CardController extends Controller
             new CardNotificationMail($card->fresh(), $headline, "{$actorLabel}: {$staff->name}")
         );
 
-        return back()->with('status', 'card-moved');
+        return null;
     }
 
     /**

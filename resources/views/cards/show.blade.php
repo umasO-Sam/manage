@@ -118,6 +118,26 @@
                         <span class="text-sm font-bold text-slate-900">{{ $card->creator->name }}（{{ $card->creator->department }}）</span>
                     </div>
                 </div>
+
+                {{-- 購入手配ボードの新規依頼カードのみ、手配中へ進めたうえで
+                     カード内容を引き継いだデータ入力画面へ移動できるようにする。 --}}
+                @if (! $card->trashed()
+                    && $card->workflowType->slug === 'purchase'
+                    && $card->current_stage === 0
+                    && Auth::user()->can('advance', $card))
+                    <div class="mt-6 pt-5 border-t border-slate-100">
+                        <form method="POST" action="{{ route('cards.advanceToInput', $card) }}">
+                            @csrf
+                            <button type="submit" class="inline-flex items-center gap-2 px-4 py-2 {{ $accent['button'] }} border border-transparent rounded-lg font-semibold text-sm text-white shadow-sm hover:shadow transition-all">
+                                <i data-lucide="pencil-line" class="w-4 h-4"></i>
+                                手配中に進めてデータ入力する
+                            </button>
+                        </form>
+                        <p class="mt-2 text-xs text-slate-400">
+                            カードを「{{ $card->workflowType->stageLabel(1) }}」に進め、この依頼の内容を反映したデータ入力画面を開きます（登録はまだ行われません）。
+                        </p>
+                    </div>
+                @endif
             </div>
 
             <div class="bg-white shadow-sm border border-slate-200 rounded-2xl p-6">

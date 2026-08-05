@@ -18,6 +18,15 @@
     <div class="py-8" x-data="{ formType: '{{ old('form_type', 'purchase') }}', isProvisional: false }">
         <div class="mx-auto sm:px-6 lg:px-8 space-y-6" x-bind:class="(formType === 'bulk' || formType === 'labor_bulk') ? 'max-w-6xl' : 'max-w-4xl'">
 
+            @if (session('status') === 'card-advanced-to-input')
+                <div class="p-3 rounded-xl bg-blue-50 border border-blue-100 text-blue-800 text-sm flex items-start gap-2">
+                    <i data-lucide="info" class="w-4 h-4 mt-0.5 shrink-0"></i>
+                    <span>
+                        注番 {{ session('advanced_card_order_no') }} の依頼カードを「手配中」に進め、内容を反映しました。
+                        <span class="font-bold">まだ登録はされていません。</span>分類・単価・商社名などを入力して登録してください。
+                    </span>
+                </div>
+            @endif
             @if (session('status') === 'input-created')
                 <div class="p-3 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-800 text-sm">登録しました。</div>
             @endif
