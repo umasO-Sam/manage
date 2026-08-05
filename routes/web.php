@@ -35,6 +35,7 @@ Route::middleware('auth')->group(function () {
     // withTrashed: アーカイブ(論理削除)済みカードの詳細も履歴検索から参照できるようにする
     Route::get('/cards/{card}', [CardController::class, 'show'])->name('cards.show')->withTrashed();
     Route::post('/cards/{card}/move', [CardController::class, 'move'])->name('cards.move');
+    Route::post('/cards/{card}/advance-to-input', [CardController::class, 'advanceToInput'])->name('cards.advanceToInput');
     Route::post('/cards/{card}/revert', [CardController::class, 'revert'])->name('cards.revert');
     Route::post('/cards/{card}/archive-now', [CardController::class, 'archiveNow'])->name('cards.archiveNow');
     Route::delete('/cards/{card}', [CardController::class, 'destroy'])->name('cards.destroy');
