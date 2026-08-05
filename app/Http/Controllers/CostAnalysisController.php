@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\BusinessOrder;
 use App\Models\LaborCost;
 use App\Models\PurchaseDetail;
 use Carbon\Carbon;
@@ -172,15 +173,10 @@ class CostAnalysisController extends Controller
 
         $rows = $purchaseRows->concat($laborRows);
 
-        // 対象が複数の注番にまたがる場合、受注金額は各注番ごとの最大値(同一注番内の重複記載を除くため)
-        // を合算する(単一注番のみの場合はmax()と同じ結果になり、従来通りの挙動を維持する)。
-        $orderAmount = (float) DB::table('purchase_details')
-            ->select('item_code', DB::raw('MAX(order_amount) as max_amount'))
-            ->whereIn('item_code', $includedOrderNos)
-            ->where('is_provisional', false)
-            ->groupBy('item_code')
-            ->get()
-            ->sum('max_amount');
+        // 受注金額は受注ヘッダ(business_orders)から注番ごとに取得して合算する。
+        // 以前は明細(purchase_details)のMAX(order_amount)を注番ごとに拾っていたが、
+        // 受注は1注番1件という実態に合わせてヘッダへ分離した。
+        $orderAmount = (float) BusinessOrder::amountsByOrderNo($includedOrderNos)->sum();
 
         $items = [];
         $subtotal = 0.0;

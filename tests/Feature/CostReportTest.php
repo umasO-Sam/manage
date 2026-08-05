@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\BusinessOrder;
 use App\Models\CategoryCode;
 use App\Models\LaborCost;
 use App\Models\PurchaseDetail;
@@ -52,20 +53,15 @@ class CostReportTest extends TestCase
     {
         $manager = Staff::factory()->procurementManager()->create();
 
-        PurchaseDetail::create([
-            'item_code' => 'SEL001-N01', 'order_qty' => 1, 'unit_price' => 1000,
-            'order_received_date' => '2024-06-15', 'order_amount' => 5000, 'is_provisional' => false,
-        ]);
+        // 受注日・受注金額は受注ヘッダ(business_orders)が持つ。
+        BusinessOrder::create(['order_no' => 'SEL001-N01', 'order_received_date' => '2024-06-15', 'order_amount' => 5000]);
+        PurchaseDetail::create(['item_code' => 'SEL001-N01', 'order_qty' => 1, 'unit_price' => 1000, 'is_provisional' => false]);
         // 終了日(2024-06-30)から2年より前 → 候補から除外される
-        PurchaseDetail::create([
-            'item_code' => 'SEL002-N01', 'order_qty' => 1, 'unit_price' => 1000,
-            'order_received_date' => '2022-01-01', 'order_amount' => 5000, 'is_provisional' => false,
-        ]);
+        BusinessOrder::create(['order_no' => 'SEL002-N01', 'order_received_date' => '2022-01-01', 'order_amount' => 5000]);
+        PurchaseDetail::create(['item_code' => 'SEL002-N01', 'order_qty' => 1, 'unit_price' => 1000, 'is_provisional' => false]);
         // 受注金額が0 → 候補から除外される
-        PurchaseDetail::create([
-            'item_code' => 'SEL003-N01', 'order_qty' => 1, 'unit_price' => 1000,
-            'order_received_date' => '2024-06-15', 'order_amount' => 0, 'is_provisional' => false,
-        ]);
+        BusinessOrder::create(['order_no' => 'SEL003-N01', 'order_received_date' => '2024-06-15', 'order_amount' => 0]);
+        PurchaseDetail::create(['item_code' => 'SEL003-N01', 'order_qty' => 1, 'unit_price' => 1000, 'is_provisional' => false]);
 
         $response = $this->actingAs($manager)->get(route('purchasing.cost-report.index', ['date_to' => '2024-06-30']));
 
@@ -78,10 +74,9 @@ class CostReportTest extends TestCase
         $worker = Staff::factory()->create(['is_labor_target' => true, 'position_weight' => 1]);
         $cat = $this->seedCategories();
 
-        PurchaseDetail::create([
-            'item_code' => 'RPT001-N01', 'category_id' => null, 'item_name' => '受注行',
-            'order_qty' => 0, 'unit_price' => 0, 'recipient' => 'テスト受注先', 'delivery_dest' => 'テスト工場', 'product_name' => 'テスト製品',
-            'order_received_date' => '2024-06-15', 'order_amount' => 100000, 'is_provisional' => false,
+        BusinessOrder::create([
+            'order_no' => 'RPT001-N01', 'recipient' => 'テスト受注先', 'delivery_dest' => 'テスト工場',
+            'product_name' => 'テスト製品', 'order_received_date' => '2024-06-15', 'order_amount' => 100000,
         ]);
         PurchaseDetail::create(['item_code' => 'RPT001-N01', 'category_id' => $cat['material']->id, 'order_qty' => 1, 'unit_price' => 1000, 'is_provisional' => false]);
         PurchaseDetail::create(['item_code' => 'RPT001-N01', 'category_id' => $cat['parts']->id, 'order_qty' => 1, 'unit_price' => 2000, 'is_provisional' => false]);
@@ -98,9 +93,10 @@ class CostReportTest extends TestCase
         LaborCost::create(['work_date' => '2024-06-10', 'staff_id' => $worker->id, 'order_no' => 'RPT001-N01', 'category_id' => $cat['electrical_labor']->id, 'work_hours' => 6, 'work_minutes' => 0, 'is_overtime' => false, 'position_weight_cache' => 1, 'is_provisional' => false]);
 
         // 除外用: 選択しない別注番
+        BusinessOrder::create(['order_no' => 'RPT099-N01', 'order_received_date' => '2024-06-15', 'order_amount' => 9999]);
         PurchaseDetail::create([
             'item_code' => 'RPT099-N01', 'item_name' => '選択しない注番', 'order_qty' => 1, 'unit_price' => 1000,
-            'order_received_date' => '2024-06-15', 'order_amount' => 9999, 'is_provisional' => false,
+            'is_provisional' => false,
         ]);
 
         // 部品材料費=1,000+2,000+3,000=6,000 機械等外注費=4,000 電気関係外注費=5,000
@@ -140,9 +136,9 @@ class CostReportTest extends TestCase
     public function test_manually_entered_item_code_outside_the_candidate_window_is_included(): void
     {
         $manager = Staff::factory()->procurementManager()->create();
+        BusinessOrder::create(['order_no' => 'OLD001-N01', 'product_name' => '古い注番', 'order_received_date' => '2018-01-01', 'order_amount' => 3000]);
         PurchaseDetail::create([
-            'item_code' => 'OLD001-N01', 'product_name' => '古い注番', 'order_qty' => 1, 'unit_price' => 1000,
-            'order_received_date' => '2018-01-01', 'order_amount' => 3000, 'is_provisional' => false,
+            'item_code' => 'OLD001-N01', 'order_qty' => 1, 'unit_price' => 1000, 'is_provisional' => false,
         ]);
 
         $response = $this->actingAs($manager)->get(route('purchasing.cost-report.results', [
@@ -155,10 +151,9 @@ class CostReportTest extends TestCase
     public function test_csv_export_returns_a_csv_file_with_expected_data(): void
     {
         $manager = Staff::factory()->procurementManager()->create();
+        BusinessOrder::create(['order_no' => 'RPT004-N01', 'recipient' => 'CSV受注先', 'order_received_date' => '2024-06-15', 'order_amount' => 5000]);
         PurchaseDetail::create([
-            'item_code' => 'RPT004-N01', 'item_name' => '対象', 'recipient' => 'CSV受注先',
-            'order_qty' => 1, 'unit_price' => 1000,
-            'order_received_date' => '2024-06-15', 'order_amount' => 5000, 'is_provisional' => false,
+            'item_code' => 'RPT004-N01', 'item_name' => '対象', 'order_qty' => 1, 'unit_price' => 1000, 'is_provisional' => false,
         ]);
 
         $response = $this->actingAs($manager)->get(route('purchasing.cost-report.export', [

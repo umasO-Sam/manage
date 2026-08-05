@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\BusinessOrder;
 use App\Models\CategoryCode;
 use App\Models\LaborCost;
 use App\Models\PurchaseDetail;
@@ -29,7 +30,10 @@ class EstimateAssistController extends Controller
 
         $priceTotal = $purchaseRows->sum(fn (PurchaseDetail $d) => $d->requiredAmount());
         $orderPriceTotal = $purchaseRows->sum(fn (PurchaseDetail $d) => $d->orderRequiredAmount());
-        $salesAmountTotal = $purchaseRows->sum(fn (PurchaseDetail $d) => (float) $d->order_amount);
+        // 受注金額は受注ヘッダから注番ごとに引いて合算する。以前は明細行の order_amount を
+        // そのまま合計していたため、同じ注番で金額を持つ行が2つあると二重計上になっていた
+        // (原価計算・原価一覧は注番ごとのMAXで拾っており、画面によって数字が食い違う状態だった)。
+        $salesAmountTotal = BusinessOrder::amountsByOrderNo($agg['includedOrderNos'])->sum();
 
         $totalMinutes = $laborRows->sum(fn (LaborCost $r) => $r->totalMinutes());
         $laborCostTotal = $laborRows->sum(fn (LaborCost $r) => $r->estimatedCost());

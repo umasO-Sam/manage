@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\BusinessOrder;
 use App\Models\CategoryCode;
 use App\Models\LaborCost;
 use App\Models\PurchaseDetail;
@@ -73,6 +74,10 @@ class PurchaseInputController extends Controller
         $data['is_provisional'] = $isProvisional;
 
         PurchaseDetail::create($data);
+
+        // 受注項目(受注先・受注日・納入先・受注金額・売上日・製品名)は受注ヘッダが正。
+        // 集計はヘッダしか見ないため、明細に入力された分をここで反映する。
+        BusinessOrder::syncFromDetail($data['item_code'] ?? null, $data);
 
         return redirect()->route('purchasing.input')->with('status', $isProvisional ? 'input-provisional' : 'input-created');
     }

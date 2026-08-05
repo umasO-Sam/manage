@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\BusinessOrder;
 use App\Models\CategoryCode;
 use App\Models\PurchaseDetail;
 use Illuminate\Contracts\Database\Eloquent\Builder;
@@ -230,6 +231,10 @@ class PurchaseDetailController extends Controller
         ]);
         $data['is_provisional'] = $isProvisional;
 
+        // 受注項目(受注先・受注日・納入先・受注金額・売上日・製品名)は受注ヘッダが正。
+        // 明細にも従来どおり保存しつつ、変更分をヘッダへ反映する。
+        BusinessOrder::syncChangedFromDetail($purchaseDetail, $data);
+
         $purchaseDetail->update($data);
 
         $returnQuery = (string) $request->input('return_query', '');
@@ -268,6 +273,8 @@ class PurchaseDetailController extends Controller
                     'unit.regex' => '単位に数字は使用できません。',
                 ])->validate();
                 $validated['is_provisional'] = $request->boolean("updates.{$id}.is_provisional");
+
+                BusinessOrder::syncChangedFromDetail($purchaseDetail, $validated);
 
                 $purchaseDetail->update($validated);
             }

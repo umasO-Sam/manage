@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\BusinessOrder;
 use App\Models\CategoryCode;
 use App\Models\LaborCost;
 use App\Models\PurchaseDetail;
@@ -909,9 +910,10 @@ class PurchasingModuleTest extends TestCase
     {
         $manager = Staff::factory()->procurementManager()->create();
         $category = CategoryCode::create(['code' => 3, 'major_category' => '部品', 'is_parts' => true]);
+        BusinessOrder::create(['order_no' => 'A1', 'order_amount' => 10000]);
         PurchaseDetail::create([
             'item_code' => 'A1', 'category_id' => $category->id, 'item_name' => '部品X',
-            'supplier_name' => '大津屋', 'order_qty' => 2, 'unit_price' => 1000, 'order_amount' => 10000,
+            'supplier_name' => '大津屋', 'order_qty' => 2, 'unit_price' => 1000,
             'is_provisional' => false,
         ]);
 

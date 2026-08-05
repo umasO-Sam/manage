@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\BusinessOrder;
 use App\Models\LaborCost;
 use App\Models\PurchaseDetail;
 use Carbon\Carbon;
@@ -145,16 +146,14 @@ class CostReportController extends Controller
     {
         $windowStart = Carbon::parse($dateTo)->subYears(self::CANDIDATE_WINDOW_YEARS)->toDateString();
 
-        return PurchaseDetail::query()
-            ->where('is_provisional', false)
-            ->select('item_code')
-            ->selectRaw('MAX(order_received_date) as order_received_date')
-            ->selectRaw('MAX(order_amount) as order_amount')
-            ->groupBy('item_code')
-            ->havingNotNull('order_received_date')
-            ->having('order_amount', '>', 0)
-            ->having('order_received_date', '<=', $dateTo)
-            ->having('order_received_date', '>=', $windowStart)
+        // 受注日・受注金額は受注ヘッダ(business_orders)が持つ。以前は明細のMAX(...)を
+        // 注番ごとに集約して同じことをしていた。
+        return BusinessOrder::query()
+            ->select('order_no as item_code', 'order_received_date', 'order_amount')
+            ->whereNotNull('order_received_date')
+            ->where('order_amount', '>', 0)
+            ->whereDate('order_received_date', '<=', $dateTo)
+            ->whereDate('order_received_date', '>=', $windowStart)
             ->orderByDesc('order_received_date')
             ->get();
     }
@@ -167,21 +166,9 @@ class CostReportController extends Controller
      */
     private function buildReportRows(Collection $itemCodes): Collection
     {
-        $orderAmounts = PurchaseDetail::query()
-            ->whereIn('item_code', $itemCodes)
-            ->where('is_provisional', false)
-            ->select('item_code')
-            ->selectRaw('MAX(order_amount) as order_amount')
-            ->groupBy('item_code')
-            ->pluck('order_amount', 'item_code');
-
-        $salesRowsByItemCode = PurchaseDetail::query()
-            ->whereIn('item_code', $itemCodes)
-            ->where('is_provisional', false)
-            ->where('order_amount', '>', 0)
-            ->orderBy('id')
-            ->get()
-            ->groupBy('item_code');
+        // 受注金額・受注先・納入先・件名は受注ヘッダから引く。
+        $headers = BusinessOrder::whereIn('order_no', $itemCodes)->get()->keyBy('order_no');
+        $orderAmounts = $headers->map(fn (BusinessOrder $o) => (float) $o->order_amount);
 
         $purchaseRows = DB::table('purchase_details as p')
             ->leftJoin('category_codes as c', 'p.category_id', '=', 'c.id')
@@ -211,15 +198,15 @@ class CostReportController extends Controller
             })
             ->groupBy('item_code');
 
-        return $itemCodes->map(function (string $itemCode) use ($orderAmounts, $salesRowsByItemCode, $purchaseRows, $laborRows) {
+        return $itemCodes->map(function (string $itemCode) use ($headers, $orderAmounts, $purchaseRows, $laborRows) {
             $rows = collect($purchaseRows->get($itemCode, collect()))->concat($laborRows->get($itemCode, collect()));
-            $salesRow = $salesRowsByItemCode->get($itemCode, collect())->first();
+            $header = $headers->get($itemCode);
 
             return $this->buildRow(
                 itemCode: $itemCode,
-                recipient: $salesRow?->recipient ?? '',
-                deliveryDest: $salesRow?->delivery_dest ?? '',
-                productName: $salesRow?->product_name ?? '',
+                recipient: $header?->recipient ?? '',
+                deliveryDest: $header?->delivery_dest ?? '',
+                productName: $header?->product_name ?? '',
                 orderAmount: (float) ($orderAmounts[$itemCode] ?? 0),
                 rows: $rows,
             );
