@@ -2,9 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\DailyReport;
 use App\Models\Holiday;
-use App\Models\LaborCost;
 use App\Models\LeaveRequest;
 use App\Models\Staff;
 use Illuminate\Support\Carbon;
@@ -13,8 +11,9 @@ use Illuminate\View\View;
 
 /**
  * 勤務状況一覧。今日を基準に前1週間・先4週間(35日)を横軸に、全社員(部署順・表示順)を
- * 縦軸に一覧表示する。一般社員・営業担当には休暇・休日出勤の種別のみを、
- * 上長・資材管理担当者には承認状況の色分けと、作業日報の登録状況もあわせて表示する。
+ * 縦軸に一覧表示する。休暇・休日出勤の種別のみを表示する(作業日報の提出・確認状況は
+ * 作業日報一覧画面で確認する)。一般社員・営業担当には種別のみを、上長・資材管理担当者
+ * には承認状況の色分けもあわせて表示する。
  */
 class WorkStatusController extends Controller
 {
@@ -41,9 +40,8 @@ class WorkStatusController extends Controller
             'dates' => $dates,
             'today' => $today->format('Y-m-d'),
             'holidaysByDate' => $holidaysByDate,
-            'staffList' => Staff::orderedForRoster()->get(),
+            'staffGroups' => Staff::orderedForRoster()->get()->groupBy('department'),
             'leaveEntriesByStaffAndDate' => $this->buildLeaveEntriesByStaffAndDate($rangeStart, $rangeEnd),
-            'dailyReportStatusByStaffAndDate' => $isPrivileged ? $this->buildDailyReportStatusByStaffAndDate($rangeStart, $rangeEnd) : [],
             'isPrivileged' => $isPrivileged,
         ]);
     }
@@ -94,34 +92,6 @@ class WorkStatusController extends Controller
             if ($compensatoryDate && $compensatoryDate >= $rangeStartStr && $compensatoryDate <= $rangeEndStr) {
                 $result[$leaveRequest->staff_id][$compensatoryDate][] = ['request' => $leaveRequest, 'role' => 'compensatory'];
             }
-        }
-
-        return $result;
-    }
-
-    /**
-     * @return array<int, array<string, string>> staff_id => [work_date => draft|pending_confirmation|rejected|confirmed]
-     */
-    private function buildDailyReportStatusByStaffAndDate(Carbon $rangeStart, Carbon $rangeEnd): array
-    {
-        $reports = DailyReport::whereDate('work_date', '>=', $rangeStart->toDateString())
-            ->whereDate('work_date', '<=', $rangeEnd->toDateString())
-            ->get();
-
-        $provisionalReportIds = LaborCost::where('is_provisional', true)
-            ->whereNotNull('daily_report_id')
-            ->pluck('daily_report_id');
-
-        $result = [];
-        foreach ($reports as $report) {
-            $status = match (true) {
-                $report->isRejected() => 'rejected',
-                ! $report->isSubmitted() => 'draft',
-                $provisionalReportIds->contains($report->id) => 'pending_confirmation',
-                default => 'confirmed',
-            };
-
-            $result[$report->staff_id][$report->work_date->format('Y-m-d')] = $status;
         }
 
         return $result;

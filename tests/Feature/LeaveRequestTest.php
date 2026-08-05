@@ -93,8 +93,8 @@ class LeaveRequestTest extends TestCase
             'day_count' => 1.0, 'approver_id' => $approver->id, 'status' => 'pending', ...$overrides,
         ]);
 
-        $this->assertSame('1D有給', $make(['granularity' => 'full_day'])->shortLabel());
-        $this->assertSame('2H有給', $make(['granularity' => 'hours'])->shortLabel());
+        $this->assertSame('1日有休', $make(['granularity' => 'full_day'])->shortLabel());
+        $this->assertSame('2H有休', $make(['granularity' => 'hours'])->shortLabel());
         $this->assertSame('AM半休', $make(['granularity' => 'half_day', 'half_day_period' => 'am'])->shortLabel());
         $this->assertSame('PM半休', $make(['granularity' => 'half_day', 'half_day_period' => 'pm'])->shortLabel());
 

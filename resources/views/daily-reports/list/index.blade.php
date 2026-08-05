@@ -7,101 +7,88 @@
     </x-slot>
 
     <div class="py-8">
-        <div class="max-w-5xl mx-auto sm:px-6 lg:px-8 space-y-4">
+        <div class="max-w-full mx-auto sm:px-6 lg:px-8 space-y-4">
 
-            <form method="GET" action="{{ route('daily-reports.list.index') }}"
-                  class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-wrap items-end gap-3">
-                <div>
-                    <label class="block text-xs font-semibold text-slate-600 mb-1">開始日</label>
-                    <input type="date" name="start_date" value="{{ $startDate }}" class="text-sm border rounded-lg p-2 border-slate-300">
-                </div>
-                <div>
-                    <label class="block text-xs font-semibold text-slate-600 mb-1">終了日</label>
-                    <input type="date" name="end_date" value="{{ $endDate }}" class="text-sm border rounded-lg p-2 border-slate-300">
-                </div>
-                @if ($isPrivileged)
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-600 mb-1">氏名</label>
-                        <select name="staff_id" class="text-sm border rounded-lg p-2 border-slate-300 min-w-[10rem]">
-                            <option value="">すべて</option>
-                            @foreach ($staffList as $staff)
-                                <option value="{{ $staff->id }}" @selected((string) $staffId === (string) $staff->id)>{{ $staff->name }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-                @endif
-                <div>
-                    <label class="block text-xs font-semibold text-slate-600 mb-1">状態</label>
-                    <select name="status" class="text-sm border rounded-lg p-2 border-slate-300">
-                        <option value="">すべて</option>
-                        <option value="draft" @selected($status === 'draft')>下書き</option>
-                        <option value="pending_confirmation" @selected($status === 'pending_confirmation')>確認待ち</option>
-                        <option value="rejected" @selected($status === 'rejected')>差戻し</option>
-                        <option value="confirmed" @selected($status === 'confirmed')>確認済み</option>
-                    </select>
-                </div>
-                <button type="submit" class="text-sm font-semibold bg-slate-800 hover:bg-slate-900 text-white px-5 py-2 rounded-lg shadow-sm">
-                    絞り込む
-                </button>
-            </form>
+            <p class="text-xs text-slate-500">今日を基準に前1週間・先4週間（35日分）の作業日報の提出・確認状況を表示しています。</p>
 
-            <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-                <table class="w-full text-left border-collapse text-sm">
+            <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-x-auto">
+                <table class="border-collapse text-xs">
                     <thead>
-                        <tr class="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-600">
-                            <th class="p-3">日付</th>
-                            @if ($isPrivileged)
-                                <th class="p-3">氏名</th>
-                            @endif
-                            <th class="p-3">状態</th>
-                            <th class="p-3">提出日時</th>
-                            <th class="p-3">差戻し理由</th>
-                            <th class="p-3 text-center">操作</th>
+                        <tr class="bg-slate-50 border-b border-slate-200 text-slate-600">
+                            <th class="sticky left-0 z-10 bg-slate-50 p-1 text-center font-semibold border-r border-slate-200 whitespace-nowrap w-6">部署</th>
+                            <th class="sticky left-6 z-10 bg-slate-50 p-1 text-left font-semibold border-r border-slate-200 whitespace-nowrap">氏名</th>
+                            @foreach ($dates as $index => $dateString)
+                                @php
+                                    $current = \Illuminate\Support\Carbon::parse($dateString);
+                                    $weekdayLabels = ['日', '月', '火', '水', '木', '金', '土'];
+                                    $isWeekend = in_array($current->dayOfWeek, [0, 6], true);
+                                    $holiday = $holidaysByDate->get($dateString);
+                                    $isDayOff = $isWeekend || in_array($holiday?->type, [\App\Models\Holiday::TYPE_PUBLIC_HOLIDAY, \App\Models\Holiday::TYPE_COMPANY_HOLIDAY], true);
+                                    $isToday = $dateString === $today;
+                                @endphp
+                                <th class="p-0.5 font-semibold text-center w-12 {{ $index % 7 === 0 ? 'border-l border-slate-200' : '' }} {{ $isDayOff ? 'bg-pink-50' : '' }} {{ $isToday ? 'bg-slate-800 text-white' : '' }}"
+                                    title="{{ $current->format('Y/m/d') }}（{{ $weekdayLabels[$current->dayOfWeek] }}）{{ $holiday?->name }}">
+                                    <div class="whitespace-nowrap">{{ $current->format('n/j') }}</div>
+                                    <div class="whitespace-nowrap {{ ! $isToday && $current->dayOfWeek === 0 ? 'text-red-500' : (! $isToday && $current->dayOfWeek === 6 ? 'text-blue-500' : '') }}">{{ $weekdayLabels[$current->dayOfWeek] }}</div>
+                                    @if (Auth::user()->is_procurement_manager)
+                                        <a href="{{ route('daily-reports.review.index', ['date' => $dateString]) }}" class="block {{ $isToday ? 'text-white/80 hover:text-white' : 'text-slate-400 hover:text-blue-600' }}" title="{{ $current->format('n/j') }}の作業日報を確認する">
+                                            <i data-lucide="clipboard-check" class="w-3 h-3 inline-block"></i>
+                                        </a>
+                                    @endif
+                                </th>
+                            @endforeach
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100">
-                        @php
-                            $statusLabels = [
-                                'draft' => ['下書き', 'bg-slate-200 text-slate-700'],
-                                'pending_confirmation' => ['確認待ち', 'bg-amber-100 text-amber-800'],
-                                'rejected' => ['差戻し', 'bg-red-100 text-red-800'],
-                                'confirmed' => ['確認済み', 'bg-emerald-100 text-emerald-800'],
-                            ];
-                        @endphp
-                        @forelse ($reports as $report)
-                            <tr class="hover:bg-slate-50">
-                                <td class="p-3 font-mono">{{ $report->work_date->format('Y/m/d') }}</td>
-                                @if ($isPrivileged)
-                                    <td class="p-3 font-semibold">{{ $report->staff->name }}</td>
-                                @endif
-                                <td class="p-3">
-                                    <span class="text-xs font-bold px-2.5 py-0.5 rounded-full {{ $statusLabels[$report->statusKey][1] }}">
-                                        {{ $statusLabels[$report->statusKey][0] }}
-                                    </span>
-                                </td>
-                                <td class="p-3 text-slate-500">{{ $report->submitted_at?->format('Y/m/d H:i') ?? '—' }}</td>
-                                <td class="p-3 text-slate-500 max-w-xs truncate">{{ $report->rejection_reason }}</td>
-                                <td class="p-3 text-center">
-                                    @if ($report->staff_id === Auth::id())
-                                        <a href="{{ route('daily-reports.show', ['date' => $report->work_date->format('Y-m-d')]) }}"
-                                           class="text-blue-700 hover:text-blue-900 font-semibold">編集</a>
-                                    @elseif ($isPrivileged && $report->statusKey === 'pending_confirmation')
-                                        <a href="{{ route('daily-reports.review.index', ['date' => $report->work_date->format('Y-m-d')]) }}"
-                                           class="text-blue-700 hover:text-blue-900 font-semibold">確認する</a>
-                                    @else
-                                        <span class="text-slate-300">—</span>
+                        @foreach ($staffGroups as $department => $staffInGroup)
+                            @foreach ($staffInGroup as $staff)
+                                <tr class="hover:bg-slate-50">
+                                    @if ($loop->first)
+                                        <td rowspan="{{ $staffInGroup->count() }}"
+                                            class="sticky left-0 z-10 bg-slate-50 text-center font-semibold text-slate-600 border-r border-slate-200 align-middle w-6"
+                                            style="writing-mode: vertical-rl;">
+                                            {{ $department }}
+                                        </td>
                                     @endif
-                                </td>
-                            </tr>
-                        @empty
-                            <tr>
-                                <td colspan="{{ $isPrivileged ? 6 : 5 }}" class="p-8 text-center text-slate-400">
-                                    該当する作業日報がありません。
-                                </td>
-                            </tr>
-                        @endforelse
+                                    <td class="sticky left-6 z-10 bg-white py-0.5 px-1.5 font-semibold text-slate-800 whitespace-nowrap border-r border-slate-200">
+                                        {{ $staff->name }}
+                                    </td>
+                                    @foreach ($dates as $index => $dateString)
+                                        @php
+                                            $current = \Illuminate\Support\Carbon::parse($dateString);
+                                            $isWeekend = in_array($current->dayOfWeek, [0, 6], true);
+                                            $holiday = $holidaysByDate->get($dateString);
+                                            $isDayOff = $isWeekend || in_array($holiday?->type, [\App\Models\Holiday::TYPE_PUBLIC_HOLIDAY, \App\Models\Holiday::TYPE_COMPANY_HOLIDAY], true);
+                                            $isToday = $dateString === $today;
+                                            $status = $statusByStaffAndDate[$staff->id][$dateString] ?? null;
+                                            $statusLabels = [
+                                                'draft' => ['下書き', 'bg-slate-300'],
+                                                'pending_confirmation' => ['確認待ち', 'bg-amber-500'],
+                                                'rejected' => ['差戻し', 'bg-red-500'],
+                                                'confirmed' => ['確認済み', 'bg-emerald-500'],
+                                            ];
+                                        @endphp
+                                        <td class="px-0.5 py-px text-center align-middle {{ $index % 7 === 0 ? 'border-l border-slate-100' : '' }} {{ $isDayOff ? 'bg-pink-50/60' : '' }} {{ $isToday ? 'bg-slate-100' : '' }}">
+                                            <div class="flex items-center justify-center min-h-[10px]">
+                                                @if ($status)
+                                                    <span class="w-2 h-2 rounded-sm inline-block {{ $statusLabels[$status][1] }}" title="{{ $statusLabels[$status][0] }}"></span>
+                                                @endif
+                                            </div>
+                                        </td>
+                                    @endforeach
+                                </tr>
+                            @endforeach
+                        @endforeach
                     </tbody>
                 </table>
+            </div>
+
+            <div class="flex flex-wrap gap-4 text-xs text-slate-600">
+                <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-sm bg-slate-300 inline-block"></span>下書き</span>
+                <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-sm bg-amber-500 inline-block"></span>確認待ち</span>
+                <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-sm bg-red-500 inline-block"></span>差戻し</span>
+                <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-sm bg-emerald-500 inline-block"></span>確認済み</span>
+                <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded bg-pink-50 border border-pink-100 inline-block"></span>土日・祝日・会社休日</span>
             </div>
         </div>
     </div>

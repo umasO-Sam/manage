@@ -127,8 +127,8 @@ class LeaveRequest extends Model
     public function shortLabel(): string
     {
         return match (true) {
-            $this->type === 'paid_leave' && $this->granularity === 'full_day' => '1D有給',
-            $this->type === 'paid_leave' && $this->granularity === 'hours' => '2H有給',
+            $this->type === 'paid_leave' && $this->granularity === 'full_day' => '1日有休',
+            $this->type === 'paid_leave' && $this->granularity === 'hours' => '2H有休',
             $this->type === 'paid_leave' && $this->granularity === 'half_day' && $this->half_day_period === 'am' => 'AM半休',
             $this->type === 'paid_leave' && $this->granularity === 'half_day' && $this->half_day_period === 'pm' => 'PM半休',
             $this->type === 'paid_leave' && $this->granularity === 'half_day' => '半休',

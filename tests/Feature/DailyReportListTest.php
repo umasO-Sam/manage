@@ -32,7 +32,19 @@ class DailyReportListTest extends TestCase
         $this->actingAs($staff)->get(route('daily-reports.list.index'))->assertOk();
     }
 
-    public function test_general_staff_sees_only_their_own_reports(): void
+    public function test_shows_35_days_from_one_week_ago_to_four_weeks_ahead(): void
+    {
+        $staff = Staff::factory()->create();
+
+        $response = $this->actingAs($staff)->get(route('daily-reports.list.index'));
+
+        $response->assertOk();
+        $response->assertViewHas('dates', function (array $dates) {
+            return $dates[0] === '2026-08-03' && end($dates) === '2026-09-06' && count($dates) === 35;
+        });
+    }
+
+    public function test_general_staff_sees_only_their_own_row(): void
     {
         $staff = Staff::factory()->create(['name' => '自分太郎']);
         $other = Staff::factory()->create(['name' => '他人次郎']);
@@ -43,7 +55,7 @@ class DailyReportListTest extends TestCase
         $response = $this->actingAs($staff)->get(route('daily-reports.list.index'));
 
         $response->assertOk();
-        $response->assertSee('2026/08/05');
+        $response->assertSee('自分太郎');
         $response->assertDontSee('他人次郎');
     }
 
@@ -53,61 +65,14 @@ class DailyReportListTest extends TestCase
         $staffA = Staff::factory()->create(['name' => '担当者A']);
         $staffB = Staff::factory()->create(['name' => '担当者B']);
 
-        DailyReport::create(['staff_id' => $staffA->id, 'work_date' => '2026-08-05', 'submitted_at' => now()]);
-        DailyReport::create(['staff_id' => $staffB->id, 'work_date' => '2026-08-06', 'submitted_at' => now()]);
-
         $response = $this->actingAs($manager)->get(route('daily-reports.list.index'));
 
+        $response->assertOk();
         $response->assertSee('担当者A');
         $response->assertSee('担当者B');
     }
 
-    public function test_privileged_viewer_can_filter_by_staff(): void
-    {
-        $manager = Staff::factory()->procurementManager()->create();
-        $staffA = Staff::factory()->create(['name' => '担当者A']);
-        $staffB = Staff::factory()->create(['name' => '担当者B']);
-
-        DailyReport::create(['staff_id' => $staffA->id, 'work_date' => '2026-08-05', 'submitted_at' => now()]);
-        DailyReport::create(['staff_id' => $staffB->id, 'work_date' => '2026-08-06', 'submitted_at' => now()]);
-
-        $response = $this->actingAs($manager)->get(route('daily-reports.list.index', ['staff_id' => $staffA->id]));
-
-        $response->assertSee('2026/08/05');
-        $response->assertDontSee('2026/08/06');
-    }
-
-    public function test_status_filter_narrows_results(): void
-    {
-        $manager = Staff::factory()->procurementManager()->create();
-        $staff = Staff::factory()->create();
-
-        $draft = DailyReport::create(['staff_id' => $staff->id, 'work_date' => '2026-08-01']);
-        $rejected = DailyReport::create(['staff_id' => $staff->id, 'work_date' => '2026-08-02', 'submitted_at' => now(), 'rejected_at' => now(), 'rejection_reason' => '差戻し理由テスト']);
-
-        $response = $this->actingAs($manager)->get(route('daily-reports.list.index', ['status' => 'rejected']));
-
-        $response->assertSee('差戻し理由テスト');
-        $response->assertDontSee('2026/08/01');
-    }
-
-    public function test_date_range_filter_excludes_reports_outside_range(): void
-    {
-        $manager = Staff::factory()->procurementManager()->create();
-        $staff = Staff::factory()->create();
-
-        DailyReport::create(['staff_id' => $staff->id, 'work_date' => '2026-08-05', 'submitted_at' => now()]);
-        DailyReport::create(['staff_id' => $staff->id, 'work_date' => '2026-08-25', 'submitted_at' => now()]);
-
-        $response = $this->actingAs($manager)->get(route('daily-reports.list.index', [
-            'start_date' => '2026-08-01', 'end_date' => '2026-08-10',
-        ]));
-
-        $response->assertSee('2026/08/05');
-        $response->assertDontSee('2026/08/25');
-    }
-
-    public function test_pending_report_shows_review_link_for_procurement_manager(): void
+    public function test_shows_pending_confirmation_status(): void
     {
         $manager = Staff::factory()->procurementManager()->create();
         $staff = Staff::factory()->create();
@@ -119,18 +84,32 @@ class DailyReportListTest extends TestCase
 
         $response = $this->actingAs($manager)->get(route('daily-reports.list.index'));
 
-        $response->assertSee(route('daily-reports.review.index', ['date' => '2026-08-05']), false);
+        $response->assertOk();
         $response->assertSee('確認待ち');
     }
 
-    public function test_own_report_shows_edit_link(): void
+    public function test_review_link_only_shown_to_procurement_managers(): void
     {
-        $staff = Staff::factory()->create();
-        DailyReport::create(['staff_id' => $staff->id, 'work_date' => '2026-08-05']);
+        $manager = Staff::factory()->procurementManager()->create();
+        $supervisor = Staff::factory()->create(['is_supervisor' => true]);
 
-        $response = $this->actingAs($staff)->get(route('daily-reports.list.index'));
+        $this->actingAs($manager)->get(route('daily-reports.list.index'))
+            ->assertSee(route('daily-reports.review.index', ['date' => '2026-08-10']), false);
 
-        $response->assertSee(route('daily-reports.show', ['date' => '2026-08-05']), false);
-        $response->assertSee('下書き');
+        $this->actingAs($supervisor)->get(route('daily-reports.list.index'))
+            ->assertDontSee('daily-reports/review');
+    }
+
+    public function test_staff_are_grouped_by_department(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        Staff::factory()->create(['name' => '製造太郎', 'department' => '機械製造', 'display_order' => 1]);
+        Staff::factory()->create(['name' => '営業花子', 'department' => '営業', 'display_order' => 1]);
+
+        $response = $this->actingAs($manager)->get(route('daily-reports.list.index'));
+
+        $content = $response->getContent();
+        $this->assertLessThan(strpos($content, '製造太郎'), strpos($content, '営業花子'));
+        $this->assertSame(1, substr_count($content, '機械製造'));
     }
 }
