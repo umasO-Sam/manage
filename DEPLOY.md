@@ -2,7 +2,9 @@
 
 対象: Laravel 13 / PHP 8.3 / MySQL / Xserver 共用サーバー（シェアードプラン）
 
-> **ステータス（2026-07-16時点）**: この手順書はまだ実行されていない。ローカル開発（SQLite）は完了しており、本番デプロイ待ち。
+> **ステータス（2026-08-05時点）**: 初回デプロイ（1〜6章）は完了済みで、
+> `https://manage.saito-koken.co.jp` で本番稼働中。
+> 2回目以降の更新は**7章の手順**（メンテナンスモードで囲む）に従うこと。
 
 ---
 
@@ -259,19 +261,80 @@ chmod -R 775 storage bootstrap/cache
 
 ## 7. 今後の更新手順（2回目以降のデプロイ）
 
-Gitでデプロイした場合:
+> **重要（2026-08-05に実際に発生した障害）**: `git pull` した瞬間に新しいBladeテンプレートが
+> 本番へ反映される一方、**ルートキャッシュ・ビューキャッシュ・フロント資産は古いまま**になる。
+> このズレの間にアクセスがあると、新しく追加したルートを参照する画面が
+> `Route [xxx] not defined` で500エラーになる（実際に利用中のユーザーが遭遇した）。
+> 同様に、`public/build/manifest.json` だけ新しくなって資産ファイルが未転送だと、
+> CSS/JSが404になり画面が崩れる。
+>
+> **対策: 必ず `artisan down` 〜 `artisan up` で全工程を囲むこと。**
+> 更新中のユーザーには500ではなくメンテナンス画面（503）が表示される。
+
+### 7-1. ローカルでの準備（フロントに変更がある場合）
+
+```powershell
+. C:\Users\OSAMU\claude\dev-tools-path.ps1
+cd C:\Users\OSAMU\claude\manage
+npm run build
+tar czf build.tar.gz -C public build
+scp -i ~/.ssh/xserver_manage -P 10022 build.tar.gz saitokoken@saitokoken.xsrv.jp:~/manage/
+```
+
+Blade・ルート・コントローラを変更した場合はフロント資産に変更が無くても
+**7-2のキャッシュ再生成は必須**（ここを飛ばすと上記の500が発生する）。
+
+### 7-2. サーバー側の作業
 
 ```bash
 ssh -i ~/.ssh/xserver_manage -p 10022 saitokoken@saitokoken.xsrv.jp
 cd ~/manage
+
+# 1. メンテナンスモードに入る（以降の全工程をこの中で行う）
+#    --secret を付けると、表示されたURLを開いたブラウザだけメンテ中でも閲覧でき、
+#    公開前に自分で動作確認できる。
+/usr/bin/php8.3 artisan down --retry=60 --secret="deploy-check"
+
+# 2. コード更新
 git pull
+
+# 3. Composer依存関係（composer.json/lockに変更が無ければ実質何も起きないが、実行して害はない）
 /usr/bin/php8.3 ~/bin/composer.phar install --no-dev --optimize-autoloader --no-interaction
+
+# 4. フロント資産の展開（7-1でアップロードした場合のみ）
+tar xzf build.tar.gz -C public && rm -f build.tar.gz
+
+# 5. マイグレーション
 /usr/bin/php8.3 artisan migrate --force
-# フロント変更があれば、ローカルでnpm run build → scpでpublic/buildを再アップロード
+
+# 6. キャッシュ再生成（順序はこの通り。config → route → view）
 /usr/bin/php8.3 artisan config:cache
 /usr/bin/php8.3 artisan route:cache
 /usr/bin/php8.3 artisan view:cache
+
+# 7. 公開前の確認（--secretを使った場合はブラウザで実画面を確認できる）
+/usr/bin/php8.3 artisan route:list | tail -5      # 追加したルートが載っているか
+tail -20 storage/logs/laravel.log                  # 新しいエラーが出ていないか
+
+# 8. メンテナンスモード解除
+/usr/bin/php8.3 artisan up
 ```
+
+### 7-3. 解除後の確認
+
+```bash
+curl -s -o /dev/null -w "%{http_code}\n" https://manage.saito-koken.co.jp/login   # 200であること
+# 配信されている資産ファイル名が、今回ビルドしたものと一致するか
+curl -s https://manage.saito-koken.co.jp/login | grep -o 'app-[A-Za-z0-9_-]*\.\(css\|js\)' | sort -u
+```
+
+解除後、`storage/logs/laravel.log` に新しいERRORが増えていないことを数分後にもう一度確認する。
+
+> **失敗したとき**: 途中で中断すると**サイトがメンテナンスモードのまま**になる。
+> 必ず `/usr/bin/php8.3 artisan up` で解除すること。
+> コードを戻す場合は `git reset --hard <戻したいコミット>` の後、6のキャッシュ再生成を
+> やり直してから `artisan up` する（キャッシュを戻さないと古いコードと新しいキャッシュが
+> 食い違って同じ500が起きる）。
 
 ---
 
