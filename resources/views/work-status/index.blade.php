@@ -38,16 +38,19 @@
                         @php $rowIndex = 0; @endphp
                         @foreach ($staffGroups as $department => $staffInGroup)
                             @foreach ($staffInGroup as $staff)
-                                @php $rowIndex++; @endphp
-                                <tr class="{{ $rowIndex % 2 === 0 ? 'bg-slate-50' : 'bg-white' }} hover:bg-blue-50 {{ $loop->first && ! $loop->parent->first ? 'border-t-4 border-t-black' : '' }}">
+                                @php
+                                    $rowIndex++;
+                                    $groupBorder = $loop->first && ! $loop->parent->first ? 'border-t-4 border-t-black' : '';
+                                @endphp
+                                <tr class="{{ $rowIndex % 2 === 0 ? 'bg-slate-50' : 'bg-white' }} hover:bg-blue-50">
                                     @if ($loop->first)
                                         <td rowspan="{{ $staffInGroup->count() }}"
-                                            class="sticky left-0 z-10 bg-slate-50 text-center font-semibold text-slate-600 border-r border-slate-200 align-middle w-6"
+                                            class="sticky left-0 z-10 bg-slate-50 text-center font-semibold text-slate-600 border-r border-slate-200 align-middle w-6 {{ $groupBorder }}"
                                             style="writing-mode: vertical-rl;">
                                             {{ $department }}
                                         </td>
                                     @endif
-                                    <td class="sticky left-6 z-10 {{ $rowIndex % 2 === 0 ? 'bg-slate-50' : 'bg-white' }} py-0.5 px-1.5 font-semibold text-slate-800 whitespace-nowrap border-r border-slate-200">
+                                    <td class="sticky left-6 z-10 {{ $rowIndex % 2 === 0 ? 'bg-slate-50' : 'bg-white' }} py-0.5 px-1.5 font-semibold text-slate-800 whitespace-nowrap border-r border-slate-200 {{ $groupBorder }}">
                                         {{ $staff->name }}
                                     </td>
                                     @foreach ($dates as $index => $dateString)
@@ -59,7 +62,7 @@
                                             $isToday = $dateString === $today;
                                             $entries = $leaveEntriesByStaffAndDate[$staff->id][$dateString] ?? [];
                                         @endphp
-                                        <td class="px-0.5 py-px text-center align-middle {{ $index % 7 === 0 ? 'border-l border-slate-100' : '' }} {{ $isDayOff ? 'bg-pink-50/60' : '' }} {{ $isToday ? 'bg-slate-100' : '' }}">
+                                        <td class="px-0.5 py-px text-center align-middle {{ $index % 7 === 0 ? 'border-l border-slate-100' : '' }} {{ $isDayOff ? 'bg-pink-50/60' : '' }} {{ $isToday ? 'bg-slate-100' : '' }} {{ $groupBorder }}">
                                             <div class="flex flex-col items-center justify-center gap-px min-h-[10px]">
                                                 @foreach ($entries as $entry)
                                                     @php
