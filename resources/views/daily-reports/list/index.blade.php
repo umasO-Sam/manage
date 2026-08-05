@@ -78,7 +78,8 @@
                                             $status = $statusByStaffAndDate[$staff->id][$dateString] ?? null;
                                             $hasPurchaseInput = $purchaseInputByStaffAndDate[$staff->id][$dateString] ?? false;
                                             $statusLabels = [
-                                                'draft' => ['下書き', 'bg-slate-300'],
+                                                // 下書き保存の廃止前に保存された未提出の日報だけがこの状態になる。
+                                                'draft' => ['未提出', 'bg-slate-300'],
                                                 'pending_confirmation' => ['確認待ち', 'bg-amber-500'],
                                                 'rejected' => ['差戻し', 'bg-red-500'],
                                                 'confirmed' => ['確認済み', 'bg-emerald-500'],
@@ -134,7 +135,7 @@
             </div>
 
             <div class="flex flex-wrap gap-4 text-xs text-slate-600">
-                <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-sm bg-slate-300 inline-block"></span>下書き</span>
+                <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-sm bg-slate-300 inline-block"></span>未提出</span>
                 <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-sm bg-amber-500 inline-block"></span>確認待ち</span>
                 <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-sm bg-red-500 inline-block"></span>差戻し</span>
                 <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-sm bg-emerald-500 inline-block"></span>確認済み</span>
