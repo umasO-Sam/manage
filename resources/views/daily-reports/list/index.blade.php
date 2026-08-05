@@ -45,7 +45,7 @@
                             @foreach ($staffInGroup as $staff)
                                 @php
                                     $rowIndex++;
-                                    $groupBorder = $loop->first && ! $loop->parent->first ? 'border-t-4 border-t-black' : '';
+                                    $groupBorder = $loop->first && ! $loop->parent->first ? 'border-t-2 border-t-black' : '';
                                 @endphp
                                 <tr class="{{ $rowIndex % 2 === 0 ? 'bg-slate-50' : 'bg-white' }} hover:bg-blue-50">
                                     @if ($loop->first)
