@@ -8,6 +8,7 @@ use App\Models\DailyReportEntry;
 use App\Models\LaborCost;
 use App\Models\OperationLog;
 use App\Models\OrderNumber;
+use App\Services\TimecardService;
 use App\Services\WorkTimeComplianceService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -18,7 +19,7 @@ use Illuminate\View\View;
 
 class DailyReportController extends Controller
 {
-    public function show(Request $request, WorkTimeComplianceService $compliance): View
+    public function show(Request $request, WorkTimeComplianceService $compliance, TimecardService $timecard): View
     {
         $workDate = $this->parseDate($request->query('date'));
 
@@ -76,6 +77,9 @@ class DailyReportController extends Controller
             'monthLabel' => $monthStart->format('m/d').'〜'.$monthEnd->format('m/d'),
             'isRestDay' => $compliance->isRestDay($referenceDate),
             'specialClause' => $compliance->specialClauseSummary($staff, $referenceDate),
+            // タイムカードの打刻(参考表示)。連携が無効・未紐づけならnullで、画面には何も出ない。
+            'punch' => $timecard->punchesFor(collect([$staff]), $referenceDate, $referenceDate)[$staff->id][$workDate] ?? null,
+            'timecardService' => $timecard,
         ]);
     }
 

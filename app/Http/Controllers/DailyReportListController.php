@@ -7,27 +7,34 @@ use App\Models\Holiday;
 use App\Models\LaborCost;
 use App\Models\Staff;
 use App\Services\WorkTimeComplianceService;
+use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\View\View;
 
 /**
  * 作業日報一覧。勤務状況一覧と同じ表示方法(全社員を部署順・表示順に縦軸、日付を横軸)で、
- * 過去3週間(今日を含む21日分)の各日の作業日報が提出・確認されているかを確認する画面。
+ * 基準日(既定は今日)までの3週間(21日分)の各日の作業日報が提出・確認されているかを確認する画面。
+ * 基準日は2週間(14日)単位で前後に動かせるほか、日付を直接指定して飛べる。
  * 右側には人別に、特別条項付き36協定の絶対上限に抵触しそうな兆候(当月の時間外労働・
  * うち休日労働・年度内の月45時間超の回数・複数月平均・取得済み有給)を並べる。
  * ルート側のsupervisor.or.managerミドルウェアにより資材管理担当者・上長のみがアクセスできる。
  */
 class DailyReportListController extends Controller
 {
-    /** 表示する日数(過去3週間)。 */
+    /** 表示する日数(3週間)。 */
     private const RANGE_DAYS = 21;
 
-    public function index(WorkTimeComplianceService $compliance): View
+    /** 前後に動かす単位(2週間)。 */
+    private const SHIFT_DAYS = 14;
+
+    public function index(Request $request, WorkTimeComplianceService $compliance): View
     {
         $today = Carbon::today();
-        $rangeStart = $today->copy()->subDays(self::RANGE_DAYS - 1);
-        $rangeEnd = $today->copy();
+        $anchor = $this->parseDate($request->query('date')) ?? $today->copy();
+
+        $rangeStart = $anchor->copy()->subDays(self::RANGE_DAYS - 1);
+        $rangeEnd = $anchor->copy();
 
         $dates = [];
         for ($d = $rangeStart->copy(); $d->lte($rangeEnd); $d->addDay()) {
@@ -43,14 +50,35 @@ class DailyReportListController extends Controller
         return view('daily-reports.list.index', [
             'dates' => $dates,
             'today' => $today->format('Y-m-d'),
+            'anchor' => $anchor->format('Y-m-d'),
+            'prevAnchor' => $anchor->copy()->subDays(self::SHIFT_DAYS)->format('Y-m-d'),
+            'nextAnchor' => $anchor->copy()->addDays(self::SHIFT_DAYS)->format('Y-m-d'),
             'rangeLabel' => $rangeStart->format('Y/m/d').'〜'.$rangeEnd->format('Y/m/d'),
             'holidaysByDate' => $holidaysByDate,
             'staffGroups' => $staffList->groupBy('department'),
             'statusByStaffAndDate' => $this->buildDailyReportStatusByStaffAndDate($rangeStart, $rangeEnd, $staffList),
             'purchaseInputByStaffAndDate' => $this->buildPurchaseInputByStaffAndDate($rangeStart, $rangeEnd, $staffList),
-            'complianceByStaff' => $this->buildComplianceByStaff($staffList, $today, $compliance),
-            'monthLabel' => $compliance->monthPeriod($today)[0]->format('m/d').'〜'.$compliance->monthPeriod($today)[1]->format('m/d'),
+            // 36協定の集計は「基準日を含む月」で行う(表示範囲を過去にずらすと当時の状況が見られる)。
+            'complianceByStaff' => $this->buildComplianceByStaff($staffList, $anchor, $compliance),
+            'monthLabel' => $compliance->monthPeriod($anchor)[0]->format('m/d').'〜'.$compliance->monthPeriod($anchor)[1]->format('m/d'),
+            'paidLeaveYearLabel' => Staff::paidLeaveYearPeriod($anchor)[0]->format('Y/m/d').'〜'.Staff::paidLeaveYearPeriod($anchor)[1]->format('Y/m/d'),
         ]);
+    }
+
+    /**
+     * 不正な日付指定は無視して既定(今日)に戻す。
+     */
+    private function parseDate(?string $date): ?Carbon
+    {
+        if (! $date) {
+            return null;
+        }
+
+        try {
+            return Carbon::createFromFormat('Y-m-d', $date)->startOfDay();
+        } catch (\Exception) {
+            return null;
+        }
     }
 
     /**

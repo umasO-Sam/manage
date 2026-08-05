@@ -6,6 +6,7 @@ use App\Models\CategoryCode;
 use App\Models\DailyReport;
 use App\Models\LaborCost;
 use App\Models\OperationLog;
+use App\Services\TimecardService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -21,7 +22,7 @@ use Illuminate\View\View;
  */
 class DailyReportReviewController extends Controller
 {
-    public function index(Request $request): View
+    public function index(Request $request, TimecardService $timecard): View
     {
         $date = $this->resolveDate($request->query('date'));
 
@@ -49,7 +50,47 @@ class DailyReportReviewController extends Controller
             'date' => $date,
             'prevDate' => Carbon::parse($date)->subDay()->format('Y-m-d'),
             'nextDate' => Carbon::parse($date)->addDay()->format('Y-m-d'),
+            ...$this->timecardContext($reports, $date, $timecard),
         ]);
+    }
+
+    /**
+     * タイムカードの打刻と日報の入力内容を突き合わせた結果。翌日以降にまとめて確認する
+     * 運用のため、確認画面で「打刻とこれだけずれている」と気づける形で並べる。
+     * 連携が無効・未紐づけの場合は空になり、画面側では何も表示しない。
+     *
+     * @param  \Illuminate\Support\Collection<int, DailyReport>  $reports
+     * @return array{punchesByStaff: array<int, array{come: int|null, bye: int|null}>, timecardWarnings: array<int, string|null>, timecardService: TimecardService}
+     */
+    private function timecardContext($reports, string $date, TimecardService $timecard): array
+    {
+        $day = Carbon::parse($date);
+        $staffList = $reports->pluck('staff')->filter()->unique('id')->values();
+
+        $punches = $timecard->punchesFor($staffList, $day, $day);
+
+        $punchesByStaff = [];
+        $warnings = [];
+
+        foreach ($reports as $report) {
+            $punch = $punches[$report->staff_id][$date] ?? null;
+            $punchesByStaff[$report->staff_id] = $punch;
+
+            // 休暇のエントリは勤務時間ではないため、突き合わせの対象から外す。
+            $worked = $report->entries->where('is_leave', false);
+
+            $warnings[$report->id] = $timecard->divergenceWarning(
+                $punch,
+                $worked->min('start_minute'),
+                $worked->max('end_minute')
+            );
+        }
+
+        return [
+            'punchesByStaff' => $punchesByStaff,
+            'timecardWarnings' => $warnings,
+            'timecardService' => $timecard,
+        ];
     }
 
     public function decide(Request $request, DailyReport $dailyReport): RedirectResponse

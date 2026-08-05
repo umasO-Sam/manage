@@ -45,7 +45,15 @@
                 <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden" x-data="{ showReject: false }">
                     <div class="p-4 bg-slate-50 border-b border-slate-200">
                         <div class="flex items-center justify-between flex-wrap gap-2">
-                            <span class="font-bold text-slate-900">{{ $report->staff->name }}</span>
+                            <div class="flex items-center gap-3 flex-wrap">
+                                <span class="font-bold text-slate-900">{{ $report->staff->name }}</span>
+                                @php($punch = $punchesByStaff[$report->staff_id] ?? null)
+                                @if ($punch)
+                                    <span class="text-xs font-mono text-slate-500" title="タイムカードの打刻">
+                                        打刻 {{ $timecardService->formatMinutes($punch['come']) }}〜{{ $timecardService->formatMinutes($punch['bye']) }}
+                                    </span>
+                                @endif
+                            </div>
                             <div class="flex items-center gap-2">
                                 <button type="button" @click="showReject = ! showReject"
                                         class="text-sm font-semibold border border-red-300 text-red-700 hover:bg-red-50 px-4 py-1.5 rounded-lg">
@@ -60,6 +68,11 @@
                                 </form>
                             </div>
                         </div>
+                        @if ($timecardWarnings[$report->id] ?? null)
+                            <p class="mt-2 text-xs font-bold text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-2">
+                                タイムカードとの差が大きいため、内容を確認してください（{{ $timecardWarnings[$report->id] }}）。
+                            </p>
+                        @endif
                         <form method="POST" action="{{ route('daily-reports.review.decide', $report) }}" x-show="showReject" x-cloak class="mt-3 space-y-2">
                             @csrf
                             <input type="hidden" name="action" value="reject">

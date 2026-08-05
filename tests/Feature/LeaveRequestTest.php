@@ -136,7 +136,7 @@ class LeaveRequestTest extends TestCase
         $approver = Staff::factory()->create(['is_supervisor' => true]);
 
         LeaveRequest::create([
-            'staff_id' => $staff->id, 'type' => 'paid_leave', 'start_date' => '2026-05-01', 'end_date' => '2026-05-05',
+            'staff_id' => $staff->id, 'type' => 'paid_leave', 'start_date' => '2026-07-15', 'end_date' => '2026-07-19',
             'granularity' => 'full_day', 'day_count' => 5.0, 'approver_id' => $approver->id, 'status' => LeaveRequest::STATUS_APPROVED,
         ]);
 
@@ -153,11 +153,11 @@ class LeaveRequestTest extends TestCase
         $approver = Staff::factory()->create(['is_supervisor' => true]);
 
         LeaveRequest::create([
-            'staff_id' => $staff->id, 'type' => 'paid_leave', 'start_date' => '2026-05-01', 'end_date' => '2026-05-01',
+            'staff_id' => $staff->id, 'type' => 'paid_leave', 'start_date' => '2026-07-15', 'end_date' => '2026-07-15',
             'granularity' => 'full_day', 'day_count' => 1.0, 'approver_id' => $approver->id, 'status' => LeaveRequest::STATUS_PENDING,
         ]);
         LeaveRequest::create([
-            'staff_id' => $staff->id, 'type' => 'paid_leave', 'start_date' => '2026-05-02', 'end_date' => '2026-05-02',
+            'staff_id' => $staff->id, 'type' => 'paid_leave', 'start_date' => '2026-07-16', 'end_date' => '2026-07-16',
             'granularity' => 'full_day', 'day_count' => 1.0, 'approver_id' => $approver->id, 'status' => LeaveRequest::STATUS_REJECTED,
         ]);
 
@@ -170,18 +170,18 @@ class LeaveRequestTest extends TestCase
         $this->assertSame(9.0, $balance['remainingTotal']);
     }
 
-    public function test_paid_leave_balance_only_counts_the_current_fiscal_year(): void
+    public function test_paid_leave_balance_only_counts_the_current_paid_leave_year(): void
     {
         $staff = Staff::factory()->create(['paid_leave_granted_current_year' => 10]);
         $approver = Staff::factory()->create(['is_supervisor' => true]);
 
-        // 年度(4/21〜翌4/20)より前に消化した分は当年度の残数から差し引かない。
+        // 有休年度は7/1起算(会社の付与日)。前年度(〜6/30)に消化した分は当年度の残数から差し引かない。
         LeaveRequest::create([
-            'staff_id' => $staff->id, 'type' => 'paid_leave', 'start_date' => '2026-04-01', 'end_date' => '2026-04-01',
+            'staff_id' => $staff->id, 'type' => 'paid_leave', 'start_date' => '2026-06-30', 'end_date' => '2026-06-30',
             'granularity' => 'full_day', 'day_count' => 1.0, 'approver_id' => $approver->id, 'status' => LeaveRequest::STATUS_APPROVED,
         ]);
         LeaveRequest::create([
-            'staff_id' => $staff->id, 'type' => 'paid_leave', 'start_date' => '2026-05-01', 'end_date' => '2026-05-01',
+            'staff_id' => $staff->id, 'type' => 'paid_leave', 'start_date' => '2026-07-01', 'end_date' => '2026-07-01',
             'granularity' => 'full_day', 'day_count' => 2.0, 'approver_id' => $approver->id, 'status' => LeaveRequest::STATUS_APPROVED,
         ]);
 
@@ -189,6 +189,18 @@ class LeaveRequestTest extends TestCase
 
         $this->assertSame(2.0, $balance['consumed']);
         $this->assertSame(8.0, $balance['remainingTotal']);
+    }
+
+    public function test_paid_leave_year_runs_from_july_to_june(): void
+    {
+        [$start, $end] = Staff::paidLeaveYearPeriod(\Illuminate\Support\Carbon::parse('2026-08-10'));
+        $this->assertSame('2026-07-01', $start->toDateString());
+        $this->assertSame('2027-06-30', $end->toDateString());
+
+        // 6/30時点はまだ前の年度に属する。
+        [$start, $end] = Staff::paidLeaveYearPeriod(\Illuminate\Support\Carbon::parse('2026-06-30'));
+        $this->assertSame('2025-07-01', $start->toDateString());
+        $this->assertSame('2026-06-30', $end->toDateString());
     }
 
     public function test_ceremonial_leave_marriage_auto_fills_five_days(): void

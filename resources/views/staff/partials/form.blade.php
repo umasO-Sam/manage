@@ -25,6 +25,12 @@
 </div>
 
 <div>
+    <x-input-label for="timecard_wid" value="タイムカードID（任意・timecard-newのwid。打刻との突き合わせに使用）" />
+    <x-text-input id="timecard_wid" name="timecard_wid" type="number" class="mt-1 block w-40" :value="old('timecard_wid', $staff?->timecard_wid)" />
+    <x-input-error class="mt-2" :messages="$errors->get('timecard_wid')" />
+</div>
+
+<div>
     <x-input-label for="login_id" value="ログインID" />
     <x-text-input id="login_id" name="login_id" type="text" class="mt-1 block w-full" :value="old('login_id', $staff?->login_id)" required />
     <x-input-error class="mt-2" :messages="$errors->get('login_id')" />

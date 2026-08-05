@@ -256,7 +256,15 @@
                 </div>
 
                 <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-2">
-                    <h3 class="text-xs font-bold text-slate-700">労働時間集計</h3>
+                    <div class="flex items-center justify-between flex-wrap gap-2">
+                        <h3 class="text-xs font-bold text-slate-700">労働時間集計</h3>
+                        @if ($punch)
+                            {{-- タイムカードの打刻(参考)。作業日報とは紐づけず、入力の目安として並べる。 --}}
+                            <span class="text-xs font-mono text-slate-500" title="タイムカードの打刻">
+                                打刻 {{ $timecardService->formatMinutes($punch['come']) }}〜{{ $timecardService->formatMinutes($punch['bye']) }}
+                            </span>
+                        @endif
+                    </div>
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
                         <div class="flex items-center justify-between bg-slate-50 rounded-lg px-2.5 py-1.5">
                             <span class="text-slate-500">本日の勤務時間</span>

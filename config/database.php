@@ -64,6 +64,32 @@ return [
             ]) : [],
         ],
 
+        /*
+         * 別システム「timecard-new」(https://saitokoken.xsrv.jp/timecard-new/)の出退勤打刻を
+         * 参照専用で読むための接続。同じXserverアカウント・同じMySQLサーバー上にあるため、
+         * 既定では本体(DB_*)と同じ接続情報でデータベース名だけを差し替える
+         * (サーバーパネルでmanage用のMySQLユーザーにtimecard DBのアクセス権を付与済み)。
+         * TIMECARD_DB_DATABASE が未設定の環境(ローカル開発・テスト)では連携自体を無効化する。
+         * 書き込みは一切行わない。
+         */
+        'timecard' => [
+            'driver' => 'mysql',
+            'host' => env('TIMECARD_DB_HOST', env('DB_HOST', '127.0.0.1')),
+            'port' => env('TIMECARD_DB_PORT', env('DB_PORT', '3306')),
+            'database' => env('TIMECARD_DB_DATABASE'),
+            'username' => env('TIMECARD_DB_USERNAME', env('DB_USERNAME', 'root')),
+            'password' => env('TIMECARD_DB_PASSWORD', env('DB_PASSWORD', '')),
+            'charset' => env('DB_CHARSET', 'utf8mb4'),
+            'collation' => env('DB_COLLATION', 'utf8mb4_unicode_ci'),
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'strict' => true,
+            'engine' => null,
+            'options' => extension_loaded('pdo_mysql') ? array_filter([
+                Mysql::ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
+            ]) : [],
+        ],
+
         'mariadb' => [
             'driver' => 'mariadb',
             'url' => env('DB_URL'),

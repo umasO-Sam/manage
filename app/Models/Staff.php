@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
-#[Fillable(['name', 'department', 'display_order', 'sid', 'login_id', 'email', 'role', 'is_labor_target', 'position_weight', 'password', 'must_change_password', 'hire_date', 'paid_leave_granted_current_year', 'paid_leave_granted_last_year', 'is_supervisor'])]
+#[Fillable(['name', 'department', 'display_order', 'sid', 'timecard_wid', 'login_id', 'email', 'role', 'is_labor_target', 'position_weight', 'password', 'must_change_password', 'hire_date', 'paid_leave_granted_current_year', 'paid_leave_granted_last_year', 'is_supervisor'])]
 #[Hidden(['password', 'remember_token'])]
 class Staff extends Authenticatable
 {
@@ -120,11 +120,29 @@ class Staff extends Authenticatable
     }
 
     /**
+     * 有給休暇の年度(7/1〜翌6/30)の開始・終了日を返す。
+     *
+     * 会社の付与日が7/1のためこの区切りを使う(4/1入社なら3か月後の7/1に初回付与)。
+     * 36協定・休日マスタの年度(4/21〜翌4/20)とは別物なので混同しないこと。
+     *
+     * @return array{0: \Illuminate\Support\Carbon, 1: \Illuminate\Support\Carbon}
+     */
+    public static function paidLeaveYearPeriod(\Illuminate\Support\Carbon $date): array
+    {
+        $year = $date->month >= 7 ? $date->year : $date->year - 1;
+
+        return [
+            \Illuminate\Support\Carbon::create($year, 7, 1)->startOfDay(),
+            \Illuminate\Support\Carbon::create($year + 1, 6, 30)->endOfDay(),
+        ];
+    }
+
+    /**
      * 有給休暇の残日数(前年度繰越分・当年度付与分の2バケツ管理)。
      *
-     * 消化分は「当年度(4/21〜翌4/20、36協定・休日マスタと同じ年度区切り)に開始する
-     * 有給休暇申請」だけを数える。年度を区切らずに全期間を合計すると、勤続年数が
-     * 増えるほど過去の消化分が積み上がり、残日数が不当に0へ張り付いてしまうため。
+     * 消化分は「当年度(7/1〜翌6/30)に開始する有給休暇申請」だけを数える。
+     * 年度を区切らずに全期間を合計すると、勤続年数が増えるほど過去の消化分が
+     * 積み上がり、残日数が不当に0へ張り付いてしまうため。
      *
      * 承認待ちの申請も消化見込みとして残日数から差し引く。承認前は残数が減らないと、
      * 残5日の状態で5日の申請を何本でも出せてしまい、承認時点で付与日数を超過するため。
@@ -147,15 +165,15 @@ class Staff extends Authenticatable
      */
     public static function paidLeaveBalancesFor(\Illuminate\Support\Collection $staffList): array
     {
-        [$fiscalStart, $fiscalEnd] = app(\App\Services\WorkTimeComplianceService::class)->fiscalYearPeriod(now());
+        [$yearStart, $yearEnd] = static::paidLeaveYearPeriod(now());
 
         $ids = $staffList->pluck('id')->all();
 
         $totals = $ids === [] ? collect() : LeaveRequest::whereIn('staff_id', $ids)
             ->where('type', 'paid_leave')
             ->whereIn('status', [LeaveRequest::STATUS_APPROVED, LeaveRequest::STATUS_PENDING])
-            ->whereDate('start_date', '>=', $fiscalStart->toDateString())
-            ->whereDate('start_date', '<=', $fiscalEnd->toDateString())
+            ->whereDate('start_date', '>=', $yearStart->toDateString())
+            ->whereDate('start_date', '<=', $yearEnd->toDateString())
             ->selectRaw('staff_id, status, SUM(day_count) as days')
             ->groupBy('staff_id', 'status')
             ->get()

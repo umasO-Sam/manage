@@ -9,10 +9,33 @@
     <div class="py-8">
         <div class="max-w-full mx-auto sm:px-6 lg:px-8 space-y-4">
 
+            <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between gap-3 flex-wrap">
+                <div class="flex items-center gap-2">
+                    <a href="{{ route('daily-reports.list.index', ['date' => $prevAnchor]) }}"
+                       class="px-3 py-1.5 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-50 text-xs font-bold whitespace-nowrap">
+                        ← 前の2週間
+                    </a>
+                    <a href="{{ route('daily-reports.list.index', ['date' => $nextAnchor]) }}"
+                       class="px-3 py-1.5 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-50 text-xs font-bold whitespace-nowrap">
+                        次の2週間 →
+                    </a>
+                    <a href="{{ route('daily-reports.list.index') }}"
+                       class="px-3 py-1.5 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-50 text-xs font-bold whitespace-nowrap">
+                        今日へ
+                    </a>
+                </div>
+                <div class="flex items-center gap-2">
+                    <label class="text-xs font-bold text-slate-600">基準日（表示の最終日）</label>
+                    <input type="date" value="{{ $anchor }}"
+                           onchange="location.href = '{{ route('daily-reports.list.index') }}?date=' + this.value"
+                           class="border rounded-lg p-1.5 border-slate-300 text-xs font-bold">
+                </div>
+            </div>
+
             <p class="text-xs text-slate-500">
-                過去3週間（21日分・{{ $rangeLabel }}）の作業日報の提出・確認状況を表示しています。
+                基準日（{{ \Illuminate\Support\Carbon::parse($anchor)->format('Y/m/d') }}）までの3週間（21日分・{{ $rangeLabel }}）の作業日報の提出・確認状況を表示しています。
                 右側は特別条項付き36協定の絶対上限（単月100時間・複数月平均80時間・月45時間超は年6回まで）に対する人別の状況です
-                （残業時間は当月{{ $monthLabel }}・20日締め、休日労働を含む）。
+                （残業時間は{{ $monthLabel }}・20日締め、休日労働を含む）。有休は{{ $paidLeaveYearLabel }}の年度分です。
             </p>
 
             <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-x-auto">
@@ -44,9 +67,9 @@
                             <th class="p-1 font-semibold text-center whitespace-nowrap border-l-2 border-slate-300 bg-slate-100">36協定</th>
                             <th class="p-1 font-semibold text-center whitespace-nowrap bg-slate-100" title="当月（20日締め）の時間外労働（休日労働を含む）">当月<br>時間外</th>
                             <th class="p-1 font-semibold text-center whitespace-nowrap bg-slate-100" title="当月の時間外労働のうち、土日・祝日・会社休日の勤務分">うち<br>休日</th>
-                            <th class="p-1 font-semibold text-center whitespace-nowrap bg-slate-100" title="今年度（4/21〜翌4/20）に月45時間超となった月数。年6回まで">45h超<br>月数</th>
+                            <th class="p-1 font-semibold text-center whitespace-nowrap bg-slate-100" title="36協定の年度（4/21〜翌4/20）に月45時間超となった月数。年6回まで">45h超<br>月数</th>
                             <th class="p-1 font-semibold text-center whitespace-nowrap bg-slate-100" title="直近2〜6か月の平均残業時間が80時間を超えている場合に表示">複数月<br>平均</th>
-                            <th class="p-1 font-semibold text-center whitespace-nowrap bg-slate-100" title="今年度に取得済みの有給休暇（承認待ちを含む）／残日数">有休<br>取得/残</th>
+                            <th class="p-1 font-semibold text-center whitespace-nowrap bg-slate-100" title="有休年度（7/1〜翌6/30）に取得済みの有給休暇（承認待ちを含む）／残日数">有休<br>取得/残</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100">
