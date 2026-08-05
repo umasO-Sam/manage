@@ -14,11 +14,17 @@ use Illuminate\Support\Str;
  * このLaravelアプリのDBへ一括インポートする。CSVはstorage/app/legacy-import/export.ps1で
  * 生成する（PHPにODBC拡張が無いため、エクスポートはPowerShell側で行う）。
  *
- * 実行のたびにpurchase_details / labor_costs / category_codesは全件洗い替えする。
+ * 実行のたびにcategory_codesは全件、purchase_details / labor_costs は
+ * **source='legacy'(＝Access由来)の行だけ**を洗い替える。
+ * 以前は無条件の全削除だったため、データ入力画面で登録した仕入レコードや、
+ * 作業日報から生成された人工レコードまで巻き添えで消える状態だった。
  * staffは既存レコード（name一致）を壊さないよう、無ければ作成・あれば人工関連の列だけ更新する。
  */
 class ImportLegacyPurchasingData extends Command
 {
+    /** Access由来のレコードに付ける出所。この値の行だけが取り込みで洗い替えられる。 */
+    private const SOURCE_LEGACY = 'legacy';
+
     protected $signature = 'app:import-legacy-purchasing-data';
 
     protected $description = 'Access「仕入管理DB」からエクスポートしたCSVを取り込み、仕入管理データ・人工データ・分類コードを最新化する';
@@ -198,7 +204,8 @@ class ImportLegacyPurchasingData extends Command
 
     private function importPurchaseDetails(string $mainPath, string $pasteErrorPath): void
     {
-        DB::table('purchase_details')->delete();
+        // このアプリのデータ入力画面で登録した分は残す(source='manage')。
+        DB::table('purchase_details')->where('source', self::SOURCE_LEGACY)->delete();
 
         $count = 0;
         $batch = [];
@@ -237,8 +244,8 @@ class ImportLegacyPurchasingData extends Command
             ]);
             $count++;
 
-            // SQLiteのバインド変数上限(SQLITE_MAX_VARIABLE_NUMBER)を超えないよう、
-            // 26列 × 1000件 = 26,000変数に抑える。
+            // SQLiteのバインド変数上限(SQLITE_MAX_VARIABLE_NUMBER=32,766)を超えないよう、
+            // 27列 × 1000件 = 27,000変数に抑える。
             if (count($batch) >= 1000) {
                 $flush();
                 $this->output->write('.');
@@ -312,6 +319,7 @@ class ImportLegacyPurchasingData extends Command
             'order_amount' => $this->toNullableDecimal($r['order_amount']),
             'supplier_invoice_no' => $r['supplier_invoice_no'] ?: null,
             'is_provisional' => false,
+            'source' => self::SOURCE_LEGACY,
             'created_at' => now(),
             'updated_at' => now(),
         ];
@@ -319,7 +327,8 @@ class ImportLegacyPurchasingData extends Command
 
     private function importLaborCosts(string $path): void
     {
-        DB::table('labor_costs')->delete();
+        // このアプリで登録した分(作業日報から生成された人工・データ入力での登録)は残す。
+        DB::table('labor_costs')->where('source', self::SOURCE_LEGACY)->delete();
 
         $count = 0;
         $skippedNoStaff = 0;
@@ -352,6 +361,7 @@ class ImportLegacyPurchasingData extends Command
                 'position_weight_cache' => $this->toNullableDecimal($row['役職荷重']),
                 'note' => $row['補足'] ?: null,
                 'is_provisional' => false,
+                'source' => self::SOURCE_LEGACY,
                 'created_at' => now(),
                 'updated_at' => now(),
             ];
