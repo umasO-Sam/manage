@@ -11,6 +11,7 @@ use App\Http\Controllers\DailyReportReviewController;
 use App\Http\Controllers\EstimateAssistController;
 use App\Http\Controllers\HolidayController;
 use App\Http\Controllers\LaborCostController;
+use App\Http\Controllers\LaborRecordController;
 use App\Http\Controllers\LeaveRequestController;
 use App\Http\Controllers\OperationLogController;
 use App\Http\Controllers\OrderNumberController;
@@ -45,7 +46,6 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/daily-reports', [DailyReportController::class, 'show'])->name('daily-reports.show');
     Route::post('/daily-reports', [DailyReportController::class, 'store'])->name('daily-reports.store');
-    Route::get('/daily-reports/list', [DailyReportListController::class, 'index'])->name('daily-reports.list.index');
 
     Route::get('/my-calendar', [PersonalCalendarController::class, 'show'])->name('my-calendar.show');
 
@@ -54,12 +54,24 @@ Route::middleware('auth')->group(function () {
     Route::get('/leave-requests', [LeaveRequestController::class, 'index'])->name('leave-requests.index');
     Route::get('/leave-requests/create', [LeaveRequestController::class, 'create'])->name('leave-requests.create');
     Route::post('/leave-requests', [LeaveRequestController::class, 'store'])->name('leave-requests.store');
-    Route::get('/leave-requests/approvals', [LeaveRequestController::class, 'approvals'])->name('leave-requests.approvals');
+    // 承認待ち一覧は資材管理担当者・上長限定。個別の承認/却下(decide)は承認者本人に
+    // 指定された社員であればPolicyで許可する(メール内リンクから詳細経由で操作できる)。
+    Route::get('/leave-requests/approvals', [LeaveRequestController::class, 'approvals'])
+        ->middleware('supervisor.or.manager')->name('leave-requests.approvals');
     Route::get('/leave-requests/{leaveRequest}', [LeaveRequestController::class, 'show'])->name('leave-requests.show');
     Route::put('/leave-requests/{leaveRequest}/decide', [LeaveRequestController::class, 'decide'])->name('leave-requests.decide');
     Route::delete('/leave-requests/{leaveRequest}', [LeaveRequestController::class, 'withdraw'])->name('leave-requests.withdraw');
 
-    Route::get('/operation-logs', [OperationLogController::class, 'index'])->name('operation-logs.index');
+    // 他の社員の勤怠・原価情報をまとめて見る画面は資材管理担当者・上長限定。
+    Route::middleware('supervisor.or.manager')->group(function () {
+        Route::get('/daily-reports/list', [DailyReportListController::class, 'index'])->name('daily-reports.list.index');
+        Route::get('/daily-reports/review', [DailyReportReviewController::class, 'index'])->name('daily-reports.review.index');
+        Route::post('/daily-reports/review/{dailyReport}/decide', [DailyReportReviewController::class, 'decide'])->name('daily-reports.review.decide');
+        Route::get('/operation-logs', [OperationLogController::class, 'index'])->name('operation-logs.index');
+        Route::get('/purchasing/cost-report', [CostReportController::class, 'index'])->name('purchasing.cost-report.index');
+        Route::get('/purchasing/cost-report/results', [CostReportController::class, 'results'])->name('purchasing.cost-report.results');
+        Route::get('/purchasing/cost-report/export', [CostReportController::class, 'export'])->name('purchasing.cost-report.export');
+    });
 
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
@@ -89,8 +101,7 @@ Route::middleware('auth')->group(function () {
         Route::put('/order-numbers/{orderNumber}', [OrderNumberController::class, 'update'])->name('order-numbers.update');
         Route::delete('/order-numbers/{orderNumber}', [OrderNumberController::class, 'destroy'])->name('order-numbers.destroy');
 
-        Route::get('/daily-reports/review', [DailyReportReviewController::class, 'index'])->name('daily-reports.review.index');
-        Route::post('/daily-reports/review/{dailyReport}/decide', [DailyReportReviewController::class, 'decide'])->name('daily-reports.review.decide');
+        Route::get('/labor-records', [LaborRecordController::class, 'index'])->name('labor-records.index');
 
         Route::get('/holidays', [HolidayController::class, 'index'])->name('holidays.index');
         Route::get('/holidays/calendar', [HolidayController::class, 'calendar'])->name('holidays.calendar');
@@ -120,10 +131,6 @@ Route::middleware('auth')->group(function () {
 
         Route::get('/purchasing/invoices', [PurchaseInvoiceController::class, 'index'])->name('purchasing.invoices.index');
         Route::post('/purchasing/invoices/print', [PurchaseInvoiceController::class, 'print'])->name('purchasing.invoices.print');
-
-        Route::get('/purchasing/cost-report', [CostReportController::class, 'index'])->name('purchasing.cost-report.index');
-        Route::get('/purchasing/cost-report/results', [CostReportController::class, 'results'])->name('purchasing.cost-report.results');
-        Route::get('/purchasing/cost-report/export', [CostReportController::class, 'export'])->name('purchasing.cost-report.export');
     });
 });
 

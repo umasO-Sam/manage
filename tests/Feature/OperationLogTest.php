@@ -154,9 +154,9 @@ class OperationLogTest extends TestCase
         $response->assertSee('担当者B');
     }
 
-    public function test_general_staff_sees_only_their_own_logs(): void
+    public function test_supervisor_sees_logs_of_all_staff(): void
     {
-        $staffA = Staff::factory()->create(['name' => '担当者A']);
+        $staffA = Staff::factory()->create(['name' => '担当者A', 'is_supervisor' => true]);
         $staffB = Staff::factory()->create(['name' => '担当者B']);
 
         OperationLog::create(['staff_id' => $staffA->id, 'owner_staff_id' => $staffA->id, 'action' => OperationLog::ACTION_LEAVE_REQUEST_CREATE]);
@@ -165,7 +165,14 @@ class OperationLogTest extends TestCase
         $response = $this->actingAs($staffA)->get(route('operation-logs.index'));
 
         $response->assertOk();
-        $response->assertDontSee('担当者B');
+        $response->assertSee('担当者B');
+    }
+
+    public function test_general_staff_cannot_access_operation_logs(): void
+    {
+        $staff = Staff::factory()->create();
+
+        $this->actingAs($staff)->get(route('operation-logs.index'))->assertForbidden();
     }
 
     public function test_prune_command_deletes_only_logs_older_than_five_years(): void

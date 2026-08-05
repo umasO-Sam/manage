@@ -167,18 +167,20 @@
                 },
 
                 // 1時間おきの目盛りに加えて、休憩・始業・終業などの正確な境界時刻を必ず含める。
+                // gridStart/gridEndは必ず60の倍数になるため、毎時ループがそのまま両端も含む。
                 axisTicks() {
-                    const customPositions = new Set(this.boundaryTicks.map((b) => b.at));
                     const ticks = [];
 
                     for (let t = Math.ceil(this.gridStart / 60) * 60; t <= this.gridEnd; t += 60) {
-                        if (!customPositions.has(t)) ticks.push({ at: t, label: this.formatMinute(t) });
+                        // 12:00と12:10、17:00と17:10のように毎時目盛りと境界目盛りが近接すると
+                        // ラベルが重なって読めなくなるため、30分以内に境界目盛りがある毎時目盛りは出さない
+                        // (実務上は休憩・終業の境界時刻のほうが重要なため、そちらを残す)。
+                        if (this.boundaryTicks.some((b) => Math.abs(b.at - t) < 30)) continue;
+                        ticks.push({ at: t, label: this.formatMinute(t) });
                     }
                     this.boundaryTicks
                         .filter((b) => b.at >= this.gridStart && b.at <= this.gridEnd)
                         .forEach((b) => ticks.push(b));
-                    if (!customPositions.has(this.gridStart)) ticks.push({ at: this.gridStart, label: this.formatMinute(this.gridStart) });
-                    if (!customPositions.has(this.gridEnd)) ticks.push({ at: this.gridEnd, label: this.formatMinute(this.gridEnd) });
 
                     return ticks.sort((a, b) => a.at - b.at);
                 },

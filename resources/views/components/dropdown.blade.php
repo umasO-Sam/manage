@@ -7,8 +7,14 @@ $alignmentClasses = match ($align) {
     default => 'ltr:origin-top-right rtl:origin-top-left end-0',
 };
 
+// 数値だけを渡された場合にw-*クラスへ変換する。ここに無い数値をそのまま出すと
+// 「56」のような不正なクラスになり、幅指定が効かずドロップダウンがトリガー幅まで
+// 縮んで項目名が折り返してしまうため、使う値は必ずここに追加する。
 $width = match ($width) {
     '48' => 'w-48',
+    '56' => 'w-56',
+    '60' => 'w-60',
+    '64' => 'w-64',
     default => $width,
 };
 @endphp

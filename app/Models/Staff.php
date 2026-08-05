@@ -59,11 +59,20 @@ class Staff extends Authenticatable
     }
 
     /**
-     * 仕入管理の検索・原価計算を閲覧できるロールかどうか(資材管理担当者・営業担当)。
+     * 他の社員の勤怠・原価情報をまとめて閲覧できる立場かどうか(資材管理担当者・上長)。
+     * 作業日報確認・作業日報一覧・操作ログ・原価一覧・申請承認一覧の表示可否に使う。
+     */
+    public function isSupervisorOrManager(): bool
+    {
+        return $this->is_procurement_manager || $this->is_supervisor;
+    }
+
+    /**
+     * 仕入管理の検索・原価計算を閲覧できるロールかどうか(資材管理担当者・上長・営業担当)。
      */
     public function canAccessPurchasing(): bool
     {
-        return in_array($this->role, [self::ROLE_PROCUREMENT_MANAGER, self::ROLE_SALES], true);
+        return $this->isSupervisorOrManager() || $this->role === self::ROLE_SALES;
     }
 
     public function roleLabel(): string

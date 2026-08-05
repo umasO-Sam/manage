@@ -25,18 +25,32 @@ class DailyReportListTest extends TestCase
         parent::tearDown();
     }
 
-    public function test_any_staff_can_view_the_page(): void
+    public function test_procurement_manager_can_view_the_page(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+
+        $this->actingAs($manager)->get(route('daily-reports.list.index'))->assertOk();
+    }
+
+    public function test_supervisor_can_view_the_page(): void
+    {
+        $supervisor = Staff::factory()->create(['is_supervisor' => true]);
+
+        $this->actingAs($supervisor)->get(route('daily-reports.list.index'))->assertOk();
+    }
+
+    public function test_general_staff_cannot_access_the_page(): void
     {
         $staff = Staff::factory()->create();
 
-        $this->actingAs($staff)->get(route('daily-reports.list.index'))->assertOk();
+        $this->actingAs($staff)->get(route('daily-reports.list.index'))->assertForbidden();
     }
 
     public function test_shows_35_days_from_one_week_ago_to_four_weeks_ahead(): void
     {
-        $staff = Staff::factory()->create();
+        $manager = Staff::factory()->procurementManager()->create();
 
-        $response = $this->actingAs($staff)->get(route('daily-reports.list.index'));
+        $response = $this->actingAs($manager)->get(route('daily-reports.list.index'));
 
         $response->assertOk();
         $response->assertViewHas('dates', function (array $dates) {
@@ -44,19 +58,41 @@ class DailyReportListTest extends TestCase
         });
     }
 
-    public function test_general_staff_sees_only_their_own_row(): void
+    public function test_shows_blue_marker_for_labor_costs_registered_from_purchase_input(): void
     {
-        $staff = Staff::factory()->create(['name' => '自分太郎']);
-        $other = Staff::factory()->create(['name' => '他人次郎']);
+        $manager = Staff::factory()->procurementManager()->create();
+        $staff = Staff::factory()->create(['name' => '入力済太郎']);
 
-        DailyReport::create(['staff_id' => $staff->id, 'work_date' => '2026-08-05', 'submitted_at' => now()]);
-        DailyReport::create(['staff_id' => $other->id, 'work_date' => '2026-08-05', 'submitted_at' => now()]);
+        // 仕入管理のデータ入力で登録されたレコード(作業日報を経由していない)。
+        LaborCost::create([
+            'work_date' => '2026-08-05', 'staff_id' => $staff->id,
+            'work_hours' => 8, 'work_minutes' => 0, 'is_overtime' => false, 'is_provisional' => false,
+        ]);
 
-        $response = $this->actingAs($staff)->get(route('daily-reports.list.index'));
+        $response = $this->actingAs($manager)->get(route('daily-reports.list.index'));
 
         $response->assertOk();
-        $response->assertSee('自分太郎');
-        $response->assertDontSee('他人次郎');
+        $response->assertViewHas('purchaseInputByStaffAndDate', function (array $map) use ($staff) {
+            return ($map[$staff->id]['2026-08-05'] ?? false) === true;
+        });
+        $response->assertSee('入力済み（仕入管理データ入力）');
+    }
+
+    public function test_does_not_mark_daily_report_generated_labor_costs_as_purchase_input(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        $staff = Staff::factory()->create();
+        $report = DailyReport::create(['staff_id' => $staff->id, 'work_date' => '2026-08-05', 'submitted_at' => now()]);
+
+        LaborCost::create([
+            'work_date' => '2026-08-05', 'staff_id' => $staff->id, 'daily_report_id' => $report->id,
+            'work_hours' => 8, 'work_minutes' => 0, 'is_overtime' => false, 'is_provisional' => false,
+        ]);
+
+        $response = $this->actingAs($manager)->get(route('daily-reports.list.index'));
+
+        $response->assertOk();
+        $response->assertViewHas('purchaseInputByStaffAndDate', fn (array $map) => $map === []);
     }
 
     public function test_privileged_viewer_sees_all_staff(): void
@@ -88,7 +124,7 @@ class DailyReportListTest extends TestCase
         $response->assertSee('確認待ち');
     }
 
-    public function test_review_link_only_shown_to_procurement_managers(): void
+    public function test_review_link_shown_to_managers_and_supervisors(): void
     {
         $manager = Staff::factory()->procurementManager()->create();
         $supervisor = Staff::factory()->create(['is_supervisor' => true]);
@@ -97,7 +133,7 @@ class DailyReportListTest extends TestCase
             ->assertSee(route('daily-reports.review.index', ['date' => '2026-08-10']), false);
 
         $this->actingAs($supervisor)->get(route('daily-reports.list.index'))
-            ->assertDontSee('daily-reports/review');
+            ->assertSee(route('daily-reports.review.index', ['date' => '2026-08-10']), false);
     }
 
     public function test_staff_are_grouped_by_department(): void
