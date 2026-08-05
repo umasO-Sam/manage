@@ -36,7 +36,7 @@ class Staff extends Authenticatable
      *
      * @var array<int, string>
      */
-    public const DEPARTMENT_ORDER = ['役員', '営業', '事務', '機械設計', '電気制御設計', '機械製造'];
+    public const DEPARTMENT_ORDER = ['役員', '営業', '機械設計', '電気制御', '製造', '経理資材'];
 
     protected function casts(): array
     {

@@ -26,7 +26,7 @@
                                     $isDayOff = $isWeekend || in_array($holiday?->type, [\App\Models\Holiday::TYPE_PUBLIC_HOLIDAY, \App\Models\Holiday::TYPE_COMPANY_HOLIDAY], true);
                                     $isToday = $dateString === $today;
                                 @endphp
-                                <th class="p-0.5 font-semibold text-center w-12 {{ $index % 7 === 0 ? 'border-l border-slate-200' : '' }} {{ $isDayOff ? 'bg-pink-50' : '' }} {{ $isToday ? 'bg-slate-800 text-white' : '' }}"
+                                <th class="p-0.5 font-semibold text-center w-16 {{ $index % 7 === 0 ? 'border-l border-slate-200' : '' }} {{ $isDayOff ? 'bg-pink-50' : '' }} {{ $isToday ? 'bg-slate-800 text-white' : '' }}"
                                     title="{{ $current->format('Y/m/d') }}（{{ $weekdayLabels[$current->dayOfWeek] }}）{{ $holiday?->name }}">
                                     <div class="whitespace-nowrap">{{ $current->format('n/j') }}</div>
                                     <div class="whitespace-nowrap {{ ! $isToday && $current->dayOfWeek === 0 ? 'text-red-500' : (! $isToday && $current->dayOfWeek === 6 ? 'text-blue-500' : '') }}">{{ $weekdayLabels[$current->dayOfWeek] }}</div>
@@ -40,9 +40,11 @@
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100">
+                        @php $rowIndex = 0; @endphp
                         @foreach ($staffGroups as $department => $staffInGroup)
                             @foreach ($staffInGroup as $staff)
-                                <tr class="hover:bg-slate-50">
+                                @php $rowIndex++; @endphp
+                                <tr class="{{ $rowIndex % 2 === 0 ? 'bg-slate-50' : 'bg-white' }} hover:bg-blue-50 {{ $loop->first && ! $loop->parent->first ? 'border-t-2 border-t-slate-400' : '' }}">
                                     @if ($loop->first)
                                         <td rowspan="{{ $staffInGroup->count() }}"
                                             class="sticky left-0 z-10 bg-slate-50 text-center font-semibold text-slate-600 border-r border-slate-200 align-middle w-6"
@@ -50,7 +52,7 @@
                                             {{ $department }}
                                         </td>
                                     @endif
-                                    <td class="sticky left-6 z-10 bg-white py-0.5 px-1.5 font-semibold text-slate-800 whitespace-nowrap border-r border-slate-200">
+                                    <td class="sticky left-6 z-10 {{ $rowIndex % 2 === 0 ? 'bg-slate-50' : 'bg-white' }} py-0.5 px-1.5 font-semibold text-slate-800 whitespace-nowrap border-r border-slate-200">
                                         {{ $staff->name }}
                                     </td>
                                     @foreach ($dates as $index => $dateString)

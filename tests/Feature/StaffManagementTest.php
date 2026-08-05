@@ -109,8 +109,8 @@ class StaffManagementTest extends TestCase
 
     public function test_ordered_for_roster_sorts_by_department_order_then_display_order(): void
     {
-        Staff::factory()->create(['name' => '製造二郎', 'department' => '機械製造', 'display_order' => 2]);
-        Staff::factory()->create(['name' => '製造太郎', 'department' => '機械製造', 'display_order' => 1]);
+        Staff::factory()->create(['name' => '製造二郎', 'department' => '製造', 'display_order' => 2]);
+        Staff::factory()->create(['name' => '製造太郎', 'department' => '製造', 'display_order' => 1]);
         Staff::factory()->create(['name' => '営業花子', 'department' => '営業', 'display_order' => 1]);
         Staff::factory()->create(['name' => '謎部署太郎', 'department' => '謎の部署', 'display_order' => 0]);
         Staff::factory()->create(['name' => '役員太郎', 'department' => '役員', 'display_order' => 1]);

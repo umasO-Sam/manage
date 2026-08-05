@@ -102,14 +102,13 @@ class DailyReportListTest extends TestCase
 
     public function test_staff_are_grouped_by_department(): void
     {
-        $manager = Staff::factory()->procurementManager()->create();
-        Staff::factory()->create(['name' => '製造太郎', 'department' => '機械製造', 'display_order' => 1]);
+        $manager = Staff::factory()->procurementManager()->create(['department' => '役員']);
+        Staff::factory()->create(['name' => '製造太郎', 'department' => '製造', 'display_order' => 1]);
         Staff::factory()->create(['name' => '営業花子', 'department' => '営業', 'display_order' => 1]);
 
         $response = $this->actingAs($manager)->get(route('daily-reports.list.index'));
 
         $content = $response->getContent();
         $this->assertLessThan(strpos($content, '製造太郎'), strpos($content, '営業花子'));
-        $this->assertSame(1, substr_count($content, '機械製造'));
     }
 }

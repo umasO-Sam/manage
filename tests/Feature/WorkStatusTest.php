@@ -97,9 +97,9 @@ class WorkStatusTest extends TestCase
 
     public function test_staff_are_grouped_by_department_then_ordered_by_display_order(): void
     {
-        $viewer = Staff::factory()->create();
-        Staff::factory()->create(['name' => '製造二郎', 'department' => '機械製造', 'display_order' => 2]);
-        Staff::factory()->create(['name' => '製造太郎', 'department' => '機械製造', 'display_order' => 1]);
+        $viewer = Staff::factory()->create(['department' => '役員']);
+        Staff::factory()->create(['name' => '製造二郎', 'department' => '製造', 'display_order' => 2]);
+        Staff::factory()->create(['name' => '製造太郎', 'department' => '製造', 'display_order' => 1]);
         Staff::factory()->create(['name' => '営業花子', 'department' => '営業', 'display_order' => 1]);
 
         $response = $this->actingAs($viewer)->get(route('work-status.index'));
@@ -107,7 +107,7 @@ class WorkStatusTest extends TestCase
         $content = $response->getContent();
         $this->assertLessThan(strpos($content, '製造太郎'), strpos($content, '営業花子'));
         $this->assertLessThan(strpos($content, '製造二郎'), strpos($content, '製造太郎'));
-        // 部署名は部署単位でまとめて1回だけ(先頭行のみ rowspan で)出力される。
-        $this->assertSame(1, substr_count($content, '機械製造'));
+        // 部署名は部署単位でまとめて1回だけ(先頭行の rowspan="2" で)出力される。
+        $this->assertSame(1, substr_count($content, 'rowspan="2"'));
     }
 }
