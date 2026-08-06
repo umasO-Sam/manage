@@ -141,6 +141,22 @@ class PurchaseDetailController extends Controller
 
         $this->applyAlphaFilter($query, $alphas);
 
+        // 画面を開いた直後(クエリ文字列が空)は何も出さない。24万件の一覧をいきなり
+        // 見せても使い道がないため。検索ボタンや物件表示を押せば、条件が未入力でも
+        // クエリ文字列が付くので全件が対象になる。
+        $searched = $request->query() !== [];
+
+        if (! $searched) {
+            return view('purchasing.index', [
+                'details' => new \Illuminate\Pagination\LengthAwarePaginator([], 0, 50),
+                'filters' => $filters,
+                'categories' => CategoryCode::orderBy('code')->get(),
+                'searched' => false,
+                'showProjects' => false,
+                'projectOrders' => collect(),
+            ]);
+        }
+
         $details = $query
             ->with('category')
             ->orderByRaw("(CASE WHEN (recipient IS NOT NULL AND recipient <> '') OR order_received_date IS NOT NULL OR order_amount > 0 THEN 0 ELSE 1 END)")
@@ -154,6 +170,7 @@ class PurchaseDetailController extends Controller
             'details' => $details,
             'filters' => $filters,
             'categories' => $categories,
+            'searched' => true,
             'showProjects' => $this->shouldShowProjects($request, $filters),
             'projectOrders' => $this->shouldShowProjects($request, $filters)
                 ? $this->searchProjectOrders($filters)

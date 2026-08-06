@@ -95,13 +95,10 @@ class PurchaseDetailSearchTest extends TestCase
         PurchaseDetail::create(['item_code' => 'AAA111-X01', 'item_name' => '受注なし']);
         PurchaseDetail::create(['item_code' => 'AAA111-X02', 'item_name' => '受注あり', 'recipient' => '株式会社テスト']);
 
-        $response = $this->actingAs($staff)->get(route('purchasing.index'));
+        // 画面を開いた直後は何も出さないため、検索した状態にする(条件は未入力＝全件)。
+        $response = $this->actingAs($staff)->get(route('purchasing.index', ['item_code' => '']));
 
-        $content = $response->getContent();
-        $this->assertLessThan(
-            strpos($content, '受注なし'),
-            strpos($content, '受注あり')
-        );
+        $response->assertSeeInOrder(['受注あり', '受注なし']);
     }
 
     public function test_search_results_show_computed_price_and_order_price(): void

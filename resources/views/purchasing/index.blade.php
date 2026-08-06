@@ -193,7 +193,11 @@
 
                 <div class="flex justify-between items-center pt-2 border-t border-slate-100">
                     <div class="text-xs text-slate-500 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200 font-medium">
-                        該当件数: <span class="font-bold text-slate-800">{{ $details->total() }}</span> 件
+                        @if ($searched)
+                            該当件数: <span class="font-bold text-slate-800">{{ $details->total() }}</span> 件
+                        @else
+                            条件を入力して検索してください（未入力のまま検索すると全件が対象になります）
+                        @endif
                     </div>
                     <div class="flex gap-3">
                         <a href="{{ route('purchasing.index') }}" class="text-xs text-slate-400 hover:text-slate-600 self-center">条件をクリア</a>
@@ -602,8 +606,8 @@
                             @empty
                                 <tr>
                                     <td colspan="{{ Auth::user()->is_procurement_manager ? 29 : 27 }}" class="p-8 text-center text-slate-400">
-                                        <i data-lucide="search-x" class="w-10 h-10 mx-auto mb-2 text-slate-300"></i>
-                                        条件に一致するデータがありません。
+                                        <i data-lucide="{{ $searched ? 'search-x' : 'search' }}" class="w-10 h-10 mx-auto mb-2 text-slate-300"></i>
+                                        {{ $searched ? '条件に一致するデータがありません。' : '条件を入力して「検索」を押してください。未入力のまま押すと全件が対象になります。' }}
                                     </td>
                                 </tr>
                             @endforelse
