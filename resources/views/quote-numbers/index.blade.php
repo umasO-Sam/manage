@@ -41,6 +41,10 @@
                         <span class="text-sm text-slate-700 pb-2">{{ $companyName }}</span>
                     @endif
                     <button type="submit" class="px-4 py-2 rounded-lg bg-slate-800 text-white text-sm font-bold hover:bg-slate-900">検索</button>
+                    @if (Auth::user()->is_administrator)
+                        <a href="{{ route('quote-numbers.logs') }}"
+                           class="px-4 py-2 rounded-lg border border-slate-300 text-slate-600 text-sm font-bold hover:bg-slate-50">取得ログ</a>
+                    @endif
                     <span class="text-[11px] text-slate-400 pb-2">検索すると案件種別の選択はリセットされます。客先番号だけなら過去注番リストの参照のみです。</span>
                 </form>
 

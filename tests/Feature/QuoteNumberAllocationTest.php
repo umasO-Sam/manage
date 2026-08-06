@@ -367,6 +367,67 @@ class QuoteNumberAllocationTest extends TestCase
             ->assertOk()->assertSee('検索')->assertSee(route('quote-numbers.lookup'), false);
     }
 
+    /**
+     * 取得ログはadministrator専用。誰がいつどの注番を採ったかを直近100件たどれる。
+     */
+    public function test_taking_a_number_records_a_log_visible_to_administrators(): void
+    {
+        $sales = Staff::factory()->create(['role' => Staff::ROLE_SALES]);
+        $manager = Staff::factory()->procurementManager()->create();
+        $admin = Staff::factory()->create(['is_administrator' => true]);
+
+        // 経理資材担当が営業担当の代わりに採る
+        $this->actingAs($manager)->post(route('quote-numbers.store'), [
+            'customer_code' => 'DH', 'mode' => 'new', 'full_no' => 'DH021-N01',
+            'project_name' => 'ログ確認装置', 'delivery_dest' => 'y', 'customer_contact' => 'z', 'staff_id' => $sales->id,
+        ])->assertRedirect();
+
+        $log = \App\Models\QuoteNumberLog::sole();
+        $this->assertSame('taken', $log->action);
+        $this->assertSame('DH021-N01', $log->full_no);
+        $this->assertSame($manager->id, $log->staff_id);       // 操作者
+        $this->assertSame($sales->id, $log->assigned_staff_id); // 社内担当者
+
+        $this->actingAs($admin)->get(route('quote-numbers.logs'))
+            ->assertOk()
+            ->assertSee('DH021-N01')
+            ->assertSee('ログ確認装置')
+            ->assertSee($manager->name)
+            ->assertSee($sales->name);
+    }
+
+    public function test_correcting_a_row_is_also_logged(): void
+    {
+        $staff = Staff::factory()->create(['role' => Staff::ROLE_SALES]);
+        $quote = QuoteNumber::where('full_no', 'DH013-N01')->sole();
+
+        $this->actingAs($staff)->put(route('quote-numbers.update', $quote), [
+            'project_name' => '直した件名',
+        ])->assertRedirect();
+
+        $log = \App\Models\QuoteNumberLog::sole();
+        $this->assertSame('updated', $log->action);
+        $this->assertSame('直した件名', $log->description);
+    }
+
+    public function test_only_administrators_can_open_the_log(): void
+    {
+        $this->actingAs(Staff::factory()->procurementManager()->create())
+            ->get(route('quote-numbers.logs'))->assertForbidden();
+
+        $this->actingAs(Staff::factory()->create(['is_fund_manager' => true]))
+            ->get(route('quote-numbers.logs'))->assertForbidden();
+    }
+
+    public function test_the_log_button_is_shown_only_to_administrators(): void
+    {
+        $this->actingAs(Staff::factory()->create(['is_administrator' => true]))
+            ->get(route('quote-numbers.index'))->assertOk()->assertSee('取得ログ');
+
+        $this->actingAs(Staff::factory()->procurementManager()->create())
+            ->get(route('quote-numbers.index'))->assertOk()->assertDontSee('取得ログ');
+    }
+
     public function test_general_staff_cannot_allocate(): void
     {
         $this->actingAs(Staff::factory()->create())->get(route('quote-numbers.index'))->assertForbidden();

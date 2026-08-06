@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\BusinessPartner;
 use App\Models\CustomerCode;
 use App\Models\QuoteNumber;
+use App\Models\QuoteNumberLog;
 use App\Models\Staff;
 use App\Services\QuoteNumberAllocator;
 use Illuminate\Http\JsonResponse;
@@ -87,7 +88,7 @@ class QuoteNumberController extends Controller
 
         $parts = $fullNo === $allocation['candidate'] ? $allocation : $this->splitFullNo($fullNo);
 
-        QuoteNumber::create([
+        $quote = QuoteNumber::create([
             'full_no' => $fullNo,
             'customer_code' => $parts['customer_code'] ?? strtoupper($data['customer_code']),
             'unit_no' => $parts['unit_no'],
@@ -103,9 +104,30 @@ class QuoteNumberController extends Controller
             'source' => 'manage',
         ]);
 
+        QuoteNumberLog::record(
+            $quote,
+            QuoteNumberLog::ACTION_TAKEN,
+            QuoteNumberAllocator::MODES[$data['mode']]['label'].'／'.$data['project_name']
+        );
+
         return redirect()->route('quote-numbers.index', ['customer_code' => strtoupper($data['customer_code'])])
             ->with('status', 'quote-number-taken')
             ->with('taken_no', $fullNo);
+    }
+
+    /**
+     * 取得ログ。誰がいつどの注番を採ったかを直近100件表示する。administrator専用。
+     */
+    public function logs(): View
+    {
+        abort_unless(Auth::user()->is_administrator, 403, '取得ログはadministratorのみ参照できます。');
+
+        return view('quote-numbers.logs', [
+            'logs' => QuoteNumberLog::with(['staff', 'assignedStaff'])
+                ->orderByDesc('id')
+                ->limit(100)
+                ->get(),
+        ]);
     }
 
     /**
@@ -151,6 +173,8 @@ class QuoteNumberController extends Controller
         ]);
 
         $quoteNumber->update($data);
+
+        QuoteNumberLog::record($quoteNumber, QuoteNumberLog::ACTION_UPDATED, $quoteNumber->project_name);
 
         return back()->with('status', 'quote-number-updated')->with('updated_no', $quoteNumber->full_no);
     }
