@@ -48,21 +48,21 @@ class ImportQuoteNumberLedger extends Command
             foreach ($this->readRows($path) as $cols) {
                 // 見出し行: 「客先番号,,会社名」
                 if (($cols[0] ?? '') !== '' && ($cols[1] ?? '') === '' && ($cols[2] ?? '') !== ''
-                    && preg_match('/^[A-Z]{1,3}$/', trim($cols[0]))) {
-                    $companies[trim($cols[0])] = trim($cols[2]);
+                    && preg_match('/^[A-Z]{1,3}$/', $this->normalizeCode($cols[0]))) {
+                    $companies[$this->normalizeCode($cols[0])] = trim($cols[2]);
 
                     continue;
                 }
 
                 // 明細行: 先頭が空で、2列目が客先番号、3列目が装置番号(見積単位)
-                $code = trim($cols[1] ?? '');
-                $unit = trim($cols[2] ?? '');
+                $code = $this->normalizeCode($cols[1] ?? '');
+                $unit = $this->normalizeCode($cols[2] ?? '');
 
                 if (($cols[0] ?? '') !== '' || ! preg_match('/^[A-Z]{1,3}$/', $code) || $unit === '') {
                     continue;
                 }
 
-                $suffix = trim($cols[3] ?? '') ?: null;
+                $suffix = $this->normalizeCode($cols[3] ?? '') ?: null;
                 $parsed = QuoteNumber::parseSuffix($suffix);
 
                 if ($suffix !== null && $parsed === null) {
@@ -155,6 +155,18 @@ class ImportQuoteNumberLedger extends Command
         } finally {
             fclose($handle);
         }
+    }
+
+    /**
+     * 注番を構成する項目(客先番号・見積単位・補足注番)を半角大文字に揃える。
+     * 台帳には「Ｎ01」「B0７」のように全角の英数字が混ざった行があり、
+     * そのままだと同じ区分が別物として並んでしまうため。
+     * 件名や納入先などの日本語には適用しない。
+     */
+    private function normalizeCode(string $value): string
+    {
+        // 'a' = 全角英数字を半角へ、's' = 全角スペースを半角へ
+        return strtoupper(trim(mb_convert_kana($value, 'as', 'UTF-8')));
     }
 
     private function toUtf8(string $value): string

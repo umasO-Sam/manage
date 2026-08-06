@@ -74,6 +74,32 @@ class QuoteNumberLedgerTest extends TestCase
         }
     }
 
+    /**
+     * 台帳には「Ｎ01」「B0７」のように全角英数字が混ざった行がある。そのままだと
+     * 同じ区分が別物として並ぶため、注番を構成する項目は半角大文字に揃えて取り込む。
+     */
+    public function test_it_normalizes_full_width_codes(): void
+    {
+        $dir = storage_path('framework/testing/quote-ledger-kana');
+        \Illuminate\Support\Facades\File::ensureDirectoryExists($dir);
+        \Illuminate\Support\Facades\File::put("{$dir}/台帳(Ｄ).csv", implode("\n", [
+            'Ｄ,,大幸,,,,,,,,',
+            ',Ｄ,０１３,Ｎ01Ｂ0７,,全角の行,納入先,,,,',
+        ]));
+
+        try {
+            $this->artisan('app:import-quote-number-ledger', ['--dir' => $dir])->assertSuccessful();
+
+            $quote = QuoteNumber::where('project_name', '全角の行')->sole();
+            $this->assertSame('D013-N01B07', $quote->full_no);
+            $this->assertSame('N01B07', $quote->suffix);
+            $this->assertSame('B', $quote->extra_code);
+            $this->assertSame('D', $quote->customer_code);
+        } finally {
+            \Illuminate\Support\Facades\File::deleteDirectory($dir);
+        }
+    }
+
     public function test_the_unit_number_is_padded_for_display_only(): void
     {
         // 過去分は2桁のこともあるが、原文は保持したまま表示だけ3桁に揃える。

@@ -298,6 +298,21 @@ class QuoteNumberAllocationTest extends TestCase
         $this->assertSame('DH013-N01', $quote->full_no);
     }
 
+    /**
+     * 注番の検索ボタンは、注番管理の新規登録と受注登録の両方から使う。
+     * どちらの画面を開ける人も検索APIを叩けること。
+     */
+    public function test_the_search_button_is_available_on_both_screens(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+
+        $this->actingAs($manager)->get(route('order-numbers.create'))
+            ->assertOk()->assertSee('検索')->assertSee(route('quote-numbers.lookup'), false);
+
+        $this->actingAs($manager)->get(route('projects.create'))
+            ->assertOk()->assertSee('検索')->assertSee(route('quote-numbers.lookup'), false);
+    }
+
     public function test_general_staff_cannot_allocate(): void
     {
         $this->actingAs(Staff::factory()->create())->get(route('quote-numbers.index'))->assertForbidden();
