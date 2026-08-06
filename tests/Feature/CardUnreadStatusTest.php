@@ -114,4 +114,32 @@ class CardUnreadStatusTest extends TestCase
         // ナビのバッジに未確認2件が表示される
         $response->assertSeeText('2');
     }
+
+    /**
+     * ナビのバッジは、経理資材担当は全カード、それ以外は自分が起票した分だけを数える。
+     * 他人の依頼の未読でバッジが埋まると、自分宛のコメントに気づけなくなるため。
+     */
+    public function test_the_navigation_badge_counts_only_own_cards_for_non_managers(): void
+    {
+        $workflowType = $this->purchaseWorkflow();
+        $staff = Staff::factory()->create();
+        $other = Staff::factory()->create();
+
+        $this->makeCard($workflowType, $staff);
+        $this->makeCard($workflowType, $other);
+        $this->makeCard($workflowType, $other);
+
+        $this->assertSame(
+            [$workflowType->id => 1],
+            $staff->unreadCardCountsByWorkflow(),
+            '一般社員には自分が起票した1件だけを数える。'
+        );
+
+        $manager = Staff::factory()->procurementManager()->create();
+        $this->assertSame(
+            [$workflowType->id => 3],
+            $manager->unreadCardCountsByWorkflow(),
+            '経理資材担当はすべてのカードを処理するため全件を数える。'
+        );
+    }
 }

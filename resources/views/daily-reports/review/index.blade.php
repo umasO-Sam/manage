@@ -41,12 +41,26 @@
                 </div>
             @endif
 
+            {{-- 確認・差し戻しは日報管理者だけが行う。それ以外の閲覧者には状態だけを見せる。 --}}
+            @unless ($canReview)
+                <p class="text-xs text-slate-500 text-center">確認・差し戻しは日報管理者が行います。この画面では内容と状態の閲覧のみできます。</p>
+            @endunless
+
             @forelse ($reports as $report)
+                @php($status = $statuses[$report->id] ?? \App\Http\Controllers\DailyReportReviewController::STATUS_PENDING)
+                @php($isPending = $status === \App\Http\Controllers\DailyReportReviewController::STATUS_PENDING)
                 <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden" x-data="{ showReject: false }">
                     <div class="p-4 bg-slate-50 border-b border-slate-200">
                         <div class="flex items-center justify-between flex-wrap gap-2">
                             <div class="flex items-center gap-3 flex-wrap">
                                 <span class="font-bold text-slate-900">{{ $report->staff->name }}</span>
+                                @if ($status === \App\Http\Controllers\DailyReportReviewController::STATUS_CONFIRMED)
+                                    <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">確認済</span>
+                                @elseif ($status === \App\Http\Controllers\DailyReportReviewController::STATUS_REJECTED)
+                                    <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">差し戻し中</span>
+                                @else
+                                    <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-red-100 text-red-700">未確認</span>
+                                @endif
                                 @php($punch = $punchesByStaff[$report->staff_id] ?? null)
                                 @if ($punch)
                                     <span class="text-xs font-mono text-slate-500" title="タイムカードの打刻">
@@ -54,36 +68,45 @@
                                     </span>
                                 @endif
                             </div>
-                            <div class="flex items-center gap-2">
-                                <button type="button" @click="showReject = ! showReject"
-                                        class="text-sm font-semibold border border-red-300 text-red-700 hover:bg-red-50 px-4 py-1.5 rounded-lg">
-                                    差し戻す
-                                </button>
-                                <form method="POST" action="{{ route('daily-reports.review.decide', $report) }}">
-                                    @csrf
-                                    <input type="hidden" name="action" value="confirm">
-                                    <button type="submit" class="text-sm font-semibold bg-blue-600 hover:bg-blue-700 text-white px-4 py-1.5 rounded-lg shadow-sm">
-                                        確認する
+                            @if ($canReview && $isPending)
+                                <div class="flex items-center gap-2">
+                                    <button type="button" @click="showReject = ! showReject"
+                                            class="text-sm font-semibold border border-red-300 text-red-700 hover:bg-red-50 px-4 py-1.5 rounded-lg">
+                                        差し戻す
                                     </button>
-                                </form>
-                            </div>
+                                    <form method="POST" action="{{ route('daily-reports.review.decide', $report) }}">
+                                        @csrf
+                                        <input type="hidden" name="action" value="confirm">
+                                        <button type="submit" class="text-sm font-semibold bg-blue-600 hover:bg-blue-700 text-white px-4 py-1.5 rounded-lg shadow-sm">
+                                            確認する
+                                        </button>
+                                    </form>
+                                </div>
+                            @endif
                         </div>
+                        @if ($status === \App\Http\Controllers\DailyReportReviewController::STATUS_REJECTED && $report->rejection_reason)
+                            <p class="mt-2 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-2">
+                                差し戻し理由: {{ $report->rejection_reason }}
+                            </p>
+                        @endif
                         @if ($timecardWarnings[$report->id] ?? null)
                             <p class="mt-2 text-xs font-bold text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-2">
                                 タイムカードとの差が大きいため、内容を確認してください（{{ $timecardWarnings[$report->id] }}）。
                             </p>
                         @endif
-                        <form method="POST" action="{{ route('daily-reports.review.decide', $report) }}" x-show="showReject" x-cloak class="mt-3 space-y-2">
-                            @csrf
-                            <input type="hidden" name="action" value="reject">
-                            <textarea name="rejection_reason" rows="2" placeholder="差し戻し理由を入力してください"
-                                      class="w-full border rounded-lg p-2 border-slate-300 text-sm" required></textarea>
-                            <div class="flex justify-end">
-                                <button type="submit" class="text-sm font-semibold bg-red-600 hover:bg-red-700 text-white px-4 py-1.5 rounded-lg shadow-sm">
-                                    差し戻しを確定
-                                </button>
-                            </div>
-                        </form>
+                        @if ($canReview && $isPending)
+                            <form method="POST" action="{{ route('daily-reports.review.decide', $report) }}" x-show="showReject" x-cloak class="mt-3 space-y-2">
+                                @csrf
+                                <input type="hidden" name="action" value="reject">
+                                <textarea name="rejection_reason" rows="2" placeholder="差し戻し理由を入力してください"
+                                          class="w-full border rounded-lg p-2 border-slate-300 text-sm" required></textarea>
+                                <div class="flex justify-end">
+                                    <button type="submit" class="text-sm font-semibold bg-red-600 hover:bg-red-700 text-white px-4 py-1.5 rounded-lg shadow-sm">
+                                        差し戻しを確定
+                                    </button>
+                                </div>
+                            </form>
+                        @endif
                     </div>
                     <div class="p-4"
                          x-data="reviewGrid({
@@ -121,7 +144,7 @@
                 </div>
             @empty
                 <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-8 text-center text-slate-400 text-sm">
-                    この日の確認待ちの作業日報はありません。
+                    この日に提出された作業日報はありません。
                 </div>
             @endforelse
         </div>

@@ -14,20 +14,28 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 /**
- * 経理資材担当向けの作業日報確認画面。日付単位で表示し、提出済みの作業日報のうち
- * 生成されたLaborCostがまだ仮登録(is_provisional=true)のままのもの(差し戻し中を除く)を
- * 一覧して、内容を確認したうえで確定または差し戻せる。個々のLaborCost行の編集は行わない
+ * 作業日報確認画面。日付単位で、提出された作業日報を確認済・未確認の別とともに一覧する。
+ * 閲覧は経理資材担当・上長・役員・資金管理者・administrator、確認と差し戻しは
+ * 日報管理者フラグを付けた担当者だけが行う。個々のLaborCost行の編集は行わない
  * (内容を直したい場合は本人に作業日報を再提出してもらう運用、
  * LaborCostController::bulkConfirm()と同じ方針)。
  */
 class DailyReportReviewController extends Controller
 {
+    /** 日報の状態。未確認のものだけが確認・差し戻しの対象になる。 */
+    public const STATUS_PENDING = 'pending';
+
+    public const STATUS_CONFIRMED = 'confirmed';
+
+    public const STATUS_REJECTED = 'rejected';
+
     public function index(Request $request, TimecardService $timecard): View
     {
         $date = $this->resolveDate($request->query('date'));
 
-        $reports = $this->pendingReportsQuery()
-            ->whereDate('work_date', $date)
+        // 確認待ちだけでなく提出済みの全件を並べ、確認済か未確認かを読み取れるようにする。
+        $reports = DailyReport::whereDate('work_date', $date)
+            ->whereNotNull('submitted_at')
             ->with([
                 'staff',
                 'entries' => fn ($q) => $q->orderBy('start_minute'),
@@ -36,6 +44,8 @@ class DailyReportReviewController extends Controller
             ->get()
             ->sortBy(fn (DailyReport $r) => $r->staff->name)
             ->values();
+
+        $statuses = $this->statusesFor($reports);
 
         // 作業日報の「なぞって選択」グリッドと同じ分類ボタン(社内人工・雑人工、コード59〜71)を
         // 参照して色分けする。DailyReportController::show()と同じ絞り込み条件。
@@ -46,6 +56,8 @@ class DailyReportReviewController extends Controller
 
         return view('daily-reports.review.index', [
             'reports' => $reports,
+            'statuses' => $statuses,
+            'canReview' => $request->user()->canReviewDailyReports(),
             'categories' => $categories,
             'date' => $date,
             'prevDate' => Carbon::parse($date)->subDay()->format('Y-m-d'),
@@ -91,6 +103,30 @@ class DailyReportReviewController extends Controller
             'timecardWarnings' => $warnings,
             'timecardService' => $timecard,
         ];
+    }
+
+    /**
+     * 各日報の状態。人工データ(LaborCost)が仮登録のまま残っていれば未確認、
+     * 差し戻し中はそちらを優先する。
+     *
+     * @param  \Illuminate\Support\Collection<int, DailyReport>  $reports
+     * @return array<int, string>
+     */
+    private function statusesFor($reports): array
+    {
+        $provisionalReportIds = LaborCost::where('is_provisional', true)
+            ->whereIn('daily_report_id', $reports->pluck('id'))
+            ->distinct()
+            ->pluck('daily_report_id')
+            ->all();
+
+        return $reports->mapWithKeys(fn (DailyReport $report) => [
+            $report->id => match (true) {
+                $report->rejected_at !== null => self::STATUS_REJECTED,
+                in_array($report->id, $provisionalReportIds, true) => self::STATUS_PENDING,
+                default => self::STATUS_CONFIRMED,
+            },
+        ])->all();
     }
 
     public function decide(Request $request, DailyReport $dailyReport): RedirectResponse

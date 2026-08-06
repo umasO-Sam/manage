@@ -132,6 +132,15 @@ class Staff extends Authenticatable
     }
 
     /**
+     * 作業日報確認の画面を開けるかどうか(経理資材担当・上長・役員・資金管理者・administrator)。
+     * 提出された日報の内容と確認済/未確認は見られるが、確定・差し戻しは日報管理者だけが行う。
+     */
+    public function canViewDailyReportReviews(): bool
+    {
+        return $this->isSupervisorOrManager() || (bool) $this->is_executive;
+    }
+
+    /**
      * 作業日報の確認(人工データの確定・差し戻し)を担当するかどうか。
      * 経理資材担当の全員ではなく日報管理者フラグを付けた人だけが行い、
      * 未確認バッジもその人にしか出さない。administratorはすべての機能を使える。
@@ -350,11 +359,16 @@ class Staff extends Authenticatable
      * 未確認・新着コメントありのものを、ワークフロー種別ごとに集計する。
      * ナビゲーションのバッジ表示用。
      *
+     * 経理資材担当はすべてのカードを処理する立場なので全件を数える。
+     * それ以外は自分が起票したカードだけを数え、他人の依頼の未読で
+     * バッジが埋まらないようにする(ボード上の未読マーク自体は全件に付く)。
+     *
      * @return array<int, int> workflow_type_id => 件数
      */
     public function unreadCardCountsByWorkflow(): array
     {
         return Card::query()
+            ->when(! $this->is_procurement_manager, fn ($query) => $query->where('created_by', $this->id))
             ->with([
                 'comments:id,card_id,created_at',
                 'views' => fn ($query) => $query->where('staff_id', $this->id),

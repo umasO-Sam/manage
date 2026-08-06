@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Http\Controllers\DailyReportReviewController;
 use App\Models\DailyReport;
 use App\Models\DailyReportEntry;
 use App\Models\LaborCost;
@@ -20,7 +21,7 @@ class DailyReportReviewTest extends TestCase
         $this->actingAs($staff)->get(route('daily-reports.review.index'))->assertForbidden();
     }
 
-    public function test_review_list_shows_only_pending_reports_for_the_requested_date(): void
+    public function test_review_list_shows_the_reports_of_the_requested_date_with_their_status(): void
     {
         $manager = Staff::factory()->procurementManager()->create();
         $reporter = Staff::factory()->create();
@@ -53,13 +54,16 @@ class DailyReportReviewTest extends TestCase
         $response = $this->actingAs($manager)->get(route('daily-reports.review.index', ['date' => '2026-08-10']));
 
         $response->assertOk();
+        // 同じ日の確認済みも状態が読めるよう残し、別日のものだけを除く。
         $response->assertViewHas('reports', function ($reports) use ($report, $confirmedReport, $otherDateReport) {
             $ids = $reports->pluck('id')->all();
 
-            return $ids === [$report->id]
-                && ! in_array($confirmedReport->id, $ids, true)
+            return in_array($report->id, $ids, true)
+                && in_array($confirmedReport->id, $ids, true)
                 && ! in_array($otherDateReport->id, $ids, true);
         });
+        $response->assertViewHas('statuses', fn ($statuses) => $statuses[$report->id] === DailyReportReviewController::STATUS_PENDING
+            && $statuses[$confirmedReport->id] === DailyReportReviewController::STATUS_CONFIRMED);
         $response->assertSee('雑作業');
     }
 
@@ -113,7 +117,7 @@ class DailyReportReviewTest extends TestCase
         $this->assertFalse($report->fresh()->isRejected());
     }
 
-    public function test_rejecting_a_report_records_the_reason_and_removes_it_from_the_queue(): void
+    public function test_rejecting_a_report_records_the_reason_and_marks_it_as_rejected(): void
     {
         $manager = Staff::factory()->procurementManager()->create();
         $reporter = Staff::factory()->create();
@@ -133,8 +137,9 @@ class DailyReportReviewTest extends TestCase
         $this->assertTrue($fresh->isRejected());
         $this->assertSame('注番が間違っています', $fresh->rejection_reason);
 
+        // 差し戻し中も一覧には残し、状態として読み取れるようにする。
         $response = $this->actingAs($manager)->get(route('daily-reports.review.index', ['date' => '2026-08-10']));
-        $response->assertViewHas('reports', fn ($reports) => $reports->isEmpty());
+        $response->assertViewHas('statuses', fn ($statuses) => $statuses[$report->id] === DailyReportReviewController::STATUS_REJECTED);
     }
 
     public function test_resubmitting_a_rejected_report_clears_the_rejection(): void

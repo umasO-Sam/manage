@@ -140,11 +140,12 @@ Route::middleware('auth')->group(function () {
         Route::delete('/staff/{staff}', [StaffController::class, 'destroy'])->name('staff.destroy');
     });
 
-    // 作業日報の確認は経理資材担当のうち日報管理者フラグを付けた人だけが行う。
-    Route::middleware('daily.report.reviewer')->group(function () {
-        Route::get('/daily-reports/review', [DailyReportReviewController::class, 'index'])->name('daily-reports.review.index');
-        Route::post('/daily-reports/review/{dailyReport}/decide', [DailyReportReviewController::class, 'decide'])->name('daily-reports.review.decide');
-    });
+    // 作業日報確認は経理資材担当・上長・役員・資金管理者が閲覧でき、
+    // 確認と差し戻しは日報管理者フラグを付けた人だけが行う。
+    Route::get('/daily-reports/review', [DailyReportReviewController::class, 'index'])
+        ->middleware('daily.report.viewer')->name('daily-reports.review.index');
+    Route::post('/daily-reports/review/{dailyReport}/decide', [DailyReportReviewController::class, 'decide'])
+        ->middleware('daily.report.reviewer')->name('daily-reports.review.decide');
 
     // データ入力・注文書・明細書・原価一覧・レコード編集は経理資材担当限定。
     Route::middleware('procurement.manager')->group(function () {

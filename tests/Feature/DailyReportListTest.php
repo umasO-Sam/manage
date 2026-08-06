@@ -151,17 +151,20 @@ class DailyReportListTest extends TestCase
         $response->assertSee('確認待ち');
     }
 
-    public function test_review_link_shown_only_to_managers(): void
+    public function test_review_link_shown_only_to_those_who_can_open_the_review_screen(): void
     {
         $manager = Staff::factory()->procurementManager()->create();
         $supervisor = Staff::factory()->create(['is_supervisor' => true]);
+        $sales = Staff::factory()->sales()->create();
 
-        $this->actingAs($manager)->get(route('daily-reports.list.index'))
-            ->assertSee(route('daily-reports.review.index', ['date' => '2026-08-10']), false);
+        // 上長も内容と確認済/未確認を閲覧できるため導線を出す(確認・差し戻しは日報管理者のみ)。
+        foreach ([$manager, $supervisor] as $viewer) {
+            $this->actingAs($viewer)->get(route('daily-reports.list.index'))
+                ->assertSee(route('daily-reports.review.index', ['date' => '2026-08-10']), false);
+        }
 
-        // 作業日報確認は資材管理担当者の業務のため、上長には導線を出さない。
-        $this->actingAs($supervisor)->get(route('daily-reports.list.index'))
-            ->assertDontSee(route('daily-reports.review.index', ['date' => '2026-08-10']), false);
+        // 営業担当はそもそも作業日報一覧を開けない。
+        $this->actingAs($sales)->get(route('daily-reports.list.index'))->assertForbidden();
     }
 
     public function test_staff_are_grouped_by_department(): void

@@ -52,11 +52,11 @@ class NavigationPermissionTest extends TestCase
     {
         $html = $this->navHtmlFor(Staff::factory()->create(['is_supervisor' => true]));
 
-        foreach (['調達ボード', '勤怠管理', '仕入管理', '作業日報一覧', '申請承認', '操作ログ', '原価一覧'] as $label) {
+        // 作業日報確認は閲覧のみ(確認・差し戻しは日報管理者だけ)で上長にも出す。
+        foreach (['調達ボード', '勤怠管理', '仕入管理', '作業日報一覧', '作業日報確認', '申請承認', '操作ログ', '原価一覧'] as $label) {
             $this->assertStringContainsString($label, $html, "上長に「{$label}」が表示されていません。");
         }
-        // 作業日報確認は人工データの確定を伴う資材管理担当者の業務のため、上長には出さない。
-        foreach (['作業日報確認', '人工レコード', '休日マスタ', 'システム管理', 'データ入力', '注文書発行'] as $label) {
+        foreach (['人工レコード', '休日マスタ', 'システム管理', 'データ入力', '注文書発行'] as $label) {
             $this->assertStringNotContainsString($label, $html, "上長に「{$label}」が表示されています。");
         }
     }
@@ -102,11 +102,12 @@ class NavigationPermissionTest extends TestCase
         }
     }
 
-    public function test_supervisor_cannot_access_the_daily_report_review_screen(): void
+    /** 上長は状態の閲覧まで。確認・差し戻しは日報管理者だけが行う。 */
+    public function test_supervisor_can_view_but_not_decide_on_the_daily_report_review_screen(): void
     {
         $supervisor = Staff::factory()->create(['is_supervisor' => true]);
 
-        $this->actingAs($supervisor)->get(route('daily-reports.review.index'))->assertForbidden();
+        $this->actingAs($supervisor)->get(route('daily-reports.review.index'))->assertOk();
     }
 
     public function test_sales_cannot_access_supervisor_only_screens(): void
