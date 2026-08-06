@@ -30,6 +30,9 @@ class LeaveRequestController extends Controller
             'orderNumbers' => OrderNumber::forDropdown()->get()
                 ->map(fn (OrderNumber $o) => ['code' => $o->code, 'label' => $o->displayLabel()])
                 ->values(),
+            'hiddenOrderNumbers' => OrderNumber::hiddenFromDropdown()->get()
+                ->map(fn (OrderNumber $o) => ['value' => $o->code, 'label' => $o->displayLabel()])
+                ->values(),
             'paidLeaveBalance' => Auth::user()->paidLeaveBalance(),
             'prefillDate' => $this->parseDateQuery($request->query('date')),
         ]);

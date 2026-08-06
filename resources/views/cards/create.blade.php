@@ -24,7 +24,9 @@
                       onsubmit="return confirm('この内容で依頼を作成しますか？');">
                     @csrf
 
-                    <div>
+                    @php($hiddenOptions = $hiddenOrderNumbers->map(fn ($o) => ['value' => $o->id, 'label' => $o->displayLabel()]))
+                    {{-- 入力エラーで戻ったとき、選んでいたのが非表示の注番なら開いたままにする。 --}}
+                    <div x-data="{ showHiddenOrderNumbers: {{ $hiddenOptions->contains(fn ($o) => (string) $o['value'] === (string) old('order_number_id')) ? 'true' : 'false' }} }">
                         <x-input-label for="order_number_id" value="注番" />
                         <select id="order_number_id" name="order_number_id" required
                                 class="mt-1 block w-full font-mono rounded-lg shadow-sm text-sm {{ $errors->has('order_number_id') ? 'bg-red-50 border-red-300 focus:border-red-400 focus:ring-red-400' : 'border-slate-300 focus:border-blue-500 focus:ring-blue-500' }}">
@@ -34,7 +36,9 @@
                                     {{ $orderNumber->displayLabel() }}
                                 </option>
                             @endforeach
+                            <x-hidden-order-number-options :options="$hiddenOptions" :selected="old('order_number_id')" />
                         </select>
+                        <x-hidden-order-numbers-toggle :count="$hiddenOptions->count()" />
                         <p class="mt-1 text-[11px] text-slate-400">
                             注番が一覧にない場合は経理資材担当に登録を依頼してください（未取得の場合は「未定」、社内利用の場合は「社内」を選択）。
                         </p>

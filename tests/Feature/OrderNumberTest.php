@@ -147,7 +147,7 @@ class OrderNumberTest extends TestCase
 
         $response = $this->actingAs($manager)->get(route('order-numbers.index'));
 
-        $response->assertSee('自由入力（形式チェック解除）');
+        $response->assertSee('自由入力');
     }
 
     public function test_the_list_is_sorted_by_code(): void
@@ -177,10 +177,14 @@ class OrderNumberTest extends TestCase
             ->assertRedirect(route('order-numbers.index'));
         $this->assertFalse($hidden->fresh()->show_in_dropdown);
 
-        // 作業日報・休暇申請の注番プルダウン
+        // 作業日報・休暇申請の注番プルダウン。既定の選択肢からは外し、
+        // 「非表示の注番も表示する」で足せる別枠に回す。
         foreach (['daily-reports.show', 'leave-requests.create'] as $routeName) {
             $this->actingAs($manager)->get(route($routeName))
-                ->assertOk()->assertDontSee($hidden->code)->assertSee($shown->code);
+                ->assertOk()
+                ->assertViewHas('orderNumbers', fn ($options) => collect($options)->pluck('code')->contains($shown->code)
+                    && ! collect($options)->pluck('code')->contains($hidden->code))
+                ->assertSee('プルダウン非表示の注番も表示する');
         }
 
         // 注番管理の一覧からは消さない(消すと設定を戻せなくなる)
@@ -203,12 +207,17 @@ class OrderNumberTest extends TestCase
             'created_by' => $manager->id, 'current_stage' => 0,
         ]);
 
+        // 編集画面では通常の選択肢に混ぜる(選び直さないと保存できなくなるため)
         $this->actingAs($manager)->get(route('cards.edit', $card))
-            ->assertOk()->assertSee($hidden->code);
+            ->assertOk()
+            ->assertViewHas('orderNumbers', fn ($options) => $options->contains('id', $hidden->id))
+            ->assertViewHas('hiddenOrderNumbers', fn ($options) => ! $options->contains('id', $hidden->id));
 
-        // 新規作成の選択肢には出さない
+        // 新規作成では既定の選択肢に出さず、「非表示の注番も表示する」の側に回す
         $this->actingAs($manager)->get(route('cards.create', $workflowType))
-            ->assertOk()->assertDontSee($hidden->code);
+            ->assertOk()
+            ->assertViewHas('orderNumbers', fn ($options) => ! $options->contains('id', $hidden->id))
+            ->assertViewHas('hiddenOrderNumbers', fn ($options) => $options->contains('id', $hidden->id));
     }
 
     public function test_unused_order_number_can_be_deleted(): void

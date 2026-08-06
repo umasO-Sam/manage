@@ -43,6 +43,11 @@ class DailyReportController extends Controller
             ->map(fn (OrderNumber $o) => ['code' => $o->code, 'label' => $o->displayLabel()])
             ->values();
 
+        // プルダウンから外した注番。画面の「非表示の注番も表示する」で選べるようにする。
+        $hiddenOrderNumbers = OrderNumber::hiddenFromDropdown()->get()
+            ->map(fn (OrderNumber $o) => ['code' => $o->code, 'label' => $o->displayLabel()])
+            ->values();
+
         $staff = Auth::user();
         $referenceDate = Carbon::parse($workDate);
 
@@ -70,6 +75,7 @@ class DailyReportController extends Controller
             'nextDate' => Carbon::parse($workDate)->addDay()->format('Y-m-d'),
             'categories' => $categories,
             'orderNumbers' => $orderNumbers,
+            'hiddenOrderNumbers' => $hiddenOrderNumbers,
             'weekOtherMinutes' => array_sum($weekWorkedByDate),
             'monthOtherMinutes' => array_sum($monthWorkedByDate),
             'monthOtherOvertimeMinutes' => $monthOtherOvertimeMinutes,

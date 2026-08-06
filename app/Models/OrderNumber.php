@@ -38,6 +38,17 @@ class OrderNumber extends Model
     }
 
     /**
+     * プルダウンから外した注番。画面の「非表示の注番も表示」で追加の選択肢として出す
+     * (外した注番をどうしても選びたい場合に、注番管理を開かずに済ませるため)。
+     *
+     * @return \Illuminate\Database\Eloquent\Builder<static>
+     */
+    public static function hiddenFromDropdown(): \Illuminate\Database\Eloquent\Builder
+    {
+        return static::where('show_in_dropdown', false)->orderBy('code');
+    }
+
+    /**
      * 標準形式(self::FORMAT_REGEX)に合致するか。
      * 保護レコード(未定/社内)や形式チェックを解除して登録した注番はfalseになる。
      */

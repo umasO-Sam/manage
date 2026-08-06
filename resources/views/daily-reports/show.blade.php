@@ -22,6 +22,7 @@
             ])) }},
             categories: {{ \Illuminate\Support\Js::from($categories) }},
             orderNumbers: {{ \Illuminate\Support\Js::from($orderNumbers) }},
+            hiddenOrderNumbers: {{ \Illuminate\Support\Js::from($hiddenOrderNumbers) }},
             weekOtherMinutes: {{ \Illuminate\Support\Js::from($weekOtherMinutes) }},
             monthOtherMinutes: {{ \Illuminate\Support\Js::from($monthOtherMinutes) }},
             monthOtherOvertimeMinutes: {{ \Illuminate\Support\Js::from($monthOtherOvertimeMinutes) }},
@@ -80,10 +81,17 @@
                         <label class="block mb-1 text-xs font-bold text-slate-700">注番</label>
                         <select x-model="selection.orderNo" class="w-full border rounded-lg p-2 border-slate-300 text-sm font-mono">
                             <option value="">（注番なし）</option>
-                            <template x-for="no in orderNumbers" :key="no.code">
+                            <template x-for="no in selectableOrderNumbers()" :key="no.code">
                                 <option :value="no.code" x-text="no.label"></option>
                             </template>
                         </select>
+                        <button type="button" x-show="hiddenOrderNumbers.length > 0"
+                                @click="showHiddenOrderNumbers = ! showHiddenOrderNumbers"
+                                class="mt-1 text-[11px] font-semibold text-slate-500 hover:text-blue-600 transition-colors">
+                            <span x-show="! showHiddenOrderNumbers"
+                                  x-text="'プルダウン非表示の注番も表示する（' + hiddenOrderNumbers.length + '件）'"></span>
+                            <span x-show="showHiddenOrderNumbers" x-cloak>プルダウン非表示の注番を隠す</span>
+                        </button>
                     </div>
 
                     <div class="flex flex-wrap gap-1.5">
@@ -363,6 +371,9 @@
                 workDate: config.workDate,
                 categories: config.categories,
                 orderNumbers: config.orderNumbers,
+                // プルダウンから外した注番。「非表示の注番も表示する」を押したときだけ選択肢に足す。
+                hiddenOrderNumbers: config.hiddenOrderNumbers,
+                showHiddenOrderNumbers: false,
                 entries: config.initialEntries,
                 nextId: Math.max(0, ...config.initialEntries.map((e) => e.id)) + 1,
                 weekOtherMinutes: config.weekOtherMinutes,
@@ -556,6 +567,13 @@
                 categoryItemName(id) {
                     const cat = this.categories.find((c) => c.id === id);
                     return cat ? cat.itemName : '';
+                },
+
+                // 注番の選択肢。「非表示の注番も表示する」を押したときだけ、外した注番を足す。
+                selectableOrderNumbers() {
+                    return this.showHiddenOrderNumbers
+                        ? [...this.orderNumbers, ...this.hiddenOrderNumbers]
+                        : this.orderNumbers;
                 },
 
                 // 研修など(69)・管理(70)・空き(71)は特定の注番に紐づく作業ではないため、

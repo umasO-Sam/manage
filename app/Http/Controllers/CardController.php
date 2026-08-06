@@ -133,6 +133,7 @@ class CardController extends Controller
         return view('cards.create', [
             'workflowType' => $workflow,
             'orderNumbers' => OrderNumber::forDropdown()->get(),
+            'hiddenOrderNumbers' => OrderNumber::hiddenFromDropdown()->get(),
         ]);
     }
 
@@ -204,6 +205,9 @@ class CardController extends Controller
             'orderNumbers' => OrderNumber::forDropdown()
                 ->orWhere('id', $card->order_number_id)
                 ->orderBy('code')->get(),
+            // 通常の選択肢に混ざった「このカードが使っている注番」は重複させない。
+            'hiddenOrderNumbers' => OrderNumber::hiddenFromDropdown()
+                ->where('id', '!=', $card->order_number_id)->get(),
         ]);
     }
 
