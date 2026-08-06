@@ -7,10 +7,12 @@
 
         <title>{{ config('app.name', 'Laravel') }}</title>
 
-        <!-- Favicon -->
-        <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('favicon-32.png') }}">
-        <link rel="icon" type="image/png" sizes="512x512" href="{{ asset('favicon-512.png') }}">
-        <link rel="apple-touch-icon" href="{{ asset('apple-touch-icon.png') }}">
+        {{-- ファビコン。差し替えてもブラウザが古い画像を握り続けるため ?v= を付ける。 --}}
+        <link rel="icon" href="{{ asset('favicon.ico') }}?v=2" sizes="any">
+        <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('favicon-32.png') }}?v=2">
+        <link rel="icon" type="image/png" sizes="192x192" href="{{ asset('favicon-192.png') }}?v=2">
+        <link rel="icon" type="image/png" sizes="512x512" href="{{ asset('favicon-512.png') }}?v=2">
+        <link rel="apple-touch-icon" href="{{ asset('apple-touch-icon.png') }}?v=2">
 
         <!-- Fonts -->
         <link rel="preconnect" href="https://fonts.bunny.net">
