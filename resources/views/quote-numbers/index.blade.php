@@ -27,10 +27,11 @@
                 </div>
             @endif
 
-            {{-- 客先番号と案件種別を変えるたびに候補を計算し直すため、条件はGETで送る。 --}}
-            <form method="GET" action="{{ route('quote-numbers.index') }}"
-                  class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4">
-                <div class="flex items-end gap-3 flex-wrap">
+            <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4">
+
+                {{-- 客先番号の検索は独立したフォームにする。案件種別や見積単位を一緒に送らないので、
+                     再検索すると選択状態がリセットされる。 --}}
+                <form method="GET" action="{{ route('quote-numbers.index') }}" class="flex items-end gap-3 flex-wrap">
                     <label class="block">
                         <span class="block text-[11px] font-bold text-slate-600 mb-0.5">客先番号（アルファベット1〜3文字）</span>
                         <input type="text" name="customer_code" value="{{ $customerCode }}" required
@@ -40,8 +41,12 @@
                         <span class="text-sm text-slate-700 pb-2">{{ $companyName }}</span>
                     @endif
                     <button type="submit" class="px-4 py-2 rounded-lg bg-slate-800 text-white text-sm font-bold hover:bg-slate-900">検索</button>
-                    <span class="text-[11px] text-slate-400 pb-2">客先番号だけで検索すると、過去注番リストの参照のみになります。</span>
-                </div>
+                    <span class="text-[11px] text-slate-400 pb-2">検索すると案件種別の選択はリセットされます。客先番号だけなら過去注番リストの参照のみです。</span>
+                </form>
+
+                {{-- 案件種別と元番号。変えるたびに候補を計算し直すためGETで送る。 --}}
+                <form method="GET" action="{{ route('quote-numbers.index') }}" class="space-y-4">
+                <input type="hidden" name="customer_code" value="{{ $customerCode }}">
 
                 <div>
                     <span class="block text-[11px] font-bold text-slate-600 mb-1">案件種別（1つ選ぶと候補を計算します）</span>
@@ -92,7 +97,8 @@
                     <input type="hidden" name="unit_no" value="{{ $unitNo }}">
                     <input type="hidden" name="base_no" value="{{ $baseNo }}">
                 @endif
-            </form>
+                </form>
+            </div>
 
             @if ($allocation && $allocation['candidate'])
                 <form method="POST" action="{{ route('quote-numbers.store') }}"
@@ -103,18 +109,23 @@
                     <input type="hidden" name="unit_no" value="{{ $unitNo }}">
                     <input type="hidden" name="base_no" value="{{ $baseNo }}">
 
-                    <div>
-                        <span class="block text-[11px] font-bold text-slate-600 mb-1">注番候補</span>
-                        <div class="flex items-center gap-2 text-2xl font-mono font-bold text-slate-900">
-                            {{-- 元番号は N01K10 のように多段になりうるので、組み立て直さず
-                                 base_suffix をそのまま出す。 --}}
-                            <span>{{ $customerCode }}{{ $allocation['unit_no'] }}</span>
-                            <span class="text-slate-400">－</span>
-                            <span>{{ $allocation['base_suffix'] }}</span>
-                            @if ($allocation['extra_code'])
-                                <span class="text-blue-700">{{ $allocation['extra_code'] }}{{ $allocation['extra_seq'] }}</span>
-                            @endif
+                    {{-- 候補はそのまま使うのが基本だが、規約に収まらないケースのために手入力で
+                         直せるようにしている。重複は取得時にサーバー側で弾く。 --}}
+                    <div x-data="{ candidate: @js(old('full_no', $allocation['candidate'])), suggested: @js($allocation['candidate']) }">
+                        <span class="block text-[11px] font-bold text-slate-600 mb-1">注番候補（必要なら直接編集できます）</span>
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <input type="text" name="full_no" x-model="candidate" required
+                                   class="border-2 rounded-lg px-3 py-2 border-slate-300 text-2xl font-mono font-bold text-slate-900 uppercase w-80">
+                            <button type="button" @click="candidate = suggested" x-show="candidate !== suggested"
+                                    class="px-3 py-1.5 rounded-lg border border-slate-300 text-slate-600 text-xs font-bold hover:bg-slate-50">
+                                候補に戻す
+                            </button>
                         </div>
+                        <p class="mt-1 text-[11px] text-slate-400">
+                            自動計算の候補：<span class="font-mono">{{ $allocation['candidate'] }}</span>
+                            （{{ $customerCode }}{{ $allocation['unit_no'] }} －
+                            {{ $allocation['base_suffix'] }}@if ($allocation['extra_code']){{ $allocation['extra_code'] }}{{ $allocation['extra_seq'] }}@endif）
+                        </p>
                         @if ($allocation['fell_back_to_new'] ?? false)
                             <p class="mt-2 text-xs font-bold text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-2">
                                 元の見積番号が空のため、<strong>{{ $modes[$mode]['label'] }}ではなく新規案件（N）として採番</strong>しています。
@@ -122,7 +133,7 @@
                             </p>
                         @endif
                         @if ($allocation['duplicate'])
-                            <p class="mt-1 text-xs font-bold text-red-700">この注番はすでに取得済みです。</p>
+                            <p class="mt-1 text-xs font-bold text-red-700">自動計算の候補はすでに取得済みです。別の注番に直してから取得してください。</p>
                         @endif
                     </div>
 
@@ -163,8 +174,9 @@
                     </div>
 
                     <div class="flex justify-end">
-                        <button type="submit" @disabled($allocation['duplicate'])
-                                class="px-6 py-2.5 rounded-lg bg-blue-600 text-white text-sm font-bold hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed">
+                        {{-- 手入力で直せるため常に押せる。重複はサーバー側で弾く。 --}}
+                        <button type="submit"
+                                class="px-6 py-2.5 rounded-lg bg-blue-600 text-white text-sm font-bold hover:bg-blue-700">
                             取得
                         </button>
                     </div>

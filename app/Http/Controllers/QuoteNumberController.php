@@ -53,6 +53,12 @@ class QuoteNumberController extends Controller
             'unit_no' => ['nullable', 'string', 'max:10'],
             // 元番号はハイフン以降そのもの。H は T/K/S/B の後ろにも付くため多段になりうる。
             'base_no' => ['nullable', 'string', 'max:20'],
+            // 候補は手入力で直せる。重複はここで弾く。
+            'full_no' => [
+                'required', 'string', 'max:50',
+                'regex:/^[A-Za-z]{1,5}\d{1,4}-[A-Za-z0-9\-]+$/',
+                Rule::unique('quote_numbers', 'full_no'),
+            ],
             'project_name' => ['required', 'string', 'max:255'],
             'company_name' => ['nullable', 'string', 'max:255'],
             'delivery_dest' => ['required', 'string', 'max:255'],
@@ -61,6 +67,8 @@ class QuoteNumberController extends Controller
             'remarks' => ['nullable', 'string', 'max:2000'],
         ], [
             'customer_code.regex' => '客先番号はアルファベットで入力してください。',
+            'full_no.regex' => '注番は「客先番号＋見積単位－以降」の形式で入力してください（例 DH013-N01）。',
+            'full_no.unique' => 'この注番はすでに取得済みです。',
         ]);
 
         $allocation = $allocator->build($data['customer_code'], $data['mode'], $data['unit_no'] ?? null, $data['base_no'] ?? null);
@@ -69,18 +77,19 @@ class QuoteNumberController extends Controller
             return back()->withInput()->withErrors(['candidate' => '採番に必要な項目が足りません：'.implode('、', $allocation['missing'])]);
         }
 
-        if ($allocation['duplicate']) {
-            return back()->withInput()->withErrors(['candidate' => "「{$allocation['candidate']}」はすでに取得済みです。"]);
-        }
+        // 手入力で直された場合はその注番を採用し、構成要素も入力値から取り直す
+        // (候補のまま取得したときは計算結果をそのまま使う)。
+        $fullNo = strtoupper(trim($data['full_no']));
+        $parts = $fullNo === $allocation['candidate'] ? $allocation : $this->splitFullNo($fullNo);
 
         QuoteNumber::create([
-            'full_no' => $allocation['candidate'],
-            'customer_code' => strtoupper($data['customer_code']),
-            'unit_no' => $allocation['unit_no'],
-            'suffix' => $allocation['suffix'],
-            'quote_type' => $allocation['quote_type'],
-            'quote_seq' => $allocation['quote_seq'],
-            'extra_code' => $allocation['extra_code'],
+            'full_no' => $fullNo,
+            'customer_code' => $parts['customer_code'] ?? strtoupper($data['customer_code']),
+            'unit_no' => $parts['unit_no'],
+            'suffix' => $parts['suffix'],
+            'quote_type' => $parts['quote_type'],
+            'quote_seq' => $parts['quote_seq'],
+            'extra_code' => $parts['extra_code'],
             'project_name' => $data['project_name'],
             'delivery_dest' => $data['delivery_dest'],
             'customer_contact' => $data['customer_contact'],
@@ -91,7 +100,30 @@ class QuoteNumberController extends Controller
 
         return redirect()->route('quote-numbers.index', ['customer_code' => strtoupper($data['customer_code'])])
             ->with('status', 'quote-number-taken')
-            ->with('taken_no', $allocation['candidate']);
+            ->with('taken_no', $fullNo);
+    }
+
+    /**
+     * 手入力された注番を構成要素に分解する。規約に収まらない書き方も許すため、
+     * 分解できない部分はnullのまま保持する(過去台帳の取り込みと同じ方針)。
+     *
+     * @return array<string, string|null>
+     */
+    private function splitFullNo(string $fullNo): array
+    {
+        preg_match('/^([A-Z]{1,5})(\d{1,4})-(.+)$/', $fullNo, $m);
+
+        $suffix = $m[3] ?? null;
+        $parsed = QuoteNumber::parseSuffix($suffix);
+
+        return [
+            'customer_code' => $m[1] ?? null,
+            'unit_no' => $m[2] ?? null,
+            'suffix' => $suffix,
+            'quote_type' => $parsed['quote_type'] ?? null,
+            'quote_seq' => $parsed['quote_seq'] ?? null,
+            'extra_code' => $parsed['extra_code'] ?? null,
+        ];
     }
 
     /**

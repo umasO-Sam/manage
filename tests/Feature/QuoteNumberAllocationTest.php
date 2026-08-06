@@ -110,6 +110,7 @@ class QuoteNumberAllocationTest extends TestCase
 
         $this->actingAs($staff)->post(route('quote-numbers.store'), [
             'customer_code' => 'DH', 'mode' => 'change', 'unit_no' => '013', 'base_no' => 'N01K10',
+            'full_no' => 'DH013-N01K10H01',
             'project_name' => 'x', 'delivery_dest' => 'y', 'customer_contact' => 'z', 'staff_id' => $staff->id,
         ])->assertRedirect();
 
@@ -170,6 +171,7 @@ class QuoteNumberAllocationTest extends TestCase
         $this->actingAs($manager)->post(route('quote-numbers.store'), [
             'customer_code' => 'DH',
             'mode' => 'new',
+            'full_no' => 'DH021-N01',
             'project_name' => 'テスト装置',
             'delivery_dest' => '第一工場',
             'customer_contact' => '客先太郎',
@@ -182,21 +184,59 @@ class QuoteNumberAllocationTest extends TestCase
         $this->assertSame('テスト装置', $quote->project_name);
     }
 
-    public function test_an_already_taken_number_cannot_be_taken_again(): void
+    public function test_the_candidate_can_be_edited_by_hand(): void
     {
         $staff = Staff::factory()->create(['role' => Staff::ROLE_SALES]);
 
-        $payload = [
-            'customer_code' => 'DH', 'mode' => 'scope_change', 'unit_no' => '013',
+        // 候補は DH021-N01 だが、手入力で別の番号にして取得する
+        $this->actingAs($staff)->post(route('quote-numbers.store'), [
+            'customer_code' => 'DH', 'mode' => 'new', 'full_no' => 'DH099-N05K02',
             'project_name' => 'x', 'delivery_dest' => 'y', 'customer_contact' => 'z', 'staff_id' => $staff->id,
-        ];
+        ])->assertRedirect();
 
-        $this->actingAs($staff)->post(route('quote-numbers.store'), $payload)->assertRedirect();
-        // 同じ条件でもう一度採ると次の通番になるため重複しない
-        $this->actingAs($staff)->post(route('quote-numbers.store'), $payload)->assertRedirect();
+        $quote = QuoteNumber::where('full_no', 'DH099-N05K02')->sole();
+        // 構成要素も入力値から取り直す
+        $this->assertSame('099', $quote->unit_no);
+        $this->assertSame('N05K02', $quote->suffix);
+        $this->assertSame('05', $quote->quote_seq);
+        $this->assertSame('K', $quote->extra_code);
+        $this->assertNull(QuoteNumber::where('full_no', 'DH021-N01')->first());
+    }
 
-        $this->assertNotNull(QuoteNumber::where('full_no', 'DH013-N03')->first());
-        $this->assertNotNull(QuoteNumber::where('full_no', 'DH013-N04')->first());
+    public function test_a_hand_edited_number_that_already_exists_is_rejected(): void
+    {
+        $staff = Staff::factory()->create(['role' => Staff::ROLE_SALES]);
+
+        $this->actingAs($staff)->post(route('quote-numbers.store'), [
+            'customer_code' => 'DH', 'mode' => 'new', 'full_no' => 'DH013-N01',
+            'project_name' => 'x', 'delivery_dest' => 'y', 'customer_contact' => 'z', 'staff_id' => $staff->id,
+        ])->assertSessionHasErrors('full_no');
+
+        $this->assertSame(1, QuoteNumber::where('full_no', 'DH013-N01')->count());
+    }
+
+    public function test_a_hand_edited_number_must_look_like_an_order_number(): void
+    {
+        $staff = Staff::factory()->create(['role' => Staff::ROLE_SALES]);
+
+        $this->actingAs($staff)->post(route('quote-numbers.store'), [
+            'customer_code' => 'DH', 'mode' => 'new', 'full_no' => 'でたらめ',
+            'project_name' => 'x', 'delivery_dest' => 'y', 'customer_contact' => 'z', 'staff_id' => $staff->id,
+        ])->assertSessionHasErrors('full_no');
+    }
+
+    public function test_taking_the_same_kind_twice_advances_the_sequence(): void
+    {
+        $staff = Staff::factory()->create(['role' => Staff::ROLE_SALES]);
+
+        foreach (['DH013-N03', 'DH013-N04'] as $expected) {
+            $this->actingAs($staff)->post(route('quote-numbers.store'), [
+                'customer_code' => 'DH', 'mode' => 'scope_change', 'unit_no' => '013', 'full_no' => $expected,
+                'project_name' => 'x', 'delivery_dest' => 'y', 'customer_contact' => 'z', 'staff_id' => $staff->id,
+            ])->assertRedirect();
+
+            $this->assertNotNull(QuoteNumber::where('full_no', $expected)->first());
+        }
     }
 
     public function test_the_lookup_endpoint_returns_the_project_details(): void
