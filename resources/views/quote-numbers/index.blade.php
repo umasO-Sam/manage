@@ -72,9 +72,9 @@
 
                 @if ($mode !== '' && ($allocation['missing'] ?? []) !== [])
                     <div class="flex items-end gap-3 flex-wrap p-3 rounded-lg bg-amber-50 border border-amber-200">
-                        @if (in_array('見積単位', $allocation['missing'], true))
+                        @if (in_array('通番', $allocation['missing'], true))
                             <label class="block">
-                                <span class="block text-[11px] font-bold text-amber-800 mb-0.5">見積単位（過去注番リストから選べます）</span>
+                                <span class="block text-[11px] font-bold text-amber-800 mb-0.5">通番（過去注番リストから選べます）</span>
                                 <input type="text" name="unit_no" value="{{ $unitNo }}"
                                        class="border rounded-lg p-2 border-amber-300 text-sm font-mono w-24">
                             </label>
@@ -84,8 +84,9 @@
                         @if (in_array('元の見積番号', $allocation['missing'], true))
                             <label class="block">
                                 <span class="block text-[11px] font-bold text-amber-800 mb-0.5">元の見積番号（ハイフン以降。N01 / N01K01 など）</span>
-                                <input type="text" name="base_no" value="{{ $baseNo }}" placeholder="N01"
-                                       class="border rounded-lg p-2 border-amber-300 text-sm font-mono uppercase w-32">
+                                {{-- プレースホルダが入力済みに見えないよう、薄い色にして「例：」を付ける。 --}}
+                                <input type="text" name="base_no" value="{{ $baseNo }}" placeholder="例：N01"
+                                       class="border rounded-lg p-2 border-amber-300 text-sm font-mono uppercase w-32 placeholder:text-slate-300 placeholder:font-sans">
                                 <span class="block text-[10px] text-amber-700 mt-0.5">H（変更）は T/K/S/B の後ろにも付けられます。</span>
                             </label>
                         @else
@@ -187,14 +188,14 @@
                 <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
                     <div class="px-4 py-2.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between gap-2 flex-wrap">
                         <span class="text-sm font-bold text-slate-800">過去注番リスト（{{ $customerCode }}）{{ $history->count() }} 件</span>
-                        <span class="text-[11px] text-slate-500">見積単位の降順。補足区分（T/K/S/B/H）付きも含めて全件表示し、規約どおりでない過去の表記もそのまま出しています。</span>
+                        <span class="text-[11px] text-slate-500">通番の降順。補足区分（T/K/S/B/H）付きも含めて全件表示し、規約どおりでない過去の表記もそのまま出しています。</span>
                     </div>
                     <div class="overflow-x-auto max-h-[32rem] overflow-y-auto">
                         <table class="w-full text-left border-collapse text-xs">
                             <thead class="sticky top-0">
                                 <tr class="bg-slate-50 border-b border-slate-200 font-semibold text-slate-600">
                                     <th class="p-2 whitespace-nowrap">注番</th>
-                                    <th class="p-2 whitespace-nowrap">見積単位</th>
+                                    <th class="p-2 whitespace-nowrap">通番</th>
                                     <th class="p-2 whitespace-nowrap text-center">区分</th>
                                     <th class="p-2">件名（工事名）</th>
                                     <th class="p-2">納入先</th>

@@ -80,7 +80,8 @@ class QuoteNumberAllocator
         } else {
             $unitNo = $this->normalizeUnit($unitNo);
             if ($unitNo === null) {
-                $missing[] = '見積単位';
+                // 画面上の呼び名は「通番」。
+                $missing[] = '通番';
             }
         }
 

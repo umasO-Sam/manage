@@ -147,7 +147,7 @@ class QuoteNumberAllocationTest extends TestCase
             $result = $this->allocator->build('DH', $mode, null, null);
 
             $this->assertNull($result['candidate']);
-            $this->assertSame(['見積単位', '元の見積番号'], $result['missing']);
+            $this->assertSame(['通番', '元の見積番号'], $result['missing']);
         }
     }
 
