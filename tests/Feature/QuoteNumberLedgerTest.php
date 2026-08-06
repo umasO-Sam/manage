@@ -100,6 +100,30 @@ class QuoteNumberLedgerTest extends TestCase
         }
     }
 
+    /**
+     * 補足注番が3列目と4列目に分かれて書かれている行がある(「1B」+「2」で AD146K-1B2)。
+     * 3列目だけを見ると別々の案件が同じ注番になってしまう。
+     */
+    public function test_it_joins_the_suffix_split_across_two_columns(): void
+    {
+        $dir = storage_path('framework/testing/quote-ledger-split');
+        \Illuminate\Support\Facades\File::ensureDirectoryExists($dir);
+        \Illuminate\Support\Facades\File::put("{$dir}/台帳(A).csv", implode("\n", [
+            'AD,,テスト客先,,,,,,,,',
+            ',AD,146K,1B,1,積載ロボットアーム補強部品,工場,,,,',
+            ',AD,146K,1B,2,予備部品,工場,,,,',
+        ]));
+
+        try {
+            $this->artisan('app:import-quote-number-ledger', ['--dir' => $dir])->assertSuccessful();
+
+            $this->assertSame('積載ロボットアーム補強部品', QuoteNumber::where('full_no', 'AD146K-1B1')->sole()->project_name);
+            $this->assertSame('予備部品', QuoteNumber::where('full_no', 'AD146K-1B2')->sole()->project_name);
+        } finally {
+            \Illuminate\Support\Facades\File::deleteDirectory($dir);
+        }
+    }
+
     public function test_the_unit_number_is_padded_for_display_only(): void
     {
         // 過去分は2桁のこともあるが、原文は保持したまま表示だけ3桁に揃える。

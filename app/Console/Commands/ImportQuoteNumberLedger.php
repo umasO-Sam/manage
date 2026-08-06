@@ -62,7 +62,9 @@ class ImportQuoteNumberLedger extends Command
                     continue;
                 }
 
-                $suffix = $this->normalizeCode($cols[3] ?? '') ?: null;
+                // 補足注番は3列目と4列目に分かれて記載されている行がある
+                // (例: 「1B」+「2」で AD146K-1B2)。工事名の1つ前までを注番として繋ぐ。
+                $suffix = ($this->normalizeCode($cols[3] ?? '').$this->normalizeCode($cols[4] ?? '')) ?: null;
                 $parsed = QuoteNumber::parseSuffix($suffix);
 
                 if ($suffix !== null && $parsed === null) {
@@ -165,8 +167,9 @@ class ImportQuoteNumberLedger extends Command
      */
     private function normalizeCode(string $value): string
     {
-        // 'a' = 全角英数字を半角へ、's' = 全角スペースを半角へ
-        return strtoupper(trim(mb_convert_kana($value, 'as', 'UTF-8')));
+        // 'a' = 全角英数字を半角へ、's' = 全角スペースを半角へ。
+        // セル内に改行や空白が入っている行があるため、空白類はすべて取り除く。
+        return strtoupper(preg_replace('/\s+/u', '', mb_convert_kana($value, 'as', 'UTF-8')) ?? '');
     }
 
     private function toUtf8(string $value): string
