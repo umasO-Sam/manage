@@ -1,5 +1,18 @@
 * text=auto eol=lf
 
+# 画像・バイナリは改行変換の対象外にする。
+# `* text=auto eol=lf` のままだと本番の作業ツリーで差分ありと誤検出され、
+# デプロイの git pull が「ローカルの変更を上書きする」と言って止まる。
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.pdf binary
+*.woff binary
+*.woff2 binary
+
 *.blade.php diff=html
 *.css diff=css
 *.html diff=html

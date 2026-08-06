@@ -52,9 +52,11 @@ tar czf build.tar.gz -C public build
 scp -i ~/.ssh/xserver_manage -P 10022 build.tar.gz saitokoken@saitokoken.xsrv.jp:~/manage/
 rm -f build.tar.gz
 
+# 本番の作業ツリーは常に origin/main と同一にする（本番側で編集はしない前提）。
+# git pull は作業ツリーに差分があると止まるため、reset --hard で確実に合わせる。
 ssh -i ~/.ssh/xserver_manage -p 10022 saitokoken@saitokoken.xsrv.jp 'cd ~/manage \
   && /usr/bin/php8.3 artisan down --render="errors::503" \
-  && git checkout -- . && git pull --ff-only \
+  && git fetch origin && git reset --hard origin/main \
   && tar xzf build.tar.gz -C public && rm build.tar.gz \
   && /usr/bin/php8.3 artisan migrate --force \
   && /usr/bin/php8.3 artisan config:cache && /usr/bin/php8.3 artisan route:cache && /usr/bin/php8.3 artisan view:cache \
@@ -69,6 +71,8 @@ ssh -i ~/.ssh/xserver_manage -p 10022 saitokoken@saitokoken.xsrv.jp 'cd ~/manage
   `composer-runtime-api ^2.2` を満たせず落ちる。依存を変更した場合はローカルで
   `vendor/` を作って転送する（今のところ依存の変更は発生していない）
 - キャッシュを消したまま放置しない。`config:cache` 済みの状態が正
+- 静的ファイル（ファビコン等）はサーバー側にもキャッシュが残る。差し替えたら
+  HTMLの `?v=` を上げる。バージョンなしのURLはしばらく古い内容を返すことがある
 - **本番のIDレコードを勝手に変更しない**。権限・氏名などの変更は都度確認を取る
 
 ### 切り戻し
