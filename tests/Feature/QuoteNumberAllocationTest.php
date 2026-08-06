@@ -1,0 +1,157 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\CustomerCode;
+use App\Models\QuoteNumber;
+use App\Models\Staff;
+use App\Services\QuoteNumberAllocator;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
+
+/**
+ * 見積番号の採番。案件の種類ごとに、見積単位・見積通番・補足区分のどこを新しく採るかが変わる。
+ */
+class QuoteNumberAllocationTest extends TestCase
+{
+    use RefreshDatabase;
+
+    private QuoteNumberAllocator $allocator;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->allocator = app(QuoteNumberAllocator::class);
+
+        CustomerCode::create(['code' => 'DH', 'company_name' => 'テスト客先']);
+
+        foreach ([
+            ['DH013-N01', '013', 'N', '01', null],
+            ['DH013-N02', '013', 'N', '02', null],
+            ['DH013-N01K01', '013', 'N', '01', 'K'],
+            ['DH020-N01', '020', 'N', '01', null],
+        ] as [$full, $unit, $type, $seq, $extra]) {
+            QuoteNumber::create([
+                'full_no' => $full, 'customer_code' => 'DH', 'unit_no' => $unit,
+                'suffix' => substr($full, strpos($full, '-') + 1),
+                'quote_type' => $type, 'quote_seq' => $seq, 'extra_code' => $extra, 'source' => 'legacy',
+            ]);
+        }
+    }
+
+    public function test_a_new_project_takes_the_next_unit_number_with_n01(): void
+    {
+        $result = $this->allocator->build('DH', 'new', null, null);
+
+        // 老番は020なので021、通番は新しい単位なので01
+        $this->assertSame('DH021-N01', $result['candidate']);
+        $this->assertFalse($result['duplicate']);
+    }
+
+    public function test_a_fake_quote_uses_the_f_type(): void
+    {
+        $this->assertSame('DH021-F01', $this->allocator->build('DH', 'fake', null, null)['candidate']);
+    }
+
+    public function test_a_scope_change_reuses_the_unit_and_takes_the_next_quote_sequence(): void
+    {
+        // 013はN01・N02が取得済みなのでN03
+        $this->assertSame('DH013-N03', $this->allocator->build('DH', 'scope_change', '013', null)['candidate']);
+    }
+
+    public function test_supplementary_types_hang_off_the_original_quote_number(): void
+    {
+        // 部品はB(修理のSではない)
+        $this->assertSame('DH013-N01B01', $this->allocator->build('DH', 'parts', '013', '01')['candidate']);
+        $this->assertSame('DH013-N01S01', $this->allocator->build('DH', 'repair', '013', '01')['candidate']);
+        $this->assertSame('DH013-N01T01', $this->allocator->build('DH', 'additional', '013', '01')['candidate']);
+        $this->assertSame('DH013-N01H01', $this->allocator->build('DH', 'change', '013', '01')['candidate']);
+
+        // 改造はK01が取得済みなのでK02
+        $this->assertSame('DH013-N01K02', $this->allocator->build('DH', 'remodel', '013', '01')['candidate']);
+    }
+
+    public function test_it_reports_what_is_missing_instead_of_guessing(): void
+    {
+        $result = $this->allocator->build('DH', 'remodel', null, null);
+
+        $this->assertNull($result['candidate']);
+        $this->assertSame(['見積単位', '元の見積通番'], $result['missing']);
+    }
+
+    public function test_the_unit_number_is_zero_padded_and_old_two_digit_units_are_matched(): void
+    {
+        QuoteNumber::create([
+            'full_no' => 'DH15-N01', 'customer_code' => 'DH', 'unit_no' => '15',
+            'suffix' => 'N01', 'quote_type' => 'N', 'quote_seq' => '01', 'source' => 'legacy',
+        ]);
+
+        // 過去分の「15」も見積単位015として同じ単位に数える
+        $this->assertSame('DH015-N02', $this->allocator->build('DH', 'scope_change', '15', null)['candidate']);
+    }
+
+    public function test_taking_a_number_records_it_with_the_selected_staff(): void
+    {
+        $sales = Staff::factory()->create(['role' => Staff::ROLE_SALES]);
+        $manager = Staff::factory()->procurementManager()->create();
+
+        // 経理資材担当が代行する場合は社内担当者を選んで取得する
+        $this->actingAs($manager)->post(route('quote-numbers.store'), [
+            'customer_code' => 'DH',
+            'mode' => 'new',
+            'project_name' => 'テスト装置',
+            'delivery_dest' => '第一工場',
+            'customer_contact' => '客先太郎',
+            'staff_id' => $sales->id,
+        ])->assertRedirect();
+
+        $quote = QuoteNumber::where('full_no', 'DH021-N01')->sole();
+        $this->assertSame($sales->id, $quote->staff_id);
+        $this->assertSame('manage', $quote->source);
+        $this->assertSame('テスト装置', $quote->project_name);
+    }
+
+    public function test_an_already_taken_number_cannot_be_taken_again(): void
+    {
+        $staff = Staff::factory()->create(['role' => Staff::ROLE_SALES]);
+
+        $payload = [
+            'customer_code' => 'DH', 'mode' => 'scope_change', 'unit_no' => '013',
+            'project_name' => 'x', 'delivery_dest' => 'y', 'customer_contact' => 'z', 'staff_id' => $staff->id,
+        ];
+
+        $this->actingAs($staff)->post(route('quote-numbers.store'), $payload)->assertRedirect();
+        // 同じ条件でもう一度採ると次の通番になるため重複しない
+        $this->actingAs($staff)->post(route('quote-numbers.store'), $payload)->assertRedirect();
+
+        $this->assertNotNull(QuoteNumber::where('full_no', 'DH013-N03')->first());
+        $this->assertNotNull(QuoteNumber::where('full_no', 'DH013-N04')->first());
+    }
+
+    public function test_the_lookup_endpoint_returns_the_project_details(): void
+    {
+        $staff = Staff::factory()->create(['role' => Staff::ROLE_SALES]);
+        QuoteNumber::where('full_no', 'DH013-N01')->update([
+            'project_name' => '搬送装置', 'delivery_dest' => '第二工場', 'staff_id' => $staff->id,
+        ]);
+
+        $this->actingAs($staff)->getJson(route('quote-numbers.lookup', ['no' => 'DH013-N01']))
+            ->assertOk()
+            ->assertJson([
+                'found' => true,
+                'project_name' => '搬送装置',
+                'recipient' => 'テスト客先',
+                'delivery_dest' => '第二工場',
+                'staff_id' => $staff->id,
+            ]);
+
+        $this->actingAs($staff)->getJson(route('quote-numbers.lookup', ['no' => 'XX999-N01']))
+            ->assertOk()->assertJson(['found' => false]);
+    }
+
+    public function test_general_staff_cannot_allocate(): void
+    {
+        $this->actingAs(Staff::factory()->create())->get(route('quote-numbers.index'))->assertForbidden();
+    }
+}

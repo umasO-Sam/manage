@@ -20,6 +20,7 @@ use App\Http\Controllers\OrderNumberController;
 use App\Http\Controllers\PersonalCalendarController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProjectBoardController;
+use App\Http\Controllers\QuoteNumberController;
 use App\Http\Controllers\PurchaseDetailController;
 use App\Http\Controllers\PurchaseInputController;
 use App\Http\Controllers\PurchaseInvoiceController;
@@ -94,6 +95,13 @@ Route::middleware('auth')->group(function () {
         Route::get('/dev/role-switch', [DevRoleSwitchController::class, 'edit'])->name('dev.role-switch.edit');
         Route::put('/dev/role-switch', [DevRoleSwitchController::class, 'update'])->name('dev.role-switch.update');
     }
+
+    // 見積番号の採番: 営業担当・上長・役員・経理資材担当・資金管理者。
+    Route::middleware('quote.number')->group(function () {
+        Route::get('/quote-numbers', [QuoteNumberController::class, 'index'])->name('quote-numbers.index');
+        Route::post('/quote-numbers', [QuoteNumberController::class, 'store'])->name('quote-numbers.store');
+        Route::get('/quote-numbers/lookup', [QuoteNumberController::class, 'lookup'])->name('quote-numbers.lookup');
+    });
 
     // 物件管理ボード: 経理資材担当・役員・営業担当・資金管理者。
     Route::middleware('project.board')->group(function () {

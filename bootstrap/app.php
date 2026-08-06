@@ -4,6 +4,7 @@ use App\Http\Middleware\EnsureFundManager;
 use App\Http\Middleware\EnsureProcurementManager;
 use App\Http\Middleware\EnsureProjectBoardUser;
 use App\Http\Middleware\EnsurePurchasingViewer;
+use App\Http\Middleware\EnsureQuoteNumberUser;
 use App\Http\Middleware\EnsureStaffManager;
 use App\Http\Middleware\EnsureSupervisorOrManager;
 use App\Http\Middleware\RequirePasswordChange;
@@ -24,6 +25,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'procurement.manager' => EnsureProcurementManager::class,
             'project.board' => EnsureProjectBoardUser::class,
             'purchasing.viewer' => EnsurePurchasingViewer::class,
+            'quote.number' => EnsureQuoteNumberUser::class,
             'staff.manager' => EnsureStaffManager::class,
             'supervisor.or.manager' => EnsureSupervisorOrManager::class,
         ]);

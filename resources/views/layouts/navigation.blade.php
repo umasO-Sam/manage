@@ -119,6 +119,11 @@
                                 <x-dropdown-link :href="route('projects.history')">
                                     <i data-lucide="history" class="w-3.5 h-3.5 inline-block align-text-bottom mr-1"></i> 物件履歴
                                 </x-dropdown-link>
+                                @if ($viewer->canAllocateQuoteNumber())
+                                    <x-dropdown-link :href="route('quote-numbers.index')">
+                                        <i data-lucide="hash" class="w-3.5 h-3.5 inline-block align-text-bottom mr-1"></i> 見積番号の採番
+                                    </x-dropdown-link>
+                                @endif
                                 @if ($viewer->canManageBusinessPartners())
                                     <x-dropdown-link :href="route('business-partners.index')">
                                         <i data-lucide="handshake" class="w-3.5 h-3.5 inline-block align-text-bottom mr-1"></i> 取引先一覧
@@ -382,6 +387,11 @@
                 <a href="{{ route('projects.history') }}" class="block px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap {{ request()->routeIs('projects.history') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
                     物件履歴
                 </a>
+                @if ($viewer->canAllocateQuoteNumber())
+                    <a href="{{ route('quote-numbers.index') }}" class="block px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap {{ request()->routeIs('quote-numbers.*') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
+                        見積番号の採番
+                    </a>
+                @endif
                 @if ($viewer->canManageBusinessPartners())
                     <a href="{{ route('business-partners.index') }}" class="block px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap {{ request()->routeIs('business-partners.*') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
                         取引先一覧

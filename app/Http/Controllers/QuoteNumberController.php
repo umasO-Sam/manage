@@ -1,0 +1,138 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\BusinessPartner;
+use App\Models\CustomerCode;
+use App\Models\QuoteNumber;
+use App\Models\Staff;
+use App\Services\QuoteNumberAllocator;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\Rule;
+use Illuminate\View\View;
+
+/**
+ * 見積番号(注文番号)の採番。営業担当・上長・役員のほか、経理資材担当・資金管理者も採番できる。
+ * 経理資材担当が代行する場合は自分が担当ではないため、社内担当者をリストから選ぶ。
+ *
+ * 客先番号だけを入れて検索すると、採番せず過去注番リストの参照だけができる。
+ */
+class QuoteNumberController extends Controller
+{
+    public function index(Request $request, QuoteNumberAllocator $allocator): View
+    {
+        $customerCode = strtoupper(trim((string) $request->query('customer_code', '')));
+        $mode = (string) $request->query('mode', '');
+        $mode = array_key_exists($mode, QuoteNumberAllocator::MODES) ? $mode : '';
+
+        $allocation = ($customerCode !== '' && $mode !== '')
+            ? $allocator->build($customerCode, $mode, $request->query('unit_no'), $request->query('base_seq'))
+            : null;
+
+        return view('quote-numbers.index', [
+            'customerCode' => $customerCode,
+            'mode' => $mode,
+            'unitNo' => (string) $request->query('unit_no', ''),
+            'baseSeq' => (string) $request->query('base_seq', ''),
+            'allocation' => $allocation,
+            'history' => $customerCode !== '' ? $allocator->history($customerCode, $mode ?: null) : collect(),
+            'companyName' => $this->resolveCompanyName($customerCode),
+            'staffList' => Staff::orderedForRoster()->get(),
+            'modes' => QuoteNumberAllocator::MODES,
+        ]);
+    }
+
+    public function store(Request $request, QuoteNumberAllocator $allocator): RedirectResponse
+    {
+        $data = $request->validate([
+            'customer_code' => ['required', 'string', 'max:10', 'regex:/^[A-Za-z]{1,5}$/'],
+            'mode' => ['required', Rule::in(array_keys(QuoteNumberAllocator::MODES))],
+            'unit_no' => ['nullable', 'string', 'max:10'],
+            'base_seq' => ['nullable', 'string', 'max:4'],
+            'project_name' => ['required', 'string', 'max:255'],
+            'company_name' => ['nullable', 'string', 'max:255'],
+            'delivery_dest' => ['required', 'string', 'max:255'],
+            'customer_contact' => ['required', 'string', 'max:255'],
+            'staff_id' => ['required', 'integer', 'exists:staff,id'],
+            'remarks' => ['nullable', 'string', 'max:2000'],
+        ], [
+            'customer_code.regex' => '客先番号はアルファベットで入力してください。',
+        ]);
+
+        $allocation = $allocator->build($data['customer_code'], $data['mode'], $data['unit_no'] ?? null, $data['base_seq'] ?? null);
+
+        if ($allocation['candidate'] === null) {
+            return back()->withInput()->withErrors(['candidate' => '採番に必要な項目が足りません：'.implode('、', $allocation['missing'])]);
+        }
+
+        if ($allocation['duplicate']) {
+            return back()->withInput()->withErrors(['candidate' => "「{$allocation['candidate']}」はすでに取得済みです。"]);
+        }
+
+        QuoteNumber::create([
+            'full_no' => $allocation['candidate'],
+            'customer_code' => strtoupper($data['customer_code']),
+            'unit_no' => $allocation['unit_no'],
+            'suffix' => $allocation['quote_type'].$allocation['quote_seq']
+                .($allocation['extra_code'] !== null ? $allocation['extra_code'].$allocation['extra_seq'] : ''),
+            'quote_type' => $allocation['quote_type'],
+            'quote_seq' => $allocation['quote_seq'],
+            'extra_code' => $allocation['extra_code'],
+            'project_name' => $data['project_name'],
+            'delivery_dest' => $data['delivery_dest'],
+            'customer_contact' => $data['customer_contact'],
+            'remarks' => $data['remarks'] ?? null,
+            'staff_id' => $data['staff_id'],
+            'source' => 'manage',
+        ]);
+
+        return redirect()->route('quote-numbers.index', ['customer_code' => strtoupper($data['customer_code'])])
+            ->with('status', 'quote-number-taken')
+            ->with('taken_no', $allocation['candidate']);
+    }
+
+    /**
+     * 注番の完全一致検索。注番管理の新規登録・受注登録の「検索」ボタンから使う。
+     */
+    public function lookup(Request $request): JsonResponse
+    {
+        $no = strtoupper(trim((string) $request->query('no', '')));
+
+        if ($no === '') {
+            return response()->json(['found' => false]);
+        }
+
+        $quote = QuoteNumber::with('staff')->where('full_no', $no)->first();
+
+        if (! $quote) {
+            return response()->json(['found' => false]);
+        }
+
+        return response()->json([
+            'found' => true,
+            'order_no' => $quote->full_no,
+            'project_name' => $quote->project_name,
+            'recipient' => $this->resolveCompanyName($quote->customer_code),
+            'delivery_dest' => $quote->delivery_dest,
+            'staff_id' => $quote->staff_id,
+            'staff_name' => $quote->staff?->name,
+        ]);
+    }
+
+    /**
+     * 客先番号から会社名を引く。取引先一覧に同じ客先番号があればそちらを優先し、
+     * 無ければ過去台帳由来の対応表(customer_codes)を使う。
+     */
+    private function resolveCompanyName(string $customerCode): ?string
+    {
+        if ($customerCode === '') {
+            return null;
+        }
+
+        return BusinessPartner::where('customer_code', $customerCode)->value('name')
+            ?? CustomerCode::where('code', $customerCode)->value('company_name');
+    }
+}

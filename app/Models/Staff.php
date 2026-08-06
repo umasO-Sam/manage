@@ -154,6 +154,18 @@ class Staff extends Authenticatable
     /**
      * 物件管理ボードを使えるかどうか(経理資材担当・役員・営業担当・資金管理者・administrator)。
      */
+    /**
+     * 見積番号を採番できるかどうか(営業担当・上長・役員に加え、代行する経理資材担当・資金管理者)。
+     */
+    public function canAllocateQuoteNumber(): bool
+    {
+        return $this->is_procurement_manager
+            || $this->is_supervisor
+            || (bool) $this->is_executive
+            || (bool) $this->is_fund_manager
+            || $this->role === self::ROLE_SALES;
+    }
+
     public function canUseProjectBoard(): bool
     {
         return $this->is_procurement_manager
