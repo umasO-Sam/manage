@@ -14,6 +14,11 @@
                     <span class="font-mono font-bold">{{ session('taken_no') }}</span> を取得しました。
                 </div>
             @endif
+            @if (session('status') === 'quote-number-deleted')
+                <div class="p-3 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-800 text-sm">
+                    <span class="font-mono font-bold">{{ session('deleted_no') }}</span> を削除しました。取得ログには残っています。
+                </div>
+            @endif
             @if (session('status') === 'quote-number-updated')
                 <div class="p-3 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-800 text-sm">
                     <span class="font-mono font-bold">{{ session('updated_no') }}</span> を修正しました。
@@ -237,6 +242,13 @@
                                             <div class="flex items-center gap-1 justify-center">
                                                 <button type="button" @click="editing = ! editing"
                                                         class="px-2 py-1 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-50 font-bold">修正</button>
+                                                <form method="POST" action="{{ route('quote-numbers.destroy', $quote) }}"
+                                                      onsubmit="return confirm('{{ $quote->canonicalNo() }} を削除します。取得ログには残りますが、この番号は次の採番で再び使われる可能性があります。よろしいですか？');">
+                                                    @csrf
+                                                    @method('DELETE')
+                                                    <button type="submit"
+                                                            class="px-2 py-1 rounded-lg border border-red-300 text-red-600 hover:bg-red-50 font-bold">削除</button>
+                                                </form>
                                                 @if ($mode !== '')
                                                     {{-- 元注番として引用する。構成や工事範囲の変更は通番を+1して採る。 --}}
                                                     <a href="{{ route('quote-numbers.index', [

@@ -180,6 +180,23 @@ class QuoteNumberController extends Controller
     }
 
     /**
+     * 過去注番リストの1件を削除する。誤って取得した注番を取り消すための操作。
+     *
+     * 削除しても取得ログは残る(ログ側が注番を保持しており、quote_number_idはnullになる)。
+     * 採番の老番計算からは外れるため、削除した番号は次の採番で再利用されうる。
+     */
+    public function destroy(QuoteNumber $quoteNumber): RedirectResponse
+    {
+        $fullNo = $quoteNumber->canonicalNo();
+
+        QuoteNumberLog::record($quoteNumber, QuoteNumberLog::ACTION_DELETED, $quoteNumber->project_name);
+
+        $quoteNumber->delete();
+
+        return back()->with('status', 'quote-number-deleted')->with('deleted_no', $fullNo);
+    }
+
+    /**
      * 注番の完全一致検索。注番管理の新規登録・受注登録の「検索」ボタンから使う。
      */
     public function lookup(Request $request, QuoteNumberAllocator $allocator): JsonResponse

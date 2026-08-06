@@ -17,10 +17,13 @@ class QuoteNumberLog extends Model
 
     public const ACTION_UPDATED = 'updated';
 
+    public const ACTION_DELETED = 'deleted';
+
     /** @var array<string, string> */
     public const ACTIONS = [
         self::ACTION_TAKEN => '取得',
         self::ACTION_UPDATED => '修正',
+        self::ACTION_DELETED => '削除',
     ];
 
     public function quoteNumber(): BelongsTo

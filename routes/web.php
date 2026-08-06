@@ -104,6 +104,7 @@ Route::middleware('auth')->group(function () {
         // 取得ログはadministrator専用(コントローラ側で判定)。
         Route::get('/quote-numbers/logs', [QuoteNumberController::class, 'logs'])->name('quote-numbers.logs');
         Route::put('/quote-numbers/{quoteNumber}', [QuoteNumberController::class, 'update'])->name('quote-numbers.update');
+        Route::delete('/quote-numbers/{quoteNumber}', [QuoteNumberController::class, 'destroy'])->name('quote-numbers.destroy');
     });
 
     // 物件管理ボード: 経理資材担当・役員・営業担当・資金管理者。

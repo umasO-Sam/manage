@@ -410,6 +410,39 @@ class QuoteNumberAllocationTest extends TestCase
         $this->assertSame('直した件名', $log->description);
     }
 
+    /**
+     * 誤って取得した注番を削除できる。削除しても取得ログは残る。
+     */
+    public function test_a_number_can_be_deleted_and_the_log_survives(): void
+    {
+        $staff = Staff::factory()->create(['role' => Staff::ROLE_SALES]);
+        $quote = QuoteNumber::where('full_no', 'DH013-N02')->sole();
+
+        $this->actingAs($staff)->delete(route('quote-numbers.destroy', $quote))->assertRedirect();
+
+        $this->assertNull(QuoteNumber::find($quote->id));
+
+        $log = \App\Models\QuoteNumberLog::sole();
+        $this->assertSame('deleted', $log->action);
+        $this->assertSame('DH013-N02', $log->full_no);
+        // 台帳の行が消えてもログは残る(参照はnullになる)
+        $this->assertNull($log->fresh()->quote_number_id);
+    }
+
+    /**
+     * 削除した番号は老番から外れるため、次の採番で再び使われる。
+     */
+    public function test_a_deleted_number_becomes_available_again(): void
+    {
+        $staff = Staff::factory()->create(['role' => Staff::ROLE_SALES]);
+
+        $this->assertSame('DH013-N03', $this->allocator->build('DH', 'scope_change', '013', null)['candidate']);
+
+        $this->actingAs($staff)->delete(route('quote-numbers.destroy', QuoteNumber::where('full_no', 'DH013-N02')->sole()));
+
+        $this->assertSame('DH013-N02', $this->allocator->build('DH', 'scope_change', '013', null)['candidate']);
+    }
+
     public function test_only_administrators_can_open_the_log(): void
     {
         $this->actingAs(Staff::factory()->procurementManager()->create())
