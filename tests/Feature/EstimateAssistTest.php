@@ -178,9 +178,10 @@ class EstimateAssistTest extends TestCase
             'ref_sort' => 'relevance',
         ]));
 
-        // 一致度2件のB1(品名+メーカー一致)が、一致度1件のB2(品名のみ一致)より先に表示される
-        $content = $response->getContent();
-        $this->assertLessThan(strpos($content, 'B2'), strpos($content, 'B1'));
+        // 一致度2件のB1(品名+メーカー一致)が、一致度1件のB2(品名のみ一致)より先に表示される。
+        // 'B1'/'B2'のような短い文字列でページ全体を検索すると、CSRFトナークンやビルドハッシュに
+        // たまたま含まれて誤検出するため、その行にしか出ない値(メーカー名)で比較する。
+        $response->assertSeeInOrder(['オムロン', '別メーカー']);
     }
 
     public function test_reference_price_search_matches_across_katakana_width(): void

@@ -122,7 +122,11 @@ class ImportQuoteNumberLedger extends Command
     }
 
     /**
-     * 台帳CSVはShift_JISで、行によって列数が異なる。UTF-8へ変換しながら1行ずつ返す。
+     * 台帳CSVを1行ずつ返す。行によって列数が異なる。
+     *
+     * 文字コードはファイルによって異なりうるため決め打ちしない。すでにUTF-8として
+     * 妥当ならそのまま使い、そうでなければShift_JIS(CP932)から変換する
+     * (UTF-8のファイルをSJIS前提で変換すると全て文字化けするため)。
      *
      * @return \Generator<int, array<int, string>>
      */
@@ -134,15 +138,31 @@ class ImportQuoteNumberLedger extends Command
             return;
         }
 
+        $first = true;
+
         try {
             while (($cols = fgetcsv($handle, 0, ',', '"', '')) !== false) {
-                yield array_map(
-                    fn ($v) => $v === null ? '' : mb_convert_encoding($v, 'UTF-8', 'SJIS-win'),
-                    $cols
-                );
+                $cols = array_map(fn ($v) => $this->toUtf8((string) ($v ?? '')), $cols);
+
+                if ($first) {
+                    // 先頭セルのBOMを取り除く。
+                    $cols[0] = preg_replace('/^\xEF\xBB\xBF/', '', $cols[0] ?? '');
+                    $first = false;
+                }
+
+                yield $cols;
             }
         } finally {
             fclose($handle);
         }
+    }
+
+    private function toUtf8(string $value): string
+    {
+        if ($value === '' || mb_check_encoding($value, 'UTF-8')) {
+            return $value;
+        }
+
+        return mb_convert_encoding($value, 'UTF-8', 'SJIS-win');
     }
 }

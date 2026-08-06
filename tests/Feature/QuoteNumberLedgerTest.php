@@ -47,6 +47,33 @@ class QuoteNumberLedgerTest extends TestCase
         $this->assertNull(QuoteNumber::parseSuffix(null));
     }
 
+    /**
+     * 台帳CSVはUTF-8。Shift_JISと決め打ちして変換すると件名・納入先が全て文字化けするため、
+     * すでにUTF-8として妥当ならそのまま使うこと。
+     */
+    public function test_it_imports_utf8_csv_without_mangling_japanese(): void
+    {
+        $dir = storage_path('framework/testing/quote-ledger');
+        \Illuminate\Support\Facades\File::ensureDirectoryExists($dir);
+        \Illuminate\Support\Facades\File::put("{$dir}/台帳(D).csv", implode("\n", [
+            ',,,,,,,,,,',
+            'D,,大幸,,,,,,,,',
+            ',,,,,,,,,,',
+            ',D,013,N01,,保温筒ストッカー,パラマウント硝子,,7,S59.5,',
+        ]));
+
+        try {
+            $this->artisan('app:import-quote-number-ledger', ['--dir' => $dir])->assertSuccessful();
+
+            $quote = QuoteNumber::where('full_no', 'D013-N01')->sole();
+            $this->assertSame('保温筒ストッカー', $quote->project_name);
+            $this->assertSame('パラマウント硝子', $quote->delivery_dest);
+            $this->assertSame('大幸', \App\Models\CustomerCode::where('code', 'D')->sole()->company_name);
+        } finally {
+            \Illuminate\Support\Facades\File::deleteDirectory($dir);
+        }
+    }
+
     public function test_the_unit_number_is_padded_for_display_only(): void
     {
         // 過去分は2桁のこともあるが、原文は保持したまま表示だけ3桁に揃える。
