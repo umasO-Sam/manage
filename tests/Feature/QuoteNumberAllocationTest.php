@@ -91,6 +91,32 @@ class QuoteNumberAllocationTest extends TestCase
     /**
      * 数字だけを入れた場合は通常番号の通番とみなしてNを補う。
      */
+    /**
+     * 表示・保存で quote_type + quote_seq から組み立て直すと、多段の途中(K10)が落ちて
+     * TL061-N01K10H01 が TL061-N01H01 になっていた。ハイフン以降は必ず suffix を使う。
+     */
+    public function test_the_suffix_keeps_every_group_of_a_multi_level_base(): void
+    {
+        $result = $this->allocator->build('DH', 'change', '013', 'N01K10');
+
+        $this->assertSame('DH013-N01K10H01', $result['candidate']);
+        $this->assertSame('N01K10', $result['base_suffix']);
+        $this->assertSame('N01K10H01', $result['suffix']);
+    }
+
+    public function test_a_taken_multi_level_number_is_stored_with_the_full_suffix(): void
+    {
+        $staff = Staff::factory()->create(['role' => Staff::ROLE_SALES]);
+
+        $this->actingAs($staff)->post(route('quote-numbers.store'), [
+            'customer_code' => 'DH', 'mode' => 'change', 'unit_no' => '013', 'base_no' => 'N01K10',
+            'project_name' => 'x', 'delivery_dest' => 'y', 'customer_contact' => 'z', 'staff_id' => $staff->id,
+        ])->assertRedirect();
+
+        $quote = QuoteNumber::where('full_no', 'DH013-N01K10H01')->sole();
+        $this->assertSame('N01K10H01', $quote->suffix);
+    }
+
     public function test_a_bare_sequence_is_treated_as_the_normal_quote_number(): void
     {
         $this->assertSame('DH013-N01H01', $this->allocator->build('DH', 'change', '013', '1')['candidate']);

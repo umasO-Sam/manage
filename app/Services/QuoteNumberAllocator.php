@@ -109,14 +109,19 @@ class QuoteNumberAllocator
             $quoteSeq = $this->nextQuoteSeq($customerCode, $unitNo, $quoteType);
         }
 
-        $candidate = $extra !== null
-            ? $customerCode.$unitNo.'-'.$baseSuffix.$extra.$extraSeq
-            : $customerCode.$unitNo.'-'.$quoteType.$quoteSeq;
+        // 元番号(base_suffix)は N01K10 のように多段になりうる。表示や保存で
+        // quote_type + quote_seq から組み立て直すと途中の区分が落ちるため、
+        // ハイフン以降は必ずこの値を使うこと。
+        $baseSuffix ??= $quoteType.$quoteSeq;
+        $suffix = $baseSuffix.($extra !== null ? $extra.$extraSeq : '');
+        $candidate = $customerCode.$unitNo.'-'.$suffix;
 
         return [
             'candidate' => $candidate,
             'fell_back_to_new' => $fellBackToNew,
             'unit_no' => $unitNo,
+            'base_suffix' => $baseSuffix,
+            'suffix' => $suffix,
             'quote_type' => $quoteType,
             'quote_seq' => $quoteSeq,
             'extra_code' => $extra,
@@ -235,6 +240,8 @@ class QuoteNumberAllocator
             'candidate' => $candidate,
             'fell_back_to_new' => false,
             'unit_no' => $unitNo,
+            'base_suffix' => null,
+            'suffix' => null,
             'quote_type' => $quoteType,
             'quote_seq' => $quoteSeq,
             'extra_code' => $extra,

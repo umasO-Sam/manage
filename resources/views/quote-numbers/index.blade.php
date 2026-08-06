@@ -106,9 +106,11 @@
                     <div>
                         <span class="block text-[11px] font-bold text-slate-600 mb-1">注番候補</span>
                         <div class="flex items-center gap-2 text-2xl font-mono font-bold text-slate-900">
+                            {{-- 元番号は N01K10 のように多段になりうるので、組み立て直さず
+                                 base_suffix をそのまま出す。 --}}
                             <span>{{ $customerCode }}{{ $allocation['unit_no'] }}</span>
                             <span class="text-slate-400">－</span>
-                            <span>{{ $allocation['quote_type'] }}{{ $allocation['quote_seq'] }}</span>
+                            <span>{{ $allocation['base_suffix'] }}</span>
                             @if ($allocation['extra_code'])
                                 <span class="text-blue-700">{{ $allocation['extra_code'] }}{{ $allocation['extra_seq'] }}</span>
                             @endif

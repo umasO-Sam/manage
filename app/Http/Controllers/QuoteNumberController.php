@@ -77,8 +77,7 @@ class QuoteNumberController extends Controller
             'full_no' => $allocation['candidate'],
             'customer_code' => strtoupper($data['customer_code']),
             'unit_no' => $allocation['unit_no'],
-            'suffix' => $allocation['quote_type'].$allocation['quote_seq']
-                .($allocation['extra_code'] !== null ? $allocation['extra_code'].$allocation['extra_seq'] : ''),
+            'suffix' => $allocation['suffix'],
             'quote_type' => $allocation['quote_type'],
             'quote_seq' => $allocation['quote_seq'],
             'extra_code' => $allocation['extra_code'],
