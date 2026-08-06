@@ -212,6 +212,11 @@
                                             </td>
                                             <td class="p-2.5 text-center">
                                                 <span x-show="!editMode">{{ $staff->is_supervisor ? '○' : '' }}</span>
+                                                {{-- 未チェックでもキーが届くようhiddenを添える。これが無いと
+                                                     「画面に無い項目」と区別できず、他のフラグが剥がれる。 --}}
+                                                @if ($canEditRow)
+                                                    <input type="hidden" name="updates[{{ $staff->id }}][is_supervisor]" value="0">
+                                                @endif
                                                 <input x-show="editMode" x-cloak @disabled(! $canEditRow) type="checkbox" name="updates[{{ $staff->id }}][is_supervisor]" value="1"
                                                        @checked($staff->is_supervisor) class="rounded border-slate-300">
                                             </td>

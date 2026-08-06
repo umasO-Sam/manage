@@ -179,6 +179,58 @@ class PermissionLadderTest extends TestCase
         $this->assertSame(12.0, (float) $executive->paid_leave_granted_current_year);
     }
 
+    /**
+     * 直接編集の表には上長のチェックボックスしか無い。チェックボックスは未チェックだと
+     * キーごと送信されないため、これを「オフにする指示」と解釈すると、
+     * 役員・資金管理者・administratorが剥がれる(最後の1人ガードに当たって保存自体も失敗する)。
+     * 画面に無い項目は現在値を据え置くこと。
+     */
+    public function test_the_bulk_edit_table_does_not_strip_flags_it_does_not_show(): void
+    {
+        $admin = $this->administrator();
+        $fund = $this->fundManager();
+        $executive = $this->executive();
+        // 経理資材担当が0人になる保存は別のガードで弾かれるため、1人残しておく
+        $this->manager();
+
+        $updates = [];
+        foreach ([$admin, $fund, $executive] as $target) {
+            $updates[$target->id] = [
+                'name' => $target->name, 'department' => $target->department, 'login_id' => $target->login_id,
+                'email' => $target->email, 'role' => $target->role,
+                // 表に出ている上長だけが送られてくる
+                'is_supervisor' => '0',
+            ];
+        }
+
+        $this->actingAs($admin)->post(route('staff.bulk-update'), ['updates' => $updates])
+            ->assertSessionHasNoErrors()
+            ->assertRedirect(route('staff.index'));
+
+        $this->assertTrue($admin->fresh()->is_administrator);
+        $this->assertTrue($fund->fresh()->is_fund_manager);
+        $this->assertTrue($executive->fresh()->is_executive);
+    }
+
+    /**
+     * 画面に出ているチェックボックスは、外したらきちんと外れること
+     * (hiddenの0を添えているので「変更の指示なし」とは区別される)。
+     */
+    public function test_a_checkbox_on_the_form_can_still_be_turned_off(): void
+    {
+        $admin = $this->administrator();
+        $target = Staff::factory()->create(['is_supervisor' => true, 'is_executive' => true]);
+
+        $this->actingAs($admin)->put(route('staff.update', $target), $this->payload($target, [
+            'is_supervisor' => '0',
+            'is_executive' => '0',
+        ]))->assertRedirect();
+
+        $target->refresh();
+        $this->assertFalse($target->is_supervisor);
+        $this->assertFalse($target->is_executive);
+    }
+
     public function test_administrator_accounts_cannot_be_edited_by_others(): void
     {
         $admin = $this->administrator();

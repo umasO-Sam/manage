@@ -38,22 +38,30 @@ class StaffController extends Controller
      * 実行者が付与を許されているフラグだけを反映する。許されていないフラグは
      * 対象の現在値（新規作成時はfalse）のまま据え置く。
      *
-     * @param  array<string, mixed>  $input  チェックボックスは未チェック時にキー自体が
-     *                                       送信されないため、存在しない＝falseとして扱う。
+     * 画面に無いフラグは「変更の指示がない」ものとして現在値を据え置く。
+     * チェックボックスは未チェックだとキーごと送信されないため、画面に置いた項目には
+     * hidden の 0 を添えてキーが必ず届くようにしている。これを区別しないと、
+     * 上長しか列に無い一覧の直接編集で、役員・資金管理者・administratorが
+     * 「オフにする指示」と誤解されて剥がれてしまう。
+     *
+     * @param  array<string, mixed>  $input
      * @return array<string, bool>
      */
     private function permittedFlags(array $input, Staff $actor, ?Staff $target = null): array
     {
-        $submitted = fn (string $key) => filter_var($input[$key] ?? false, FILTER_VALIDATE_BOOLEAN);
+        $resolve = function (string $key, bool $allowed) use ($input, $target) {
+            if (! $allowed || ! array_key_exists($key, $input)) {
+                return (bool) $target?->$key;
+            }
+
+            return filter_var($input[$key], FILTER_VALIDATE_BOOLEAN);
+        };
 
         return [
-            'is_supervisor' => $submitted('is_supervisor'),
-            'is_executive' => $actor->canGrantExecutive()
-                ? $submitted('is_executive') : (bool) $target?->is_executive,
-            'is_fund_manager' => $actor->canGrantFundManager()
-                ? $submitted('is_fund_manager') : (bool) $target?->is_fund_manager,
-            'is_administrator' => $actor->canGrantAdministrator()
-                ? $submitted('is_administrator') : (bool) $target?->is_administrator,
+            'is_supervisor' => $resolve('is_supervisor', true),
+            'is_executive' => $resolve('is_executive', $actor->canGrantExecutive()),
+            'is_fund_manager' => $resolve('is_fund_manager', $actor->canGrantFundManager()),
+            'is_administrator' => $resolve('is_administrator', $actor->canGrantAdministrator()),
         ];
     }
 

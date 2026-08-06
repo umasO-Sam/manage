@@ -167,12 +167,15 @@ class StaffManagementTest extends TestCase
 
         $this->assertTrue((bool) $target->fresh()->is_supervisor);
 
+        // フォームはチェックボックスにhiddenの0を添えており、未チェックでも0が届く。
+        // キー自体が来ない場合は「変更の指示なし」として現在値を据え置く。
         $this->actingAs($manager)->put(route('staff.update', $target), [
             'name' => $target->name,
             'department' => $target->department,
             'login_id' => $target->login_id,
             'email' => $target->email,
             'role' => $target->role,
+            'is_supervisor' => '0',
         ]);
 
         $this->assertFalse((bool) $target->fresh()->is_supervisor);
