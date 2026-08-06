@@ -63,7 +63,7 @@
         <label class="flex items-start gap-2 p-3 border rounded-lg cursor-pointer {{ $currentRole === \App\Models\Staff::ROLE_PROCUREMENT_MANAGER ? 'border-blue-400 bg-blue-50' : 'border-slate-200' }}">
             <input type="radio" name="role" value="{{ \App\Models\Staff::ROLE_PROCUREMENT_MANAGER }}" class="mt-0.5 text-blue-600 focus:ring-blue-500" @checked($currentRole === \App\Models\Staff::ROLE_PROCUREMENT_MANAGER)>
             <span>
-                <span class="block text-sm font-semibold text-slate-800">資材管理担当者</span>
+                <span class="block text-sm font-semibold text-slate-800">経理資材担当</span>
                 <span class="block text-xs text-slate-500">カードの移動、仕入管理への全アクセス、仕入管理でのレコード編集、担当者管理を行える</span>
             </span>
         </label>

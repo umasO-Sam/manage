@@ -27,7 +27,7 @@
 
             @if (session('status') === 'card-created')
                 <div class="mb-4 p-3 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-800 text-sm flex items-center gap-2">
-                    <i data-lucide="check-circle-2" class="w-4 h-4"></i>依頼を登録しました。資材管理担当者に通知しました。
+                    <i data-lucide="check-circle-2" class="w-4 h-4"></i>依頼を登録しました。経理資材担当に通知しました。
                 </div>
             @endif
             @if (session('status') === 'card-moved')
@@ -295,7 +295,7 @@
             </div>
 
             @if (! Auth::user()->is_procurement_manager)
-                <p class="mt-4 text-xs text-slate-400">カードの移動は資材管理担当者のみ行えます。</p>
+                <p class="mt-4 text-xs text-slate-400">カードの移動は経理資材担当のみ行えます。</p>
             @endif
         </div>
     </div>

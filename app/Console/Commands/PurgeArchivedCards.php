@@ -17,7 +17,12 @@ class PurgeArchivedCards extends Command
         $retentionYears = 5;
         $cutoff = now()->subYears($retentionYears);
 
-        $cards = Card::onlyTrashed()->where('deleted_at', '<=', $cutoff)->with('attachments')->get();
+        // retention_days が null のボード(物件管理)は「非表示後も削除しない」方針のため対象外。
+        $cards = Card::onlyTrashed()
+            ->where('deleted_at', '<=', $cutoff)
+            ->whereHas('workflowType', fn ($q) => $q->whereNotNull('retention_days'))
+            ->with('attachments')
+            ->get();
 
         foreach ($cards as $card) {
             foreach ($card->attachments as $attachment) {

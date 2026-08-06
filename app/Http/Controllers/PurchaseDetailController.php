@@ -158,7 +158,7 @@ class PurchaseDetailController extends Controller
     }
 
     /**
-     * 仕入管理データの編集(資材管理担当者のみ、procurement.managerミドルウェアで制御)。
+     * 仕入管理データの編集(経理資材担当のみ、procurement.managerミドルウェアで制御)。
      * 検索画面の絞り込み条件付きURLから遷移してきた場合、更新後にその条件へ戻れるよう
      * クエリ文字列をそのままフォームに持ち回す。
      */

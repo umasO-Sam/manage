@@ -7,7 +7,7 @@ use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * 資材管理担当者または上長のみが利用できる画面を保護する。
+ * 経理資材担当または上長のみが利用できる画面を保護する。
  * 作業日報確認・作業日報一覧・操作ログ・原価一覧・申請承認一覧など、
  * 他の社員の勤怠・原価情報をまとめて閲覧する画面が対象。
  */
@@ -23,7 +23,7 @@ class EnsureSupervisorOrManager
         abort_unless(
             $request->user()?->isSupervisorOrManager(),
             403,
-            'この画面は資材管理担当者・上長のみ利用できます。'
+            'この画面は経理資材担当・上長のみ利用できます。'
         );
 
         return $next($request);

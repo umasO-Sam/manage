@@ -168,7 +168,7 @@ class DailyReportController extends Controller
     /**
      * 休憩・休暇以外のエントリを(注番, 分類, その他フラグ, 自由記入)でグルーピングし、
      * 区間の合計分数を人工(時間+分)へ換算してLaborCostを再生成する。
-     * 資材管理担当者の確認・確定待ちとして常にis_provisional=trueで作成する。
+     * 経理資材担当の確認・確定待ちとして常にis_provisional=trueで作成する。
      * 休暇は有給休暇取得の記録であり人工・原価集計の対象ではないため除外する。
      */
     private function syncLaborCosts(DailyReport $report): void

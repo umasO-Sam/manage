@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-#[Fillable(['workflow_type_id', 'order_number_id', 'machine_number', 'item_name', 'model_number', 'manufacturer', 'quantity', 'unit', 'due_date', 'due_date_type', 'created_by', 'current_stage'])]
+#[Fillable(['workflow_type_id', 'order_number_id', 'business_order_id', 'machine_number', 'item_name', 'model_number', 'manufacturer', 'quantity', 'unit', 'due_date', 'due_date_type', 'created_by', 'current_stage'])]
 class Card extends Model
 {
     use SoftDeletes;
@@ -29,6 +29,17 @@ class Card extends Model
     public function orderNumber(): BelongsTo
     {
         return $this->belongsTo(OrderNumber::class);
+    }
+
+    /** 物件管理ボードのカードに対応する受注ヘッダ(1対1)。他のボードではnull。 */
+    public function businessOrder(): BelongsTo
+    {
+        return $this->belongsTo(BusinessOrder::class);
+    }
+
+    public function isProjectCard(): bool
+    {
+        return $this->business_order_id !== null;
     }
 
     public function creator(): BelongsTo

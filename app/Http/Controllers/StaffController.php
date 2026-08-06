@@ -180,7 +180,7 @@ class StaffController extends Controller
 
             if (! $otherManagers) {
                 return back()->withErrors([
-                    'role' => '資材管理担当者が0人になるため、この担当者の資材管理担当を外すことはできません。先に他の担当者を資材管理担当にしてください。',
+                    'role' => '経理資材担当が0人になるため、この担当者の資材管理担当を外すことはできません。先に他の担当者を資材管理担当にしてください。',
                 ]);
             }
         }
@@ -201,7 +201,7 @@ class StaffController extends Controller
 
         if (! empty($data['password'])) {
             $staff->password = Hash::make($data['password']);
-            // 資材管理担当者が代わりにパスワードを設定した場合、本人に次回ログイン時の変更を求める。
+            // 経理資材担当が代わりにパスワードを設定した場合、本人に次回ログイン時の変更を求める。
             $staff->must_change_password = true;
         }
 
@@ -216,7 +216,7 @@ class StaffController extends Controller
 
     /**
      * 表形式一覧の「直接編集」用。パスワードを除く項目を複数件まとめて更新する。
-     * 1件でも検証エラーがあれば全体を保存しない(all-or-nothing)。資材管理担当者が
+     * 1件でも検証エラーがあれば全体を保存しない(all-or-nothing)。経理資材担当が
      * 0人になる保存は、バッチ適用後の全担当者の最終ロールで判定して拒否する
      * (updateと違い複数人のロールが同時に変わり得るため、行ごとの判定では
      * 「Aを降格しBを昇格」のような入れ替えを誤って弾いてしまう)。
@@ -296,7 +296,7 @@ class StaffController extends Controller
         );
 
         if (! $wouldHaveManager) {
-            return back()->withErrors(['bulk_update' => ['資材管理担当者が0人になるため保存できません。']]);
+            return back()->withErrors(['bulk_update' => ['経理資材担当が0人になるため保存できません。']]);
         }
 
         DB::transaction(function () use ($validatedById, $staffMembers) {
@@ -322,7 +322,7 @@ class StaffController extends Controller
             return back()->withErrors(['delete' => 'このアカウントは自分より上の権限のため削除できません。']);
         }
 
-        // 資材管理担当者は自分自身の削除禁止だけで0人化を防げる(削除できるのが資材管理担当者以上のため)が、
+        // 経理資材担当は自分自身の削除禁止だけで0人化を防げる(削除できるのが経理資材担当以上のため)が、
         // 資金管理者・administratorは削除実行者と別人でも0人になりうるため個別に守る。
         if ($error = $this->protectedFlagError($staff, ['is_fund_manager' => false, 'is_administrator' => false])) {
             return back()->withErrors(['delete' => $error]);

@@ -36,7 +36,7 @@
                             @endforeach
                         </select>
                         <p class="mt-1 text-[11px] text-slate-400">
-                            注番が一覧にない場合は資材管理担当者に登録を依頼してください（未取得の場合は「未定」、社内利用の場合は「社内」を選択）。
+                            注番が一覧にない場合は経理資材担当に登録を依頼してください（未取得の場合は「未定」、社内利用の場合は「社内」を選択）。
                         </p>
                         <x-input-error class="mt-2" :messages="$errors->get('order_number_id')" />
                     </div>

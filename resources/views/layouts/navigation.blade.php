@@ -18,7 +18,7 @@
                     @php
                         $viewer = Auth::user();
                         // 権限区分。上長(is_supervisor)はロールとは独立したフラグで、
-                        // 資材管理担当者と同じく他社員の勤怠・原価をまとめて閲覧できる。
+                        // 経理資材担当と同じく他社員の勤怠・原価をまとめて閲覧できる。
                         $isManager = $viewer->is_procurement_manager;
                         // ＩＤ管理は権限付与のために役員・資金管理者も使う。
                         $canManageStaff = $viewer->canManageStaff();
@@ -101,6 +101,15 @@
                         </x-dropdown>
                     @endif
 
+                    {{-- 物件管理: 経理資材担当・役員・営業担当・資金管理者 --}}
+                    @if ($viewer->canUseProjectBoard())
+                        <a href="{{ route('projects.index') }}"
+                           class="px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 shrink-0 whitespace-nowrap transition-colors {{ request()->routeIs('projects.*') ? 'bg-slate-200 text-slate-800' : 'text-slate-600 hover:bg-slate-50' }}">
+                            <i data-lucide="building-2" class="w-4 h-4"></i>
+                            <span>物件管理</span>
+                        </a>
+                    @endif
+
                     {{-- 勤怠管理: 全員が利用でき、項目ごとに権限で出し分ける --}}
                     <x-dropdown align="left" width="56">
                         <x-slot name="trigger">
@@ -122,7 +131,7 @@
                             <x-dropdown-link :href="route('daily-reports.show')">
                                 <i data-lucide="clipboard-list" class="w-3.5 h-3.5 inline-block align-text-bottom mr-1"></i> 作業日報
                             </x-dropdown-link>
-                            {{-- 作業日報確認は人工データの確定操作を伴うため資材管理担当者のみ --}}
+                            {{-- 作業日報確認は人工データの確定操作を伴うため経理資材担当のみ --}}
                             @if ($isManager)
                                 <x-dropdown-link :href="route('daily-reports.review.index')">
                                     <i data-lucide="clipboard-check" class="w-3.5 h-3.5 inline-block align-text-bottom mr-1"></i> 作業日報確認
@@ -172,7 +181,7 @@
                         </x-slot>
                     </x-dropdown>
 
-                    {{-- 仕入管理: 資材管理担当者・上長・営業担当 --}}
+                    {{-- 仕入管理: 経理資材担当・上長・営業担当 --}}
                     @if ($viewer->canAccessPurchasing())
                         <x-dropdown align="left" width="56">
                             <x-slot name="trigger">
@@ -211,6 +220,11 @@
                                 @if ($isSupervisorOrManager)
                                     <x-dropdown-link :href="route('purchasing.cost-report.index')">
                                         <i data-lucide="table" class="w-3.5 h-3.5 inline-block align-text-bottom mr-1"></i> 原価一覧
+                                    </x-dropdown-link>
+                                @endif
+                                @if ($viewer->canManageBusinessPartners())
+                                    <x-dropdown-link :href="route('business-partners.index')">
+                                        <i data-lucide="handshake" class="w-3.5 h-3.5 inline-block align-text-bottom mr-1"></i> 取引先一覧
                                     </x-dropdown-link>
                                 @endif
                             </x-slot>
@@ -339,6 +353,12 @@
                 </a>
             @endif
 
+            @if ($viewer->canUseProjectBoard())
+                <a href="{{ route('projects.index') }}" class="block px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap {{ request()->routeIs('projects.*') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
+                    物件管理
+                </a>
+            @endif
+
             {{-- 勤怠管理: 全員 --}}
             <div class="px-3 py-2 text-xs font-bold text-slate-400 uppercase tracking-wider">勤怠管理</div>
             <a href="{{ route('my-calendar.show') }}" class="block px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap {{ request()->routeIs('my-calendar.*') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
@@ -394,7 +414,7 @@
                 </a>
             @endif
 
-            {{-- 仕入管理: 資材管理担当者・上長・営業担当 --}}
+            {{-- 仕入管理: 経理資材担当・上長・営業担当 --}}
             @if ($viewer->canAccessPurchasing())
                 <div class="px-3 py-2 text-xs font-bold text-slate-400 uppercase tracking-wider">仕入管理</div>
                 @if ($isManager)
@@ -425,6 +445,11 @@
                 @if ($isSupervisorOrManager)
                     <a href="{{ route('purchasing.cost-report.index') }}" class="block px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap {{ request()->routeIs('purchasing.cost-report.*') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
                         原価一覧
+                    </a>
+                @endif
+                @if ($viewer->canManageBusinessPartners())
+                    <a href="{{ route('business-partners.index') }}" class="block px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap {{ request()->routeIs('business-partners.*') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
+                        取引先一覧
                     </a>
                 @endif
             @endif

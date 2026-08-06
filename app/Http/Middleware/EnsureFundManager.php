@@ -6,7 +6,10 @@ use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
-class EnsureProcurementManager
+/**
+ * 取引先一覧など、銀行・支払条件を扱う画面を資金管理者(とadministrator)に限定する。
+ */
+class EnsureFundManager
 {
     /**
      * Handle an incoming request.
@@ -16,9 +19,9 @@ class EnsureProcurementManager
     public function handle(Request $request, Closure $next): Response
     {
         abort_unless(
-            $request->user()?->is_procurement_manager,
+            $request->user()?->canManageBusinessPartners(),
             403,
-            '担当者管理は経理資材担当のみ利用できます。'
+            'この画面は資金管理者のみ利用できます。'
         );
 
         return $next($request);

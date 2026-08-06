@@ -21,7 +21,7 @@ class LaborCostController extends Controller
         $orderNoMatch = $request->query('order_no_match') === 'perfect' ? 'perfect' : 'partial';
         $excludedOrderNos = array_values(array_filter((array) $request->query('excluded_order_nos', [])));
         // 既定では従来通りis_provisional=falseのみを対象とする。作業日報から生成された
-        // 仮登録データを資材管理担当者が確認する時だけ、このチェックで含める。
+        // 仮登録データを経理資材担当が確認する時だけ、このチェックで含める。
         $includeProvisional = $request->boolean('include_provisional');
 
         $laborStaff = Staff::whereNotNull('sid')->orderBy('sid')->get();
@@ -115,7 +115,7 @@ class LaborCostController extends Controller
     }
 
     /**
-     * 作業日報から生成された仮登録(is_provisional=true)のLaborCostを、資材管理担当者が
+     * 作業日報から生成された仮登録(is_provisional=true)のLaborCostを、経理資材担当が
      * 内容確認のうえ確定する。フィールドの編集は行わず確定のみ(内容を直したい場合は
      * 本人に作業日報を再提出してもらう運用)。
      */

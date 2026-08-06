@@ -8,7 +8,7 @@ use Illuminate\View\View;
 
 /**
  * 操作ログ一覧。ルート側のsupervisor.or.managerミドルウェアにより
- * 資材管理担当者・上長のみがアクセスでき、常に全員分のログを表示する。
+ * 経理資材担当・上長のみがアクセスでき、常に全員分のログを表示する。
  */
 class OperationLogController extends Controller
 {

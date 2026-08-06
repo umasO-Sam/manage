@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['card_id', 'file_name', 'path', 'size_bytes', 'uploaded_by'])]
+#[Fillable(['card_id', 'kind', 'file_name', 'path', 'size_bytes', 'uploaded_by'])]
 class Attachment extends Model
 {
     /**

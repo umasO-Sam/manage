@@ -30,7 +30,7 @@
         <div class="max-w-4xl mx-auto sm:px-6 lg:px-8 space-y-6">
 
             @if (session('status') === 'daily-report-submitted')
-                <div class="p-3 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-800 text-sm">日報を提出しました。資材管理担当者の確認後、正式な人工データとして反映されます。</div>
+                <div class="p-3 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-800 text-sm">日報を提出しました。経理資材担当の確認後、正式な人工データとして反映されます。</div>
             @endif
             @if ($report->exists && $report->isRejected())
                 <div class="p-3 rounded-xl bg-red-50 border border-red-100 text-red-800 text-sm">
@@ -230,7 +230,7 @@
                     </div>
                 </div>
 
-                {{-- 提出後に資材管理担当者が見る「作業日報確認」と同じ横並び表示を、入力中もそのまま
+                {{-- 提出後に経理資材担当が見る「作業日報確認」と同じ横並び表示を、入力中もそのまま
                      確認できるようにする。entriesを直接参照しているため反映のたびに自動で更新される。 --}}
                 <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
                     <h3 class="text-xs font-bold text-slate-700 mb-2">日報プレビュー（作業日報確認と同じ表示）</h3>

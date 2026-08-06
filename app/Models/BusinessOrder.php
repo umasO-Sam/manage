@@ -5,7 +5,9 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Collection;
 
 /**
@@ -15,7 +17,7 @@ use Illuminate\Support\Collection;
  * 原価計算・原価一覧・見積補助の「受注金額」は必ずこのテーブルを参照する
  * (明細側にも同名の列が残っているが、集計には使わない。移行期間の参照専用)。
  */
-#[Fillable(['order_no', 'product_name', 'recipient', 'delivery_dest', 'order_received_date', 'order_amount', 'sales_date'])]
+#[Fillable(['order_no', 'product_name', 'recipient', 'business_partner_id', 'staff_id', 'is_direct_delivery_only', 'invoice_confirmed', 'delivery_dest', 'order_received_date', 'order_amount', 'sales_date'])]
 class BusinessOrder extends Model
 {
     use HasFactory;
@@ -26,7 +28,40 @@ class BusinessOrder extends Model
             'order_received_date' => 'date',
             'sales_date' => 'date',
             'order_amount' => 'decimal:2',
+            'is_direct_delivery_only' => 'boolean',
+            'invoice_confirmed' => 'boolean',
         ];
+    }
+
+    public function businessPartner(): BelongsTo
+    {
+        return $this->belongsTo(BusinessPartner::class);
+    }
+
+    /** 社内担当者。 */
+    public function staff(): BelongsTo
+    {
+        return $this->belongsTo(Staff::class);
+    }
+
+    public function card(): HasOne
+    {
+        return $this->hasOne(Card::class);
+    }
+
+    public function logs(): HasMany
+    {
+        return $this->hasMany(BusinessOrderLog::class)->orderByDesc('created_at');
+    }
+
+    /**
+     * 取引条件調整中かどうか。カード自身ではなく受注先(取引先)の状態から導出する。
+     * 同じ新規取引先で複数のカードを作った場合も、取引先が仮登録のままなら
+     * すべてのカードにバッジが出て請求済へ進めない。
+     */
+    public function isTradeTermsPending(): bool
+    {
+        return (bool) $this->businessPartner?->isPending();
     }
 
     /**

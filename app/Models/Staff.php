@@ -26,7 +26,7 @@ class Staff extends Authenticatable
 
     /** @var array<string, string> ロール値 => 表示ラベル */
     public const ROLE_LABELS = [
-        self::ROLE_PROCUREMENT_MANAGER => '資材管理担当者',
+        self::ROLE_PROCUREMENT_MANAGER => '経理資材担当',
         self::ROLE_SALES => '営業担当',
         self::ROLE_GENERAL => '一般社員',
     ];
@@ -54,12 +54,16 @@ class Staff extends Authenticatable
     }
 
     /**
-     * カードの移動・仕入管理でのレコード編集・担当者管理を行える資材管理担当者かどうか。
+     * カードの移動・仕入管理でのレコード編集・担当者管理を行える経理資材担当かどうか。
      * administratorはすべての機能を使えるため、常に真として扱う。
      */
     public function getIsProcurementManagerAttribute(): bool
     {
-        return $this->role === self::ROLE_PROCUREMENT_MANAGER || $this->is_administrator;
+        // 資金管理者はadministrator権限が必要ない全機能を使えるため、
+        // 経理資材担当限定の画面も同じ扱いにする。
+        return $this->role === self::ROLE_PROCUREMENT_MANAGER
+            || (bool) $this->is_administrator
+            || (bool) $this->is_fund_manager;
     }
 
     /**
@@ -126,7 +130,7 @@ class Staff extends Authenticatable
     }
 
     /**
-     * 他の社員の勤怠・原価情報をまとめて閲覧できる立場かどうか(資材管理担当者・上長)。
+     * 他の社員の勤怠・原価情報をまとめて閲覧できる立場かどうか(経理資材担当・上長)。
      * 作業日報確認・作業日報一覧・操作ログ・原価一覧・申請承認一覧の表示可否に使う。
      */
     public function isSupervisorOrManager(): bool
@@ -135,11 +139,27 @@ class Staff extends Authenticatable
     }
 
     /**
-     * 仕入管理の検索・原価計算を閲覧できるロールかどうか(資材管理担当者・上長・営業担当)。
+     * 仕入管理の検索・原価計算を閲覧できるかどうか
+     * (経理資材担当・上長・営業担当・役員・資金管理者)。
+     * 役員は物件管理ボードで受注金額を扱うため、原価も見られるようにしている。
      */
     public function canAccessPurchasing(): bool
     {
-        return $this->isSupervisorOrManager() || $this->role === self::ROLE_SALES;
+        return $this->isSupervisorOrManager()
+            || $this->role === self::ROLE_SALES
+            || (bool) $this->is_executive
+            || (bool) $this->is_fund_manager;
+    }
+
+    /**
+     * 物件管理ボードを使えるかどうか(経理資材担当・役員・営業担当・資金管理者・administrator)。
+     */
+    public function canUseProjectBoard(): bool
+    {
+        return $this->is_procurement_manager
+            || (bool) $this->is_executive
+            || (bool) $this->is_fund_manager
+            || $this->role === self::ROLE_SALES;
     }
 
     public function roleLabel(): string

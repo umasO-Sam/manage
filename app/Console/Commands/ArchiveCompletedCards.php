@@ -17,6 +17,12 @@ class ArchiveCompletedCards extends Command
         $archived = 0;
 
         foreach (WorkflowType::all() as $workflowType) {
+            // retention_days が null のボード(物件管理)は自動アーカイブしない。
+            // 人が非表示ボタンを押したときだけアーカイブする運用のため。
+            if ($workflowType->retention_days === null) {
+                continue;
+            }
+
             $lastStage = $workflowType->lastStageIndex();
             $cutoff = now()->subDays($workflowType->retention_days);
 

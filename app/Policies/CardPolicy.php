@@ -64,7 +64,7 @@ class CardPolicy
     /**
      * While a card is still in the first stage (新規依頼), its creator may
      * withdraw it themselves in addition to procurement managers. Once it has
-     * moved on (手配中・入荷など)、取り消しは資材管理担当者のみに限定する。
+     * moved on (手配中・入荷など)、取り消しは経理資材担当のみに限定する。
      */
     public function delete(Staff $staff, Card $card): bool
     {

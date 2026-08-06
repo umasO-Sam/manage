@@ -12,7 +12,7 @@ use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 /**
- * 休日マスタ管理(祝日・会社休日・有給休暇取得推奨日)。資材管理担当者のみが
+ * 休日マスタ管理(祝日・会社休日・有給休暇取得推奨日)。経理資材担当のみが
  * 登録・編集・削除できる(routes/web.phpのprocurement.managerミドルウェアでアクセス制御)。
  * 本人カレンダー・全社休日一覧画面(フェーズ3以降の別項目)で参照する想定。
  */

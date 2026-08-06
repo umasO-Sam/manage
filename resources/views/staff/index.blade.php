@@ -6,7 +6,7 @@
                     <i data-lucide="users" class="text-blue-600 w-6 h-6"></i>
                     <span>担当者・権限管理</span>
                 </h2>
-                <p class="text-xs text-slate-500 mt-1">システムのログインアカウントと資材管理担当者の権限を管理します</p>
+                <p class="text-xs text-slate-500 mt-1">システムのログインアカウントと経理資材担当の権限を管理します</p>
             </div>
             <a href="{{ route('staff.create') }}" class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-xl shadow-sm hover:shadow flex items-center gap-2 text-sm transition-all">
                 <i data-lucide="user-plus" class="w-4 h-4"></i>

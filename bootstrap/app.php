@@ -1,6 +1,8 @@
 <?php
 
+use App\Http\Middleware\EnsureFundManager;
 use App\Http\Middleware\EnsureProcurementManager;
+use App\Http\Middleware\EnsureProjectBoardUser;
 use App\Http\Middleware\EnsurePurchasingViewer;
 use App\Http\Middleware\EnsureStaffManager;
 use App\Http\Middleware\EnsureSupervisorOrManager;
@@ -18,7 +20,9 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
+            'fund.manager' => EnsureFundManager::class,
             'procurement.manager' => EnsureProcurementManager::class,
+            'project.board' => EnsureProjectBoardUser::class,
             'purchasing.viewer' => EnsurePurchasingViewer::class,
             'staff.manager' => EnsureStaffManager::class,
             'supervisor.or.manager' => EnsureSupervisorOrManager::class,

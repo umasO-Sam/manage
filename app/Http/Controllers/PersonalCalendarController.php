@@ -158,7 +158,7 @@ class PersonalCalendarController extends Controller
 
     /**
      * 作業日報の登録状況を日付ごとに判定する。draft(下書き・未提出)、
-     * pending_confirmation(提出済みだが資材管理担当者の確認待ち)、
+     * pending_confirmation(提出済みだが経理資材担当の確認待ち)、
      * rejected(差し戻し中、本人の修正・再提出待ち)、
      * confirmed(確認済み、またはLaborCostが発生しない内容で提出済み)の4状態。
      *

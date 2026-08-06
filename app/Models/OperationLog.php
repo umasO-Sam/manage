@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\Auth;
 
 /**
  * 作業日報・休暇/勤務申請まわりの操作履歴。法定保存期間に準じ5年間保持し、
- * PurgeOperationLogsコマンドで期限切れ分を削除する。資材管理担当者・上長は
+ * PurgeOperationLogsコマンドで期限切れ分を削除する。経理資材担当・上長は
  * 全員分を、それ以外の一般社員・営業担当は自分(owner_staff_id)の分のみ閲覧できる。
  */
 #[Fillable(['staff_id', 'owner_staff_id', 'action', 'subject_type', 'subject_id', 'description'])]

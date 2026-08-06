@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\ArchiveController;
+use App\Http\Controllers\BusinessPartnerController;
 use App\Http\Controllers\CardCommentController;
 use App\Http\Controllers\CardController;
 use App\Http\Controllers\CostAnalysisController;
@@ -17,6 +18,7 @@ use App\Http\Controllers\OperationLogController;
 use App\Http\Controllers\OrderNumberController;
 use App\Http\Controllers\PersonalCalendarController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\ProjectBoardController;
 use App\Http\Controllers\PurchaseDetailController;
 use App\Http\Controllers\PurchaseInputController;
 use App\Http\Controllers\PurchaseInvoiceController;
@@ -55,7 +57,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/leave-requests', [LeaveRequestController::class, 'index'])->name('leave-requests.index');
     Route::get('/leave-requests/create', [LeaveRequestController::class, 'create'])->name('leave-requests.create');
     Route::post('/leave-requests', [LeaveRequestController::class, 'store'])->name('leave-requests.store');
-    // 承認待ち一覧は資材管理担当者・上長限定。個別の承認/却下(decide)は承認者本人に
+    // 承認待ち一覧は経理資材担当・上長限定。個別の承認/却下(decide)は承認者本人に
     // 指定された社員であればPolicyで許可する(メール内リンクから詳細経由で操作できる)。
     Route::get('/leave-requests/approvals', [LeaveRequestController::class, 'approvals'])
         ->middleware('supervisor.or.manager')->name('leave-requests.approvals');
@@ -63,8 +65,8 @@ Route::middleware('auth')->group(function () {
     Route::put('/leave-requests/{leaveRequest}/decide', [LeaveRequestController::class, 'decide'])->name('leave-requests.decide');
     Route::delete('/leave-requests/{leaveRequest}', [LeaveRequestController::class, 'withdraw'])->name('leave-requests.withdraw');
 
-    // 他の社員の勤怠・原価情報をまとめて見る画面は資材管理担当者・上長限定。
-    // 作業日報確認(review)は人工データの確定を伴う資材管理担当者の業務のため、
+    // 他の社員の勤怠・原価情報をまとめて見る画面は経理資材担当・上長限定。
+    // 作業日報確認(review)は人工データの確定を伴う経理資材担当の業務のため、
     // このグループではなくprocurement.managerグループに置く。
     Route::middleware('supervisor.or.manager')->group(function () {
         Route::get('/daily-reports/list', [DailyReportListController::class, 'index'])->name('daily-reports.list.index');
@@ -77,13 +79,33 @@ Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
 
-    // 仕入管理の検索・原価計算・人工計算は資材管理担当者・営業担当が閲覧できる。
+    // 仕入管理の検索・原価計算・人工計算は経理資材担当・営業担当が閲覧できる。
     Route::middleware('purchasing.viewer')->group(function () {
         Route::get('/purchasing', [PurchaseDetailController::class, 'index'])->name('purchasing.index');
         Route::get('/purchasing/cost', [CostAnalysisController::class, 'index'])->name('purchasing.cost.index');
         Route::get('/purchasing/cost/export', [CostAnalysisController::class, 'export'])->name('purchasing.cost.export');
         Route::get('/purchasing/labor', [LaborCostController::class, 'index'])->name('purchasing.labor.index');
         Route::get('/purchasing/estimate', [EstimateAssistController::class, 'index'])->name('purchasing.estimate.index');
+    });
+
+    // 物件管理ボード: 経理資材担当・役員・営業担当・資金管理者。
+    Route::middleware('project.board')->group(function () {
+        Route::get('/projects', [ProjectBoardController::class, 'index'])->name('projects.index');
+        Route::get('/projects/create', [ProjectBoardController::class, 'create'])->name('projects.create');
+        Route::post('/projects', [ProjectBoardController::class, 'store'])->name('projects.store');
+        Route::get('/projects/{card}', [ProjectBoardController::class, 'show'])->name('projects.show')->withTrashed();
+        Route::get('/projects/{card}/order', [ProjectBoardController::class, 'editOrder'])->name('projects.order.edit');
+        Route::put('/projects/{card}/order', [ProjectBoardController::class, 'updateOrder'])->name('projects.order.update');
+        Route::post('/projects/{card}/attachments', [ProjectBoardController::class, 'storeAttachment'])->name('projects.attachments.store');
+        Route::post('/projects/{card}/advance', [ProjectBoardController::class, 'advance'])->name('projects.advance');
+        Route::delete('/projects/{card}/hide', [ProjectBoardController::class, 'hide'])->name('projects.hide');
+    });
+
+    // 取引先一覧(銀行・取引区分・締め日・支払条件)は資金管理者限定。
+    Route::middleware('fund.manager')->group(function () {
+        Route::get('/business-partners', [BusinessPartnerController::class, 'index'])->name('business-partners.index');
+        Route::put('/business-partners/{businessPartner}', [BusinessPartnerController::class, 'update'])->name('business-partners.update');
+        Route::post('/business-partners/{businessPartner}/confirm', [BusinessPartnerController::class, 'confirm'])->name('business-partners.confirm');
     });
 
     // 担当者管理(ＩＤ管理)は経理資材担当・役員・資金管理者が使う。
@@ -98,7 +120,7 @@ Route::middleware('auth')->group(function () {
         Route::delete('/staff/{staff}', [StaffController::class, 'destroy'])->name('staff.destroy');
     });
 
-    // データ入力・注文書・明細書・原価一覧・レコード編集は資材管理担当者限定。
+    // データ入力・注文書・明細書・原価一覧・レコード編集は経理資材担当限定。
     Route::middleware('procurement.manager')->group(function () {
         Route::get('/daily-reports/review', [DailyReportReviewController::class, 'index'])->name('daily-reports.review.index');
         Route::post('/daily-reports/review/{dailyReport}/decide', [DailyReportReviewController::class, 'decide'])->name('daily-reports.review.decide');

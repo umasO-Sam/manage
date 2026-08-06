@@ -424,7 +424,7 @@ class CardController extends Controller
 
     /**
      * 依頼カードの取り消し。新規依頼の段階では依頼者自身も取り消せるが、
-     * 手配中・入荷に進んだ後は資材管理担当者のみに限定される（CardPolicy::delete）。
+     * 手配中・入荷に進んだ後は経理資材担当のみに限定される（CardPolicy::delete）。
      * 実体は他の非表示操作と同じ論理削除で、履歴（アーカイブ）から参照できる。
      */
     public function destroy(Request $request, Card $card): RedirectResponse
@@ -483,7 +483,7 @@ class CardController extends Controller
         $managers = Staff::where('role', Staff::ROLE_PROCUREMENT_MANAGER)->get();
 
         if ($managers->isEmpty()) {
-            Log::warning("資材管理担当者が0人のため、新規依頼(card_id={$card->id})の通知先がありません。");
+            Log::warning("経理資材担当が0人のため、新規依頼(card_id={$card->id})の通知先がありません。");
         }
 
         foreach ($managers as $manager) {

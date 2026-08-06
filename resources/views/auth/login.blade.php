@@ -33,7 +33,7 @@
         </div>
 
         <p class="mt-4 text-sm text-slate-500">
-            ID・パスワードが分からない場合は資材管理担当者にお問い合わせください。
+            ID・パスワードが分からない場合は経理資材担当にお問い合わせください。
         </p>
 
         <div class="flex items-center justify-end mt-4">

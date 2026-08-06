@@ -10,7 +10,7 @@ use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 /**
- * 注番マスタ管理。資材管理担当者のみが登録できる（routes/web.phpの
+ * 注番マスタ管理。経理資材担当のみが登録できる（routes/web.phpの
  * procurement.managerミドルウェアでアクセス制御）。「未定」「社内」は
  * 保護レコードとして初期投入され、削除できない。
  */
