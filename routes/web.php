@@ -140,11 +140,14 @@ Route::middleware('auth')->group(function () {
         Route::delete('/staff/{staff}', [StaffController::class, 'destroy'])->name('staff.destroy');
     });
 
-    // データ入力・注文書・明細書・原価一覧・レコード編集は経理資材担当限定。
-    Route::middleware('procurement.manager')->group(function () {
+    // 作業日報の確認は経理資材担当のうち日報管理者フラグを付けた人だけが行う。
+    Route::middleware('daily.report.reviewer')->group(function () {
         Route::get('/daily-reports/review', [DailyReportReviewController::class, 'index'])->name('daily-reports.review.index');
         Route::post('/daily-reports/review/{dailyReport}/decide', [DailyReportReviewController::class, 'decide'])->name('daily-reports.review.decide');
+    });
 
+    // データ入力・注文書・明細書・原価一覧・レコード編集は経理資材担当限定。
+    Route::middleware('procurement.manager')->group(function () {
         Route::get('/order-numbers', [OrderNumberController::class, 'index'])->name('order-numbers.index');
         Route::get('/order-numbers/create', [OrderNumberController::class, 'create'])->name('order-numbers.create');
         Route::post('/order-numbers', [OrderNumberController::class, 'store'])->name('order-numbers.store');

@@ -168,6 +168,7 @@
                                         <th class="p-2.5">メールアドレス</th>
                                         <th class="p-2.5">権限</th>
                                         <th class="p-2.5">上長</th>
+                                        <th class="p-2.5" title="作業日報の確認を担当する。未確認バッジもこの人にだけ出す">日報管理</th>
                                         <th class="p-2.5" title="作業日報一覧・勤務状況一覧・社内担当者リストから除外する">名簿非表示</th>
                                         <th class="p-2.5">有休 当年度</th>
                                         <th class="p-2.5">有休 前年度繰越</th>
@@ -229,6 +230,14 @@
                                                 @endif
                                                 <input x-show="editMode" x-cloak @disabled(! $canEditRow) type="checkbox" name="updates[{{ $staff->id }}][is_supervisor]" value="1"
                                                        @checked($staff->is_supervisor) class="rounded border-slate-300">
+                                            </td>
+                                            <td class="p-2.5 text-center">
+                                                <span x-show="!editMode">{{ $staff->is_daily_report_reviewer ? '○' : '' }}</span>
+                                                @if ($canEditRow)
+                                                    <input type="hidden" name="updates[{{ $staff->id }}][is_daily_report_reviewer]" value="0">
+                                                @endif
+                                                <input x-show="editMode" x-cloak @disabled(! $canEditRow) type="checkbox" name="updates[{{ $staff->id }}][is_daily_report_reviewer]" value="1"
+                                                       @checked($staff->is_daily_report_reviewer) class="rounded border-slate-300">
                                             </td>
                                             <td class="p-2.5 text-center">
                                                 <span x-show="!editMode">{{ $staff->excluded_from_rosters ? '○' : '' }}</span>

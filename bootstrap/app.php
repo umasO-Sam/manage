@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\EnsureDailyReportReviewer;
 use App\Http\Middleware\EnsureFundManager;
 use App\Http\Middleware\EnsureProcurementManager;
 use App\Http\Middleware\EnsureProjectBoardUser;
@@ -21,6 +22,7 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
+            'daily.report.reviewer' => EnsureDailyReportReviewer::class,
             'fund.manager' => EnsureFundManager::class,
             'procurement.manager' => EnsureProcurementManager::class,
             'project.board' => EnsureProjectBoardUser::class,

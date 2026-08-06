@@ -23,6 +23,8 @@
                         // ＩＤ管理は権限付与のために役員・資金管理者も使う。
                         $canManageStaff = $viewer->canManageStaff();
                         $isSupervisorOrManager = $viewer->isSupervisorOrManager();
+                        // 作業日報確認は経理資材担当のうち日報管理者フラグを付けた人だけ。
+                        $canReviewDailyReports = $viewer->canReviewDailyReports();
                         // 一般社員はメニュー項目が少ないのでボードを直接並べる。上長や
                         // 役員・資金管理者・administratorは他のメニューが増えて横に収まらなくなるため、
                         // 一般社員ロールのままでもドロップダウン(調達ボード)にまとめる。
@@ -164,8 +166,8 @@
                             <x-dropdown-link :href="route('daily-reports.show')">
                                 <i data-lucide="clipboard-list" class="w-3.5 h-3.5 inline-block align-text-bottom mr-1"></i> 作業日報
                             </x-dropdown-link>
-                            {{-- 作業日報確認は人工データの確定操作を伴うため経理資材担当のみ --}}
-                            @if ($isManager)
+                            {{-- 作業日報確認は人工データの確定操作を伴うため日報管理者のみ --}}
+                            @if ($canReviewDailyReports)
                                 <x-dropdown-link :href="route('daily-reports.review.index')">
                                     <i data-lucide="clipboard-check" class="w-3.5 h-3.5 inline-block align-text-bottom mr-1"></i> 作業日報確認
                                     @if ($pendingDailyReportReviewCount > 0)
@@ -420,7 +422,7 @@
             <a href="{{ route('daily-reports.show') }}" class="block px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap {{ request()->routeIs('daily-reports.show') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
                 作業日報
             </a>
-            @if ($isManager)
+            @if ($canReviewDailyReports)
                 <a href="{{ route('daily-reports.review.index') }}" class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap {{ request()->routeIs('daily-reports.review.*') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
                     <span>作業日報確認</span>
                     @if ($pendingDailyReportReviewCount > 0)

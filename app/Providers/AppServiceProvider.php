@@ -36,7 +36,8 @@ class AppServiceProvider extends ServiceProvider
 
             $view->with('unreadCardCountsByWorkflow', $staff?->unreadCardCountsByWorkflow() ?? []);
             $view->with('pendingApprovalsCount', $staff?->pendingApprovalsCount() ?? 0);
-            $view->with('pendingDailyReportReviewCount', $staff?->is_procurement_manager
+            // 未確認バッジは確認を担当する日報管理者にだけ出す。
+            $view->with('pendingDailyReportReviewCount', $staff?->canReviewDailyReports()
                 ? DailyReport::whereNull('rejected_at')
                     ->whereIn('id', LaborCost::where('is_provisional', true)->whereNotNull('daily_report_id')->distinct()->pluck('daily_report_id'))
                     ->count()

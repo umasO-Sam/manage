@@ -57,7 +57,7 @@
                                     title="{{ $current->format('Y/m/d') }}（{{ $weekdayLabels[$current->dayOfWeek] }}）{{ $holiday?->name }}">
                                     <div class="whitespace-nowrap">{{ $current->format('n/j') }}</div>
                                     <div class="whitespace-nowrap {{ ! $isToday && $current->dayOfWeek === 0 ? 'text-red-500' : (! $isToday && $current->dayOfWeek === 6 ? 'text-blue-500' : '') }}">{{ $weekdayLabels[$current->dayOfWeek] }}</div>
-                                    @if (Auth::user()->is_procurement_manager)
+                                    @if (Auth::user()->canReviewDailyReports())
                                         <a href="{{ route('daily-reports.review.index', ['date' => $dateString]) }}" class="block {{ $isToday ? 'text-white/80 hover:text-white' : 'text-slate-400 hover:text-blue-600' }}" title="{{ $current->format('n/j') }}の作業日報を確認する">
                                             <i data-lucide="clipboard-check" class="w-3 h-3 inline-block"></i>
                                         </a>

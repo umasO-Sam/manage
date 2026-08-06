@@ -59,6 +59,8 @@ class StaffController extends Controller
 
         return [
             'is_supervisor' => $resolve('is_supervisor', true),
+            // 日報管理者も上長フラグと同じ扱い(担当者管理を開ける人なら設定できる)。
+            'is_daily_report_reviewer' => $resolve('is_daily_report_reviewer', true),
             // 名簿からの除外は上長フラグと同じ扱い(担当者管理を開ける人なら設定できる)。
             'excluded_from_rosters' => $resolve('excluded_from_rosters', true),
             'is_executive' => $resolve('is_executive', $actor->canGrantExecutive()),
@@ -116,6 +118,7 @@ class StaffController extends Controller
             'role' => ['required', Rule::in(array_keys(Staff::ROLE_LABELS))],
             'password' => ['required', Password::defaults(), new NotSimilarToLoginId($request->input('login_id'))],
             'is_supervisor' => ['nullable', 'boolean'],
+            'is_daily_report_reviewer' => ['nullable', 'boolean'],
             'excluded_from_rosters' => ['nullable', 'boolean'],
             'is_executive' => ['nullable', 'boolean'],
             'is_fund_manager' => ['nullable', 'boolean'],
@@ -159,6 +162,7 @@ class StaffController extends Controller
             'role' => ['required', Rule::in(array_keys(Staff::ROLE_LABELS))],
             'password' => ['nullable', Password::defaults(), new NotSimilarToLoginId($request->input('login_id'))],
             'is_supervisor' => ['nullable', 'boolean'],
+            'is_daily_report_reviewer' => ['nullable', 'boolean'],
             'excluded_from_rosters' => ['nullable', 'boolean'],
             'is_executive' => ['nullable', 'boolean'],
             'is_fund_manager' => ['nullable', 'boolean'],
@@ -263,6 +267,7 @@ class StaffController extends Controller
                 'email' => ['required', 'string', 'email', 'max:255', Rule::unique('staff', 'email')->ignore($staff->id)],
                 'role' => ['required', Rule::in(array_keys(Staff::ROLE_LABELS))],
                 'is_supervisor' => ['nullable', 'boolean'],
+                'is_daily_report_reviewer' => ['nullable', 'boolean'],
                 'excluded_from_rosters' => ['nullable', 'boolean'],
                 'is_executive' => ['nullable', 'boolean'],
                 'is_fund_manager' => ['nullable', 'boolean'],

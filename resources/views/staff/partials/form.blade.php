@@ -95,6 +95,12 @@
     <x-input-error :messages="$errors->get('is_supervisor')" />
 
     <label class="flex items-center gap-2 text-sm">
+        <input type="hidden" name="is_daily_report_reviewer" value="0">
+        <input type="checkbox" name="is_daily_report_reviewer" value="1" @checked(old('is_daily_report_reviewer', $staff?->is_daily_report_reviewer))>
+        日報管理者（作業日報の確認を担当する。未確認バッジもこの人にだけ出す。経理資材担当に付ける）
+    </label>
+
+    <label class="flex items-center gap-2 text-sm">
         <input type="hidden" name="excluded_from_rosters" value="0">
         <input type="checkbox" name="excluded_from_rosters" value="1" @checked(old('excluded_from_rosters', $staff?->excluded_from_rosters))>
         名簿に表示しない（作業日報一覧・勤務状況一覧・社内担当者リストから除外。テスト用・管理用や退職者に使う）

@@ -22,6 +22,7 @@ class DevRoleSwitchController extends Controller
     /** 切り替えられる権限フラグ。 */
     private const FLAGS = [
         'is_supervisor' => '上長',
+        'is_daily_report_reviewer' => '日報管理者',
         'is_executive' => '役員',
         'is_fund_manager' => '資金管理者',
         'is_administrator' => 'administrator',
@@ -44,6 +45,7 @@ class DevRoleSwitchController extends Controller
         $data = $request->validate([
             'role' => ['required', Rule::in(array_keys(Staff::ROLE_LABELS))],
             'is_supervisor' => ['nullable', 'boolean'],
+            'is_daily_report_reviewer' => ['nullable', 'boolean'],
             'is_executive' => ['nullable', 'boolean'],
             'is_fund_manager' => ['nullable', 'boolean'],
             'is_administrator' => ['nullable', 'boolean'],

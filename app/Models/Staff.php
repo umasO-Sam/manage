@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
-#[Fillable(['name', 'department', 'display_order', 'sid', 'login_id', 'email', 'role', 'is_labor_target', 'position_weight', 'password', 'must_change_password', 'hire_date', 'paid_leave_granted_current_year', 'paid_leave_granted_last_year', 'is_supervisor', 'excluded_from_rosters', 'is_executive', 'is_fund_manager', 'is_administrator'])]
+#[Fillable(['name', 'department', 'display_order', 'sid', 'login_id', 'email', 'role', 'is_labor_target', 'position_weight', 'password', 'must_change_password', 'hire_date', 'paid_leave_granted_current_year', 'paid_leave_granted_last_year', 'is_supervisor', 'excluded_from_rosters', 'is_daily_report_reviewer', 'is_executive', 'is_fund_manager', 'is_administrator'])]
 #[Hidden(['password', 'remember_token'])]
 class Staff extends Authenticatable
 {
@@ -48,6 +48,7 @@ class Staff extends Authenticatable
             'hire_date' => 'date',
             'is_supervisor' => 'boolean',
             'excluded_from_rosters' => 'boolean',
+            'is_daily_report_reviewer' => 'boolean',
             'is_executive' => 'boolean',
             'is_fund_manager' => 'boolean',
             'is_administrator' => 'boolean',
@@ -128,6 +129,17 @@ class Staff extends Authenticatable
     public function canManageBusinessPartners(): bool
     {
         return (bool) $this->is_fund_manager || (bool) $this->is_administrator;
+    }
+
+    /**
+     * 作業日報の確認(人工データの確定・差し戻し)を担当するかどうか。
+     * 経理資材担当の全員ではなく日報管理者フラグを付けた人だけが行い、
+     * 未確認バッジもその人にしか出さない。administratorはすべての機能を使える。
+     */
+    public function canReviewDailyReports(): bool
+    {
+        return (bool) $this->is_administrator
+            || ($this->is_procurement_manager && (bool) $this->is_daily_report_reviewer);
     }
 
     /**

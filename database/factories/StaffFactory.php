@@ -36,10 +36,15 @@ class StaffFactory extends Factory
         ];
     }
 
+    /**
+     * 経理資材担当。作業日報の確認は日報管理者フラグを付けた人だけが行うが、
+     * 既定ではその担当も兼ねるものとして扱う(担当を外した状態はテスト側で指定する)。
+     */
     public function procurementManager(): static
     {
         return $this->state(fn (array $attributes) => [
             'role' => Staff::ROLE_PROCUREMENT_MANAGER,
+            'is_daily_report_reviewer' => true,
         ]);
     }
 
