@@ -287,6 +287,14 @@
                             プロフィール
                         </x-dropdown-link>
 
+                        {{-- 開発環境専用のテスト機能。本番ではルートごと存在しない。 --}}
+                        @production
+                        @else
+                            <x-dropdown-link :href="route('dev.role-switch.edit')">
+                                <span class="text-amber-700">権限切替（開発用）</span>
+                            </x-dropdown-link>
+                        @endproduction
+
                         <!-- Authentication -->
                         <form method="POST" action="{{ route('logout') }}">
                             @csrf

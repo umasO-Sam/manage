@@ -9,6 +9,7 @@ use App\Http\Controllers\CostReportController;
 use App\Http\Controllers\DailyReportController;
 use App\Http\Controllers\DailyReportListController;
 use App\Http\Controllers\DailyReportReviewController;
+use App\Http\Controllers\DevRoleSwitchController;
 use App\Http\Controllers\EstimateAssistController;
 use App\Http\Controllers\HolidayController;
 use App\Http\Controllers\LaborCostController;
@@ -87,6 +88,12 @@ Route::middleware('auth')->group(function () {
         Route::get('/purchasing/labor', [LaborCostController::class, 'index'])->name('purchasing.labor.index');
         Route::get('/purchasing/estimate', [EstimateAssistController::class, 'index'])->name('purchasing.estimate.index');
     });
+
+    // 開発環境専用の権限切替(テスト用)。本番ではルート自体を登録しない。
+    if (! app()->environment('production')) {
+        Route::get('/dev/role-switch', [DevRoleSwitchController::class, 'edit'])->name('dev.role-switch.edit');
+        Route::put('/dev/role-switch', [DevRoleSwitchController::class, 'update'])->name('dev.role-switch.update');
+    }
 
     // 物件管理ボード: 経理資材担当・役員・営業担当・資金管理者。
     Route::middleware('project.board')->group(function () {

@@ -374,14 +374,11 @@ curl -s https://manage.saito-koken.co.jp/login | grep -o 'app-[A-Za-z0-9_-]*\.\(
    「MySQLユーザ設定」で、manage用のMySQLユーザーにタイムカードのDB
    （`<アカウント名>_timecard`）のアクセス権を追加する。
 2. **`.env` に `TIMECARD_DB_DATABASE` を設定**（3で作った接続。host/user/passwordはDB_*を流用）
-3. **担当者の紐づけ**
-   ```bash
-   /usr/bin/php8.3 artisan app:map-timecard-staff --dry-run   # まず結果だけ確認
-   /usr/bin/php8.3 artisan app:map-timecard-staff
-   ```
-   タイムカード側の氏名は「斉藤　修」のように全角スペース入りのため、
-   スペースを除去して突き合わせている。一致しなかった担当者はＩＤ管理画面の
-   「タイムカードID」欄から手動で設定する。
+3. **担当者のSIDが入っていること**
+   突き合わせは `staff.sid` = `card.wid` で行う（本番データで確認済み: SIDを持つ30人のうち
+   29人がタイムカード側の wid と一致、不一致0。残る1人はタイムカード側に氏名なし）。
+   SIDが未設定の担当者は打刻が表示されないだけで、他の機能には影響しない。
+   ＩＤ管理画面のSID欄から設定する。
 
 参照するのは `card`（打刻）と `stuff`（担当者）の2テーブルのみで、**書き込みは一切行わない**。
 タイムカード側が停止していても、警告をログに残すだけで作業日報の画面は通常どおり開く。

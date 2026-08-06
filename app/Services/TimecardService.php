@@ -19,6 +19,8 @@ use Throwable;
  *   card  … wid(担当者ID) / yyyymmdd(日付) / cometime(出勤打刻) / byetime(退勤打刻) ほかフラグ
  *   stuff … wid / wname(氏名) ほか表示設定
  *
+ * 担当者の対応付けは staff.sid = card.wid で行う(本番実データで一致を確認済み)。
+ *
  * 接続が未設定(TIMECARD_DB_DATABASEが空)の環境や、接続に失敗した場合は
  * 「連携なし」として静かに空を返す。タイムカード側の不調で作業日報の画面が
  * 500エラーになってはいけないため。
@@ -46,7 +48,9 @@ class TimecardService
             return [];
         }
 
-        $staffByWid = $staffList->whereNotNull('timecard_wid')->keyBy('timecard_wid');
+        // タイムカードの担当者ID(wid)は manage の SID と同じ値を使う運用
+        // (本番で突き合わせ済み。別列での二重管理はしない)。
+        $staffByWid = $staffList->whereNotNull('sid')->keyBy('sid');
 
         if ($staffByWid->isEmpty()) {
             return [];

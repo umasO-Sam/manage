@@ -19,15 +19,9 @@
 </div>
 
 <div>
-    <x-input-label for="sid" value="SID（任意・社内人工日報の一括登録で使用）" />
+    <x-input-label for="sid" value="SID（任意・社内人工日報の一括登録と、タイムカードの打刻との突き合わせに使用）" />
     <x-text-input id="sid" name="sid" type="number" class="mt-1 block w-40" :value="old('sid', $staff?->sid)" />
     <x-input-error class="mt-2" :messages="$errors->get('sid')" />
-</div>
-
-<div>
-    <x-input-label for="timecard_wid" value="タイムカードID（任意・timecard-newのwid。打刻との突き合わせに使用）" />
-    <x-text-input id="timecard_wid" name="timecard_wid" type="number" class="mt-1 block w-40" :value="old('timecard_wid', $staff?->timecard_wid)" />
-    <x-input-error class="mt-2" :messages="$errors->get('timecard_wid')" />
 </div>
 
 <div>

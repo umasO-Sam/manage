@@ -72,10 +72,14 @@ class TimecardIntegrationTest extends TestCase
         $this->assertNull($service->divergenceWarning(['come' => 8 * 60, 'bye' => null], 8 * 60, 23 * 60));
     }
 
-    public function test_timecard_id_can_be_assigned_from_the_staff_screen(): void
+    /**
+     * タイムカードの担当者ID(wid)は staff.sid と同じ値を使う。本番の実データで
+     * SID保有30人中29人が一致・不一致0だったため、専用の列は持たない。
+     */
+    public function test_the_sid_is_used_to_match_timecard_punches(): void
     {
         $manager = Staff::factory()->procurementManager()->create();
-        $staff = Staff::factory()->create(['timecard_wid' => null]);
+        $staff = Staff::factory()->create(['sid' => null]);
 
         $this->actingAs($manager)->put(route('staff.update', $staff), [
             'name' => $staff->name,
@@ -83,9 +87,9 @@ class TimecardIntegrationTest extends TestCase
             'login_id' => $staff->login_id,
             'email' => $staff->email,
             'role' => $staff->role,
-            'timecard_wid' => 37,
+            'sid' => 37,
         ])->assertRedirect(route('staff.index'));
 
-        $this->assertSame(37, $staff->fresh()->timecard_wid);
+        $this->assertSame(37, $staff->fresh()->sid);
     }
 }
