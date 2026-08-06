@@ -25,9 +25,28 @@ class WorkflowType extends Model
         return 'slug';
     }
 
+    /** 物件管理ボードのslug。専用画面(projects.*)を持つため、調達ボードとしては扱わない。 */
+    public const SLUG_PROJECT = 'project';
+
     public function cards(): HasMany
     {
         return $this->hasMany(Card::class);
+    }
+
+    public function isProjectBoard(): bool
+    {
+        return $this->slug === self::SLUG_PROJECT;
+    }
+
+    /**
+     * 調達ボード(購入手配・見積依頼)だけを返す。物件管理は同じカード基盤を使うが、
+     * 画面もメニューも履歴も物件管理側に分かれているため、調達ボードの一覧からは外す。
+     *
+     * @return \Illuminate\Database\Eloquent\Builder<static>
+     */
+    public static function procurementBoards(): \Illuminate\Database\Eloquent\Builder
+    {
+        return static::where('slug', '!=', self::SLUG_PROJECT)->orderBy('id');
     }
 
     public function stageCount(): int

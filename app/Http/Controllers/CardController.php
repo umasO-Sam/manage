@@ -30,9 +30,15 @@ class CardController extends Controller
     /**
      * カンバンボード表示（ワークフロー種別ごと）
      */
-    public function index(Request $request, WorkflowType $workflow): View
+    public function index(Request $request, WorkflowType $workflow): View|RedirectResponse
     {
         $this->authorize('viewAny', Card::class);
+
+        // 物件管理は同じカード基盤を使うが専用画面がある。汎用ボードで開くと
+        // 受注ヘッダの項目が出ない二重の画面になるため、物件ボードへ送る。
+        if ($workflow->isProjectBoard()) {
+            return redirect()->route('projects.index');
+        }
 
         /** @var Staff $staff */
         $staff = $request->user();

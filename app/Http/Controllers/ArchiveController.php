@@ -15,7 +15,8 @@ class ArchiveController extends Controller
 
     /**
      * 5年保存履歴・アーカイブの検索一覧。
-     * ボードから非表示（論理削除）になった全ワークフローのカードを対象とする。
+     * 調達ボード（購入手配・見積依頼）から非表示（論理削除）になったカードを対象とする。
+     * 物件管理は非表示にしたカードも含めて物件履歴（projects.history）で追うため、ここには出さない。
      */
     public function index(Request $request): View
     {
@@ -25,7 +26,8 @@ class ArchiveController extends Controller
         $keyword = $request->string('keyword')->trim()->value();
 
         $query = Card::onlyTrashed()
-            ->with(['workflowType', 'orderNumber', 'creator', 'stageLogs.actor']);
+            ->with(['workflowType', 'orderNumber', 'creator', 'stageLogs.actor'])
+            ->whereHas('workflowType', fn ($q) => $q->where('slug', '!=', WorkflowType::SLUG_PROJECT));
 
         if ($workflowSlug !== '' && $workflowSlug !== 'all') {
             $query->whereHas('workflowType', fn ($q) => $q->where('slug', $workflowSlug));
@@ -44,7 +46,7 @@ class ArchiveController extends Controller
 
         return view('archive.index', [
             'cards' => $cards,
-            'workflowTypes' => WorkflowType::orderBy('id')->get(),
+            'workflowTypes' => WorkflowType::procurementBoards()->get(),
             'selectedWorkflow' => $workflowSlug ?: 'all',
             'keyword' => $keyword,
         ]);

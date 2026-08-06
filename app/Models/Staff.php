@@ -153,8 +153,16 @@ class Staff extends Authenticatable
     }
 
     /**
-     * 物件管理ボードを使えるかどうか(経理資材担当・役員・営業担当・資金管理者・administrator)。
+     * ロールに重ねて付与する上位フラグ(役員・資金管理者・administrator)を持つかどうか。
+     * 上長は同格の担当者を見る立場で使える機能が増えるだけなので、ここには含めない。
      */
+    public function hasElevatedFlag(): bool
+    {
+        return (bool) $this->is_executive
+            || (bool) $this->is_fund_manager
+            || (bool) $this->is_administrator;
+    }
+
     /**
      * 見積番号を採番できるかどうか(営業担当・上長・役員に加え、代行する経理資材担当・資金管理者)。
      */
@@ -167,6 +175,9 @@ class Staff extends Authenticatable
             || $this->role === self::ROLE_SALES;
     }
 
+    /**
+     * 物件管理ボードを使えるかどうか(経理資材担当・役員・営業担当・資金管理者・administrator)。
+     */
     public function canUseProjectBoard(): bool
     {
         return $this->is_procurement_manager

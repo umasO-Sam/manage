@@ -126,4 +126,44 @@ class NavigationPermissionTest extends TestCase
             $this->actingAs($staff)->get(route($routeName))->assertForbidden();
         }
     }
+
+    /**
+     * 物件管理はカード基盤を共有しているだけで専用画面を持つ。
+     * 調達ボードの一覧に混ざると同じボードへの入口が二つできてしまう。
+     */
+    public function test_the_project_board_is_not_listed_among_the_procurement_boards(): void
+    {
+        $html = $this->navHtmlFor(Staff::factory()->procurementManager()->create());
+
+        $this->assertStringNotContainsString('物件管理ボード', $html);
+        // 物件管理メニュー配下の物件ボードは残る
+        $this->assertStringContainsString('物件ボード', $html);
+        $this->assertStringContainsString('購入手配ボード', $html);
+    }
+
+    public function test_opening_the_project_board_as_a_generic_board_redirects_to_the_project_screen(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        $project = WorkflowType::where('slug', WorkflowType::SLUG_PROJECT)->firstOrFail();
+
+        $this->actingAs($manager)->get(route('cards.index', $project))
+            ->assertRedirect(route('projects.index'));
+    }
+
+    /**
+     * 一般社員ロールのままでも役員・資金管理者・administratorはメニュー項目が増えるため、
+     * ボードを横に並べたままだと右端で見切れる。ドロップダウンにまとめる。
+     */
+    public function test_general_staff_with_an_elevated_flag_get_the_grouped_board_menu(): void
+    {
+        $html = $this->navHtmlFor(Staff::factory()->create());
+        $this->assertStringNotContainsString('調達ボード', $html, '一般社員にはボードを直接並べる。');
+
+        foreach (['is_executive', 'is_fund_manager', 'is_administrator'] as $flag) {
+            $html = $this->navHtmlFor(Staff::factory()->create([$flag => true]));
+
+            $this->assertStringContainsString('調達ボード', $html, "{$flag} でドロップダウンにまとまっていません。");
+            $this->assertStringContainsString('購入手配ボード', $html);
+        }
+    }
 }
