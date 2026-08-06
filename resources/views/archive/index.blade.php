@@ -10,7 +10,7 @@
     </x-slot>
 
     <div class="py-8">
-        <div class="max-w-6xl mx-auto sm:px-6 lg:px-8 space-y-6">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
 
             <form method="GET" action="{{ route('archive.index') }}" class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
                 <div class="flex flex-wrap items-center gap-3 w-full md:w-auto">
@@ -40,49 +40,49 @@
 
             <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
                 <div class="overflow-x-auto">
-                    <table class="w-full text-left border-collapse">
+                    {{-- 1件1行。品名・メーカーは折り返さず、入り切らない画面でだけ横スクロールする。 --}}
+                    <table class="w-full text-left border-collapse whitespace-nowrap">
                         <thead>
                             <tr class="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-600">
-                                <th class="p-4">注番</th>
-                                <th class="p-4">種別</th>
-                                <th class="p-4">品名 / メーカー</th>
-                                <th class="p-4">数量</th>
-                                <th class="p-4">依頼者</th>
-                                <th class="p-4">完了日</th>
-                                <th class="p-4">ステータス</th>
-                                <th class="p-4 text-center">操作</th>
+                                <th class="px-3 py-2 w-px">注番</th>
+                                <th class="px-3 py-2 w-px">種別</th>
+                                <th class="px-3 py-2 w-full">品名</th>
+                                <th class="px-3 py-2 w-px">メーカー</th>
+                                <th class="px-3 py-2 w-px text-right">数量</th>
+                                <th class="px-3 py-2 w-px">依頼者</th>
+                                <th class="px-3 py-2 w-px">完了日</th>
+                                <th class="px-3 py-2 w-px">ステータス</th>
+                                <th class="px-3 py-2 w-px text-center">操作</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100 text-sm">
                             @forelse ($cards as $card)
                                 @php($rowAccent = $card->workflowType->accentClasses())
                                 <tr class="hover:bg-slate-50">
-                                    <td class="p-4 font-mono font-semibold text-slate-800">{{ $card->orderNumber->code }}</td>
-                                    <td class="p-4">
-                                        <span class="text-[11px] font-bold px-2.5 py-0.5 rounded-full {{ $rowAccent['badge_solid_bg'] }} {{ $rowAccent['badge_solid_text'] }}">{{ $card->workflowType->name }}</span>
+                                    <td class="px-3 py-1.5 w-px text-xs font-mono font-semibold text-slate-800">{{ $card->orderNumber->code }}</td>
+                                    <td class="px-3 py-1.5 w-px">
+                                        <span class="text-[11px] font-bold px-2 py-0.5 rounded-full {{ $rowAccent['badge_solid_bg'] }} {{ $rowAccent['badge_solid_text'] }}">{{ $card->workflowType->name }}</span>
                                     </td>
-                                    <td class="p-4">
-                                        <div class="font-bold text-slate-900">{{ $card->item_name }}</div>
-                                        <div class="text-xs text-slate-500">{{ $card->manufacturer }}</div>
-                                    </td>
-                                    <td class="p-4 font-semibold text-slate-700">{{ $card->quantity }}{{ $card->unit }}</td>
-                                    <td class="p-4 text-xs text-slate-600 font-medium">{{ $card->creator?->name ?? '(退職・削除済み)' }}</td>
-                                    <td class="p-4 text-xs text-slate-500">{{ $card->stageLogs->last()?->moved_at->format('Y-m-d') ?? '-' }}</td>
-                                    <td class="p-4">
+                                    <td class="px-3 py-1.5 w-full text-sm font-bold text-slate-900">{{ $card->item_name }}</td>
+                                    <td class="px-3 py-1.5 w-px text-xs text-slate-500">{{ $card->manufacturer }}</td>
+                                    <td class="px-3 py-1.5 w-px text-right text-xs font-semibold text-slate-700">{{ $card->quantity }}{{ $card->unit }}</td>
+                                    <td class="px-3 py-1.5 w-px text-xs text-slate-600 font-medium">{{ $card->creator?->name ?? '(退職・削除済み)' }}</td>
+                                    <td class="px-3 py-1.5 w-px text-xs text-slate-500">{{ $card->stageLogs->last()?->moved_at->format('Y-m-d') ?? '-' }}</td>
+                                    <td class="px-3 py-1.5 w-px">
                                         <span class="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded">
                                             <i data-lucide="archive" class="w-3 h-3"></i>
                                             <span>履歴保管(5年)</span>
                                         </span>
                                     </td>
-                                    <td class="p-4 text-center">
+                                    <td class="px-3 py-1.5 w-px text-center">
                                         <a href="{{ route('cards.show', $card) }}" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium py-1 px-2.5 rounded-lg border border-slate-200 transition-colors">
-                                            詳細履歴を確認
+                                            詳細履歴
                                         </a>
                                     </td>
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="8" class="p-8 text-center text-slate-400 text-xs">
+                                    <td colspan="9" class="p-8 text-center text-slate-400 text-xs">
                                         <i data-lucide="layers" class="w-12 h-12 mx-auto mb-2 text-slate-300"></i>
                                         一致するアーカイブ履歴はありません。
                                     </td>
