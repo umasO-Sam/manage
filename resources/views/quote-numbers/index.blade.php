@@ -14,6 +14,11 @@
                     <span class="font-mono font-bold">{{ session('taken_no') }}</span> を取得しました。
                 </div>
             @endif
+            @if (session('status') === 'quote-number-updated')
+                <div class="p-3 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-800 text-sm">
+                    <span class="font-mono font-bold">{{ session('updated_no') }}</span> を修正しました。
+                </div>
+            @endif
             @if ($errors->any())
                 <div class="p-3 rounded-xl bg-red-50 border border-red-100 text-red-800 text-sm">
                     @foreach ($errors->all() as $error)
@@ -155,7 +160,7 @@
                 <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
                     <div class="px-4 py-2.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between gap-2 flex-wrap">
                         <span class="text-sm font-bold text-slate-800">過去注番リスト（{{ $customerCode }}）{{ $history->count() }} 件</span>
-                        <span class="text-[11px] text-slate-500">見積単位の降順。規約どおりでない過去の表記もそのまま表示しています。</span>
+                        <span class="text-[11px] text-slate-500">見積単位の降順。補足区分（T/K/S/B/H）付きも含めて全件表示し、規約どおりでない過去の表記もそのまま出しています。</span>
                     </div>
                     <div class="overflow-x-auto max-h-[32rem] overflow-y-auto">
                         <table class="w-full text-left border-collapse text-xs">
@@ -163,39 +168,115 @@
                                 <tr class="bg-slate-50 border-b border-slate-200 font-semibold text-slate-600">
                                     <th class="p-2 whitespace-nowrap">注番</th>
                                     <th class="p-2 whitespace-nowrap">見積単位</th>
+                                    <th class="p-2 whitespace-nowrap text-center">区分</th>
                                     <th class="p-2">件名（工事名）</th>
                                     <th class="p-2">納入先</th>
                                     <th class="p-2 whitespace-nowrap">担当</th>
                                     <th class="p-2 whitespace-nowrap">完了日</th>
-                                    <th class="p-2 whitespace-nowrap">引用</th>
+                                    <th class="p-2 whitespace-nowrap text-center">操作</th>
                                 </tr>
                             </thead>
-                            <tbody class="divide-y divide-slate-100">
-                                @forelse ($history as $quote)
+                            {{-- 「修正」を押すと直下に編集行を開く。1件=1tbodyにして表示行と編集行を
+                                 同じAlpineスコープにまとめている。 --}}
+                            @forelse ($history as $quote)
+                                <tbody class="divide-y divide-slate-100 border-b border-slate-100" x-data="{ editing: false }">
                                     <tr class="hover:bg-blue-50">
                                         <td class="p-2 font-mono whitespace-nowrap">{{ $quote->full_no }}</td>
                                         <td class="p-2 font-mono whitespace-nowrap">{{ $quote->paddedUnitNo() }}</td>
+                                        <td class="p-2 whitespace-nowrap text-center">
+                                            @if ($quote->extra_code)
+                                                <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 border border-blue-200"
+                                                      title="{{ \App\Models\QuoteNumber::EXTRA_CODES[$quote->extra_code] ?? \App\Models\QuoteNumber::RETIRED_EXTRA_CODES[$quote->extra_code] ?? '' }}">{{ $quote->extra_code }}</span>
+                                            @elseif ($quote->quote_type === \App\Models\QuoteNumber::TYPE_FAKE)
+                                                <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-200 text-slate-700" title="フェイク（ダミー見積）">F</span>
+                                            @elseif ($quote->quote_type)
+                                                <span class="text-[10px] text-slate-400">N</span>
+                                            @endif
+                                        </td>
                                         <td class="p-2">{{ $quote->project_name }}</td>
                                         <td class="p-2">{{ $quote->delivery_dest }}</td>
                                         <td class="p-2 whitespace-nowrap">{{ $quote->staff?->name }}</td>
                                         <td class="p-2 whitespace-nowrap text-slate-500">{{ $quote->completed_on }}</td>
-                                        <td class="p-2 whitespace-nowrap">
-                                            @if ($mode !== '')
-                                                {{-- 元注番として引用する。構成や工事範囲の変更は通番を+1して採る。 --}}
-                                                <a href="{{ route('quote-numbers.index', [
-                                                        'customer_code' => $customerCode,
-                                                        'mode' => $mode,
-                                                        'unit_no' => $quote->unit_no,
-                                                        'base_seq' => $quote->quote_seq,
-                                                    ]) }}"
-                                                   class="text-blue-700 hover:text-blue-900 font-semibold">引用</a>
-                                            @endif
+                                        <td class="p-2 whitespace-nowrap text-center">
+                                            <div class="flex items-center gap-1 justify-center">
+                                                <button type="button" @click="editing = ! editing"
+                                                        class="px-2 py-1 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-50 font-bold">修正</button>
+                                                @if ($mode !== '')
+                                                    {{-- 元注番として引用する。構成や工事範囲の変更は通番を+1して採る。 --}}
+                                                    <a href="{{ route('quote-numbers.index', [
+                                                            'customer_code' => $customerCode,
+                                                            'mode' => $mode,
+                                                            'unit_no' => $quote->unit_no,
+                                                            'base_seq' => $quote->quote_seq,
+                                                        ]) }}"
+                                                       class="px-2 py-1 rounded-lg border border-blue-300 text-blue-700 hover:bg-blue-50 font-bold">引用</a>
+                                                @endif
+                                            </div>
                                         </td>
                                     </tr>
-                                @empty
-                                    <tr><td colspan="7" class="p-6 text-center text-slate-400">この客先番号の過去注番はありません。</td></tr>
-                                @endforelse
-                            </tbody>
+                                    <tr x-show="editing" x-cloak class="bg-slate-50">
+                                        <td colspan="8" class="p-3">
+                                            <form method="POST" action="{{ route('quote-numbers.update', $quote) }}"
+                                                  class="flex flex-wrap items-end gap-3">
+                                                @csrf
+                                                @method('PUT')
+                                                <span class="font-mono text-sm font-bold text-slate-700 pb-1.5">{{ $quote->full_no }}</span>
+                                                <label class="block flex-1 min-w-[12rem]">
+                                                    <span class="block text-[11px] font-bold text-slate-600 mb-0.5">件名（工事名）</span>
+                                                    <input type="text" name="project_name" value="{{ $quote->project_name }}"
+                                                           class="border rounded-lg p-1.5 border-slate-300 text-xs w-full">
+                                                </label>
+                                                <label class="block flex-1 min-w-[10rem]">
+                                                    <span class="block text-[11px] font-bold text-slate-600 mb-0.5">納入先</span>
+                                                    <input type="text" name="delivery_dest" value="{{ $quote->delivery_dest }}"
+                                                           class="border rounded-lg p-1.5 border-slate-300 text-xs w-full">
+                                                </label>
+                                                <label class="block">
+                                                    <span class="block text-[11px] font-bold text-slate-600 mb-0.5">客先担当者</span>
+                                                    <input type="text" name="customer_contact" value="{{ $quote->customer_contact }}"
+                                                           class="border rounded-lg p-1.5 border-slate-300 text-xs w-32">
+                                                </label>
+                                                <label class="block">
+                                                    <span class="block text-[11px] font-bold text-slate-600 mb-0.5">社内担当者</span>
+                                                    <select name="staff_id" class="border rounded-lg p-1.5 border-slate-300 text-xs">
+                                                        <option value="">（未設定）</option>
+                                                        @foreach ($staffList as $person)
+                                                            <option value="{{ $person->id }}" @selected($quote->staff_id === $person->id)>{{ $person->name }}</option>
+                                                        @endforeach
+                                                    </select>
+                                                </label>
+                                                <label class="block">
+                                                    <span class="block text-[11px] font-bold text-slate-600 mb-0.5">完了日</span>
+                                                    <input type="text" name="completed_on" value="{{ $quote->completed_on }}" placeholder="S59.5 など"
+                                                           class="border rounded-lg p-1.5 border-slate-300 text-xs w-24">
+                                                </label>
+                                                <label class="block">
+                                                    <span class="block text-[11px] font-bold text-slate-600 mb-0.5">ノートNo</span>
+                                                    <input type="text" name="note_no" value="{{ $quote->note_no }}"
+                                                           class="border rounded-lg p-1.5 border-slate-300 text-xs w-20">
+                                                </label>
+                                                <label class="block flex-1 min-w-[10rem]">
+                                                    <span class="block text-[11px] font-bold text-slate-600 mb-0.5">備考</span>
+                                                    <input type="text" name="remarks" value="{{ $quote->remarks }}"
+                                                           class="border rounded-lg p-1.5 border-slate-300 text-xs w-full">
+                                                </label>
+                                                <div class="flex items-center gap-2 pb-0.5">
+                                                    <button type="submit" class="px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-bold hover:bg-blue-700">保存</button>
+                                                    <button type="button" @click="editing = false"
+                                                            class="px-3 py-1.5 rounded-lg border border-slate-300 text-slate-600 text-xs font-bold">取消</button>
+                                                </div>
+                                                <p class="w-full text-[11px] text-slate-400">
+                                                    注番そのもの（客先番号・見積単位・見積区分・通番）は変更できません。採番の老番計算と取得済み判定の基準になっているためです。
+                                                </p>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            @empty
+                                <tbody>
+                                    <tr><td colspan="8" class="p-6 text-center text-slate-400">この客先番号の過去注番はありません。</td></tr>
+                                </tbody>
+                            @endforelse
                         </table>
                     </div>
                 </div>

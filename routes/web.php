@@ -101,6 +101,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/quote-numbers', [QuoteNumberController::class, 'index'])->name('quote-numbers.index');
         Route::post('/quote-numbers', [QuoteNumberController::class, 'store'])->name('quote-numbers.store');
         Route::get('/quote-numbers/lookup', [QuoteNumberController::class, 'lookup'])->name('quote-numbers.lookup');
+        Route::put('/quote-numbers/{quoteNumber}', [QuoteNumberController::class, 'update'])->name('quote-numbers.update');
     });
 
     // 物件管理ボード: 経理資材担当・役員・営業担当・資金管理者。

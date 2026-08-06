@@ -155,14 +155,11 @@ class QuoteNumberAllocator
      */
     public function history(string $customerCode, ?string $mode = null): Collection
     {
-        $query = QuoteNumber::where('customer_code', strtoupper(trim($customerCode)))->with('staff');
-
-        // 補足区分を採る種別のときは、元番号になりうる通常(N)の行を優先して見せる。
-        if ($mode !== null && (self::MODES[$mode]['extra'] ?? null) !== null) {
-            $query->where('quote_type', QuoteNumber::TYPE_NORMAL)->whereNull('extra_code');
-        }
-
-        return $query->get()
+        // 補足区分(T/K/S/B/H)が付いた注番も含めて全件出す。どの区分が何番まで
+        // 使われているかを見ながら採番するため、絞り込まない。
+        return QuoteNumber::where('customer_code', strtoupper(trim($customerCode)))
+            ->with('staff')
+            ->get()
             ->sortByDesc(fn (QuoteNumber $q) => [ctype_digit((string) $q->unit_no) ? (int) $q->unit_no : 0, $q->full_no])
             ->values();
     }

@@ -95,6 +95,30 @@ class QuoteNumberController extends Controller
     }
 
     /**
+     * 過去注番リストの1件を修正する。
+     *
+     * 注番そのもの(客先番号・見積単位・見積区分・通番)は変更できない。採番の老番計算と
+     * 取得済み判定の基準になっており、後から書き換えると既に配った番号と矛盾するため。
+     * 誤った注番は使わない旨を備考に書く運用にする。
+     */
+    public function update(Request $request, QuoteNumber $quoteNumber): RedirectResponse
+    {
+        $data = $request->validate([
+            'project_name' => ['nullable', 'string', 'max:255'],
+            'delivery_dest' => ['nullable', 'string', 'max:255'],
+            'customer_contact' => ['nullable', 'string', 'max:255'],
+            'remarks' => ['nullable', 'string', 'max:2000'],
+            'note_no' => ['nullable', 'string', 'max:255'],
+            'completed_on' => ['nullable', 'string', 'max:50'],
+            'staff_id' => ['nullable', 'integer', 'exists:staff,id'],
+        ]);
+
+        $quoteNumber->update($data);
+
+        return back()->with('status', 'quote-number-updated')->with('updated_no', $quoteNumber->full_no);
+    }
+
+    /**
      * 注番の完全一致検索。注番管理の新規登録・受注登録の「検索」ボタンから使う。
      */
     public function lookup(Request $request): JsonResponse

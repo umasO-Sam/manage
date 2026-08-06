@@ -150,6 +150,44 @@ class QuoteNumberAllocationTest extends TestCase
             ->assertOk()->assertJson(['found' => false]);
     }
 
+    /**
+     * 過去注番リストは補足区分(T/K/S/B/H)付きも含めて全件出す。
+     * どの区分が何番まで使われているかを見ながら採番するため。
+     */
+    public function test_the_history_includes_supplementary_numbers(): void
+    {
+        $staff = Staff::factory()->create(['role' => Staff::ROLE_SALES]);
+
+        $response = $this->actingAs($staff)->get(route('quote-numbers.index', [
+            'customer_code' => 'DH', 'mode' => 'remodel',
+        ]));
+
+        $response->assertOk()
+            ->assertSee('DH013-N01K01')   // 補足区分付き
+            ->assertSee('DH013-N02');     // 通常
+    }
+
+    public function test_a_history_row_can_be_corrected(): void
+    {
+        $staff = Staff::factory()->create(['role' => Staff::ROLE_SALES]);
+        $quote = QuoteNumber::where('full_no', 'DH013-N01')->sole();
+
+        $this->actingAs($staff)->put(route('quote-numbers.update', $quote), [
+            'project_name' => '直した件名',
+            'delivery_dest' => '直した納入先',
+            'customer_contact' => '客先花子',
+            'staff_id' => $staff->id,
+            'remarks' => 'メモ',
+        ])->assertRedirect();
+
+        $quote->refresh();
+        $this->assertSame('直した件名', $quote->project_name);
+        $this->assertSame('直した納入先', $quote->delivery_dest);
+        $this->assertSame($staff->id, $quote->staff_id);
+        // 注番そのものは変わらない
+        $this->assertSame('DH013-N01', $quote->full_no);
+    }
+
     public function test_general_staff_cannot_allocate(): void
     {
         $this->actingAs(Staff::factory()->create())->get(route('quote-numbers.index'))->assertForbidden();
