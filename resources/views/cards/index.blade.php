@@ -50,6 +50,11 @@
                     <i data-lucide="trash-2" class="w-4 h-4"></i>依頼カードを削除しました。
                 </div>
             @endif
+            @if (str_starts_with((string) session('status'), 'cards-marked-read:'))
+                <div class="mb-4 p-3 rounded-xl bg-slate-100 border border-slate-200 text-slate-700 text-sm flex items-center gap-2">
+                    <i data-lucide="mail-check" class="w-4 h-4"></i>自分の依頼以外の{{ (int) substr(session('status'), strlen('cards-marked-read:')) }}件を既読にしました。
+                </div>
+            @endif
             @if ($errors->any())
                 <div class="mb-4 p-3 rounded-xl bg-red-50 border border-red-100 text-red-800 text-sm">
                     @foreach ($errors->all() as $error)
@@ -77,6 +82,20 @@
                     <i data-lucide="user" class="w-3.5 h-3.5"></i>
                     <span>自分の依頼のみ表示</span>
                 </a>
+
+                {{-- 自分の依頼以外の未読をまとめて片付け、自分宛の新着だけを残せるようにする。
+                     未読が無いときはボタン自体を出さない。 --}}
+                @if ($othersUnreadCount > 0)
+                    <form method="POST" action="{{ route('cards.markOthersRead', $workflowType) }}"
+                          onsubmit="return confirm('自分の依頼ではないカード{{ $othersUnreadCount }}件を既読にします。よろしいですか？');">
+                        @csrf
+                        <button type="submit"
+                                class="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 transition-colors">
+                            <i data-lucide="mail-check" class="w-3.5 h-3.5"></i>
+                            <span>自分の依頼以外を既読にする（{{ $othersUnreadCount }}）</span>
+                        </button>
+                    </form>
+                @endif
 
                 <form method="GET" action="{{ route('cards.index', $workflowType) }}" class="flex items-center gap-2">
                     @if ($onlyMine)

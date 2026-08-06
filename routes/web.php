@@ -33,6 +33,7 @@ Route::redirect('/', '/boards/purchase');
 
 Route::middleware('auth')->group(function () {
     Route::get('/boards/{workflow}', [CardController::class, 'index'])->name('cards.index');
+    Route::post('/boards/{workflow}/mark-others-read', [CardController::class, 'markOthersRead'])->name('cards.markOthersRead');
     Route::get('/boards/{workflow}/create', [CardController::class, 'create'])->name('cards.create');
     Route::post('/boards/{workflow}', [CardController::class, 'store'])->name('cards.store');
 

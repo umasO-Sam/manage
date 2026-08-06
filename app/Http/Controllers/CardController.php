@@ -67,7 +67,63 @@ class CardController extends Controller
             'cardsByStage' => $cards,
             'onlyMine' => $onlyMine,
             'orderNo' => $orderNo,
+            'othersUnreadCount' => $this->othersUnreadCards($workflow, $staff)->count(),
         ]);
+    }
+
+    /**
+     * このボードの、自分の依頼ではない未読カード（未確認・新着コメントあり）。
+     * 一括既読の対象件数の表示と、実際の一括既読の両方で使う。
+     *
+     * @return \Illuminate\Support\Collection<int, Card>
+     */
+    private function othersUnreadCards(WorkflowType $workflow, Staff $staff)
+    {
+        return $workflow->cards()
+            // created_by が NULL のカードも「自分の依頼ではない」ものとして扱う
+            // (SQLの != は NULL を弾いてしまうため明示する)。
+            ->where(fn ($query) => $query->where('created_by', '!=', $staff->id)->orWhereNull('created_by'))
+            ->with([
+                'comments:id,card_id,created_at',
+                'views' => fn ($query) => $query->where('staff_id', $staff->id),
+            ])
+            ->get(['id'])
+            ->filter(fn (Card $card) => $card->unreadStatusFor($staff) !== null);
+    }
+
+    /**
+     * 自分の依頼ではないカードをまとめて既読にする。他の人の依頼の未読で
+     * バッジが埋まったときに、自分宛の新着だけを残せるようにするための操作。
+     */
+    public function markOthersRead(Request $request, WorkflowType $workflow): RedirectResponse
+    {
+        $this->authorize('viewAny', Card::class);
+
+        if ($workflow->isProjectBoard()) {
+            return redirect()->route('projects.index');
+        }
+
+        /** @var Staff $staff */
+        $staff = $request->user();
+        $now = now();
+
+        $rows = $this->othersUnreadCards($workflow, $staff)
+            ->map(fn (Card $card) => [
+                'card_id' => $card->id,
+                'staff_id' => $staff->id,
+                'viewed_at' => $now,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ])
+            ->values()
+            ->all();
+
+        if ($rows !== []) {
+            // (card_id, staff_id) の一意制約があるため、既存の閲覧記録は viewed_at だけ更新される。
+            CardView::upsert($rows, ['card_id', 'staff_id'], ['viewed_at', 'updated_at']);
+        }
+
+        return back()->with('status', 'cards-marked-read:'.count($rows));
     }
 
     public function create(WorkflowType $workflow): View

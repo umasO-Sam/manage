@@ -116,6 +116,47 @@ class CardUnreadStatusTest extends TestCase
     }
 
     /**
+     * ボードの「自分の依頼以外を既読にする」。他人の依頼の未読を片付けて、
+     * 自分宛の新着だけを残せるようにする操作。
+     */
+    public function test_marking_others_cards_as_read_leaves_own_cards_unread(): void
+    {
+        $workflowType = $this->purchaseWorkflow();
+        $staff = Staff::factory()->create();
+        $other = Staff::factory()->create();
+
+        $ownCard = $this->makeCard($workflowType, $staff);
+        $othersCard = $this->makeCard($workflowType, $other);
+
+        $this->actingAs($staff)->post(route('cards.markOthersRead', $workflowType))->assertRedirect();
+
+        $this->assertDatabaseHas('card_views', ['card_id' => $othersCard->id, 'staff_id' => $staff->id]);
+        $this->assertDatabaseMissing('card_views', ['card_id' => $ownCard->id, 'staff_id' => $staff->id]);
+        $this->assertSame([$workflowType->id => 1], $staff->unreadCardCountsByWorkflow());
+    }
+
+    /** 他のボードの未読は残す(ボードごとに片付ける)。 */
+    public function test_marking_others_cards_as_read_only_affects_the_current_board(): void
+    {
+        $purchase = $this->purchaseWorkflow();
+        $estimate = WorkflowType::create([
+            'slug' => 'estimate', 'name' => '見積依頼', 'due_date_label' => '希望納期',
+            'icon' => 'file-text', 'accent' => 'emerald',
+            'stage_definition' => [['label' => '新規依頼', 'actor_label' => '依頼者']],
+            'retention_days' => 7,
+        ]);
+        $staff = Staff::factory()->create();
+        $other = Staff::factory()->create();
+
+        $this->makeCard($purchase, $other);
+        $estimateCard = $this->makeCard($estimate, $other);
+
+        $this->actingAs($staff)->post(route('cards.markOthersRead', $purchase))->assertRedirect();
+
+        $this->assertDatabaseMissing('card_views', ['card_id' => $estimateCard->id, 'staff_id' => $staff->id]);
+    }
+
+    /**
      * ナビのバッジは、経理資材担当は全カード、それ以外は自分が起票した分だけを数える。
      * 他人の依頼の未読でバッジが埋まると、自分宛のコメントに気づけなくなるため。
      */
