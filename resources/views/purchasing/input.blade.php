@@ -171,25 +171,8 @@
                         <x-text-input id="supplier_invoice_no" name="supplier_invoice_no" type="text" class="mt-1 block w-full" :value="old('supplier_invoice_no')" />
                     </div>
 
-                    <div class="md:col-span-2 border-t border-slate-100 pt-4">
-                        <h3 class="text-xs font-bold text-slate-500 mb-3 uppercase tracking-wider">受注情報（他社から受注した場合）</h3>
-                    </div>
-                    <div>
-                        <x-input-label for="recipient" value="受注先" />
-                        <x-text-input id="recipient" name="recipient" type="text" class="mt-1 block w-full" :value="old('recipient')" />
-                    </div>
-                    <div>
-                        <x-input-label for="order_received_date" value="受注日" />
-                        <x-date-text-input id="order_received_date" name="order_received_date" class="mt-1 block w-full" :value="old('order_received_date')" />
-                    </div>
-                    <div>
-                        <x-input-label for="delivery_dest" value="納入先" />
-                        <x-text-input id="delivery_dest" name="delivery_dest" type="text" class="mt-1 block w-full" :value="old('delivery_dest')" />
-                    </div>
-                    <div>
-                        <x-input-label for="order_amount" value="受注金額" />
-                        <x-text-input id="order_amount" name="order_amount" type="number" step="0.01" class="mt-1 block w-full" :value="old('order_amount')" />
-                    </div>
+                    {{-- 受注情報(受注先・受注日・納入先・受注金額)は物件管理ボードの受注登録で
+                         受注ヘッダに入力するため、この画面からは外している。 --}}
                     <div>
                         <x-input-label for="sales_date" value="売上日" />
                         <x-date-text-input id="sales_date" name="sales_date" class="mt-1 block w-full" :value="old('sales_date')" />

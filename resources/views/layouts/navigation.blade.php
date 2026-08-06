@@ -101,13 +101,31 @@
                         </x-dropdown>
                     @endif
 
-                    {{-- 物件管理: 経理資材担当・役員・営業担当・資金管理者 --}}
+                    {{-- 物件管理: 経理資材担当・役員・営業担当・資金管理者。
+                         物件履歴は調達ボードの「履歴」とは別で、取引先一覧もこの配下に置く。 --}}
                     @if ($viewer->canUseProjectBoard())
-                        <a href="{{ route('projects.index') }}"
-                           class="px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 shrink-0 whitespace-nowrap transition-colors {{ request()->routeIs('projects.*') ? 'bg-slate-200 text-slate-800' : 'text-slate-600 hover:bg-slate-50' }}">
-                            <i data-lucide="building-2" class="w-4 h-4"></i>
-                            <span>物件管理</span>
-                        </a>
+                        <x-dropdown align="left" width="56">
+                            <x-slot name="trigger">
+                                <button class="px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 whitespace-nowrap transition-colors {{ request()->routeIs('projects.*') || request()->routeIs('business-partners.*') ? 'bg-slate-200 text-slate-800' : 'text-slate-600 hover:bg-slate-50' }}">
+                                    <i data-lucide="building-2" class="w-4 h-4"></i>
+                                    <span>物件管理</span>
+                                    <i data-lucide="chevron-down" class="w-3.5 h-3.5"></i>
+                                </button>
+                            </x-slot>
+                            <x-slot name="content">
+                                <x-dropdown-link :href="route('projects.index')">
+                                    <i data-lucide="building-2" class="w-3.5 h-3.5 inline-block align-text-bottom mr-1"></i> 物件ボード
+                                </x-dropdown-link>
+                                <x-dropdown-link :href="route('projects.history')">
+                                    <i data-lucide="history" class="w-3.5 h-3.5 inline-block align-text-bottom mr-1"></i> 物件履歴
+                                </x-dropdown-link>
+                                @if ($viewer->canManageBusinessPartners())
+                                    <x-dropdown-link :href="route('business-partners.index')">
+                                        <i data-lucide="handshake" class="w-3.5 h-3.5 inline-block align-text-bottom mr-1"></i> 取引先一覧
+                                    </x-dropdown-link>
+                                @endif
+                            </x-slot>
+                        </x-dropdown>
                     @endif
 
                     {{-- 勤怠管理: 全員が利用でき、項目ごとに権限で出し分ける --}}
@@ -220,11 +238,6 @@
                                 @if ($isSupervisorOrManager)
                                     <x-dropdown-link :href="route('purchasing.cost-report.index')">
                                         <i data-lucide="table" class="w-3.5 h-3.5 inline-block align-text-bottom mr-1"></i> 原価一覧
-                                    </x-dropdown-link>
-                                @endif
-                                @if ($viewer->canManageBusinessPartners())
-                                    <x-dropdown-link :href="route('business-partners.index')">
-                                        <i data-lucide="handshake" class="w-3.5 h-3.5 inline-block align-text-bottom mr-1"></i> 取引先一覧
                                     </x-dropdown-link>
                                 @endif
                             </x-slot>
@@ -354,9 +367,18 @@
             @endif
 
             @if ($viewer->canUseProjectBoard())
-                <a href="{{ route('projects.index') }}" class="block px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap {{ request()->routeIs('projects.*') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
-                    物件管理
+                <div class="px-3 py-2 text-xs font-bold text-slate-400 uppercase tracking-wider">物件管理</div>
+                <a href="{{ route('projects.index') }}" class="block px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap {{ request()->routeIs('projects.index') || request()->routeIs('projects.show') || request()->routeIs('projects.create') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
+                    物件ボード
                 </a>
+                <a href="{{ route('projects.history') }}" class="block px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap {{ request()->routeIs('projects.history') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
+                    物件履歴
+                </a>
+                @if ($viewer->canManageBusinessPartners())
+                    <a href="{{ route('business-partners.index') }}" class="block px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap {{ request()->routeIs('business-partners.*') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
+                        取引先一覧
+                    </a>
+                @endif
             @endif
 
             {{-- 勤怠管理: 全員 --}}
@@ -445,11 +467,6 @@
                 @if ($isSupervisorOrManager)
                     <a href="{{ route('purchasing.cost-report.index') }}" class="block px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap {{ request()->routeIs('purchasing.cost-report.*') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
                         原価一覧
-                    </a>
-                @endif
-                @if ($viewer->canManageBusinessPartners())
-                    <a href="{{ route('business-partners.index') }}" class="block px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap {{ request()->routeIs('business-partners.*') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
-                        取引先一覧
                     </a>
                 @endif
             @endif

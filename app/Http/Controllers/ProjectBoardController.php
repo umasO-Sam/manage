@@ -36,11 +36,46 @@ class ProjectBoardController extends Controller
             ->orderByDesc('id')
             ->get();
 
+        // ドラッグ&ドロップで隣のステージへ落とせるようにするため、カードごとに
+        // 「次のステージへ進めない理由」をあらかじめ渡しておく(落とした時点で
+        // サーバーへ往復せずに理由を出せるようにする。保存時は必ずサーバー側でも判定する)。
+        $blockersByCard = $cards->mapWithKeys(fn (Card $card) => [
+            $card->id => $card->isAtFinalStage() ? ['このカードはすでに入金済です。'] : $gate->blockers($card, $card->current_stage + 1),
+        ])->all();
+
         return view('projects.index', [
             'workflowType' => $workflowType,
             'cardsByStage' => $cards->groupBy('current_stage'),
-            'gate' => $gate,
+            'blockersByCard' => $blockersByCard,
             'canHide' => Auth::user()->canManageBusinessPartners(),
+        ]);
+    }
+
+    /**
+     * 物件履歴。調達ボードの「履歴」とは別で、非表示にしたカードも含め物件だけを扱う。
+     * 期間による削除を行わないため、過去の受注をここから遡って参照できる。
+     */
+    public function history(Request $request): View
+    {
+        $keyword = trim((string) $request->query('q', ''));
+        $onlyHidden = $request->boolean('hidden');
+
+        $orders = BusinessOrder::query()
+            ->whereHas('card', fn ($q) => $q->withTrashed())
+            ->with(['businessPartner', 'staff', 'card' => fn ($q) => $q->withTrashed()])
+            ->when($keyword !== '', fn ($q) => $q->where(fn ($w) => $w
+                ->where('order_no', 'like', "%{$keyword}%")
+                ->orWhere('product_name', 'like', "%{$keyword}%")
+                ->orWhere('recipient', 'like', "%{$keyword}%")))
+            ->when($onlyHidden, fn ($q) => $q->whereHas('card', fn ($c) => $c->onlyTrashed()))
+            ->orderByDesc('order_received_date')
+            ->orderByDesc('id')
+            ->paginate(50)
+            ->withQueryString();
+
+        return view('projects.history', [
+            'orders' => $orders,
+            'filters' => ['q' => $keyword, 'hidden' => $onlyHidden],
         ]);
     }
 

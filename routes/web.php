@@ -91,6 +91,7 @@ Route::middleware('auth')->group(function () {
     // 物件管理ボード: 経理資材担当・役員・営業担当・資金管理者。
     Route::middleware('project.board')->group(function () {
         Route::get('/projects', [ProjectBoardController::class, 'index'])->name('projects.index');
+        Route::get('/projects/history', [ProjectBoardController::class, 'history'])->name('projects.history');
         Route::get('/projects/create', [ProjectBoardController::class, 'create'])->name('projects.create');
         Route::post('/projects', [ProjectBoardController::class, 'store'])->name('projects.store');
         Route::get('/projects/{card}', [ProjectBoardController::class, 'show'])->name('projects.show')->withTrashed();

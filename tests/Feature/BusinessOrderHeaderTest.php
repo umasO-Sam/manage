@@ -63,10 +63,19 @@ class BusinessOrderHeaderTest extends TestCase
             ->assertOk()->assertSee('50,000');
     }
 
-    public function test_entering_order_fields_on_the_input_screen_creates_the_header(): void
+    /**
+     * 受注情報は物件管理ボードの受注登録で受注ヘッダに入れる運用にしたため、
+     * 仕入管理のデータ入力画面では受注先・受注日・納入先・受注金額を扱わない。
+     */
+    public function test_the_input_screen_no_longer_handles_order_information(): void
     {
         $manager = Staff::factory()->procurementManager()->create();
         $category = CategoryCode::create(['code' => 3, 'major_category' => '部品', 'is_parts' => true]);
+
+        $this->actingAs($manager)->get(route('purchasing.input'))
+            ->assertOk()
+            ->assertDontSee('受注情報（他社から受注した場合）')
+            ->assertDontSee('name="order_amount"', false);
 
         $this->actingAs($manager)->post(route('purchasing.input.store'), [
             'form_type' => 'purchase',
@@ -77,19 +86,12 @@ class BusinessOrderHeaderTest extends TestCase
             'order_qty' => 5,
             'unit_price' => 1000,
             'supplier_name' => '大津屋',
-            'product_name' => '搬送装置',
-            'recipient' => '受注先A',
-            'delivery_dest' => '納入先A',
-            'order_received_date' => '2026-07-01',
+            // 送られてきても受注ヘッダは作らない
             'order_amount' => 300000,
         ])->assertRedirect();
 
-        $header = BusinessOrder::where('order_no', 'NEW001-N01')->sole();
-        $this->assertSame('受注先A', $header->recipient);
-        $this->assertSame('納入先A', $header->delivery_dest);
-        $this->assertSame('搬送装置', $header->product_name);
-        $this->assertSame('2026-07-01', $header->order_received_date->format('Y-m-d'));
-        $this->assertSame(300000.0, (float) $header->order_amount);
+        $this->assertDatabaseHas('purchase_details', ['item_code' => 'NEW001-N01']);
+        $this->assertNull(BusinessOrder::where('order_no', 'NEW001-N01')->first());
     }
 
     public function test_editing_the_amount_on_a_detail_updates_the_header(): void

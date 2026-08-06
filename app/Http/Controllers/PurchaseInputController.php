@@ -62,10 +62,8 @@ class PurchaseInputController extends Controller
             'order_date' => ['nullable', 'date'],
             'arrival_date' => ['nullable', 'date'],
             'invoice_date' => ['nullable', 'date'],
-            'recipient' => ['nullable', 'string', 'max:255'],
-            'order_received_date' => ['nullable', 'date'],
-            'delivery_dest' => ['nullable', 'string', 'max:255'],
-            'order_amount' => ['nullable', 'numeric'],
+            // 受注情報(受注先・受注日・納入先・受注金額)はこの画面では扱わない。
+            // 受注は物件管理ボードで登録し、受注ヘッダ(business_orders)が持つ。
             'sales_date' => ['nullable', 'date'],
             'supplier_invoice_no' => ['nullable', 'string', 'max:255'],
         ], [
@@ -74,10 +72,6 @@ class PurchaseInputController extends Controller
         $data['is_provisional'] = $isProvisional;
 
         PurchaseDetail::create($data);
-
-        // 受注項目(受注先・受注日・納入先・受注金額・売上日・製品名)は受注ヘッダが正。
-        // 集計はヘッダしか見ないため、明細に入力された分をここで反映する。
-        BusinessOrder::syncFromDetail($data['item_code'] ?? null, $data);
 
         return redirect()->route('purchasing.input')->with('status', $isProvisional ? 'input-provisional' : 'input-created');
     }
