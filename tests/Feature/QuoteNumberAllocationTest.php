@@ -72,12 +72,56 @@ class QuoteNumberAllocationTest extends TestCase
         $this->assertSame('DH013-N01K02', $this->allocator->build('DH', 'remodel', '013', '01')['candidate']);
     }
 
-    public function test_it_reports_what_is_missing_instead_of_guessing(): void
+    /**
+     * H(変更)はNの後ろだけでなく、T/K/S/Bの後ろにも付く。
+     */
+    public function test_a_change_can_hang_off_a_supplementary_number(): void
     {
-        $result = $this->allocator->build('DH', 'remodel', null, null);
+        $this->assertSame('DH013-N01K01H01', $this->allocator->build('DH', 'change', '013', 'N01K01')['candidate']);
 
-        $this->assertNull($result['candidate']);
-        $this->assertSame(['見積単位', '元の見積通番'], $result['missing']);
+        // 同じ元番号でもう1件採ると通番が進む
+        QuoteNumber::create([
+            'full_no' => 'DH013-N01K01H01', 'customer_code' => 'DH', 'unit_no' => '013',
+            'suffix' => 'N01K01H01', 'quote_type' => 'N', 'quote_seq' => '01', 'extra_code' => 'K', 'source' => 'manage',
+        ]);
+
+        $this->assertSame('DH013-N01K01H02', $this->allocator->build('DH', 'change', '013', 'N01K01')['candidate']);
+    }
+
+    /**
+     * 数字だけを入れた場合は通常番号の通番とみなしてNを補う。
+     */
+    public function test_a_bare_sequence_is_treated_as_the_normal_quote_number(): void
+    {
+        $this->assertSame('DH013-N01H01', $this->allocator->build('DH', 'change', '013', '1')['candidate']);
+    }
+
+    /**
+     * 改造・修理・部品は元注番がなければ新規案件(N)として採る。
+     * 補足区分だと思い込みやすいので、画面側でも注釈を出している。
+     */
+    public function test_remodel_repair_and_parts_fall_back_to_a_new_project(): void
+    {
+        foreach (['remodel', 'repair', 'parts'] as $mode) {
+            $result = $this->allocator->build('DH', $mode, null, null);
+
+            $this->assertSame('DH021-N01', $result['candidate'], "{$mode} は元注番が無ければ新規採番になる");
+            $this->assertTrue($result['fell_back_to_new']);
+            $this->assertNull($result['extra_code']);
+        }
+    }
+
+    /**
+     * 追加請求(T)と変更(H)は必ず元注番にぶら下がるため、空のままでは採番しない。
+     */
+    public function test_additional_and_change_still_require_a_base_number(): void
+    {
+        foreach (['additional', 'change'] as $mode) {
+            $result = $this->allocator->build('DH', $mode, null, null);
+
+            $this->assertNull($result['candidate']);
+            $this->assertSame(['見積単位', '元の見積番号'], $result['missing']);
+        }
     }
 
     public function test_the_unit_number_is_zero_padded_and_old_two_digit_units_are_matched(): void

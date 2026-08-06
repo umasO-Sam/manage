@@ -29,14 +29,14 @@ class QuoteNumberController extends Controller
         $mode = array_key_exists($mode, QuoteNumberAllocator::MODES) ? $mode : '';
 
         $allocation = ($customerCode !== '' && $mode !== '')
-            ? $allocator->build($customerCode, $mode, $request->query('unit_no'), $request->query('base_seq'))
+            ? $allocator->build($customerCode, $mode, $request->query('unit_no'), $request->query('base_no'))
             : null;
 
         return view('quote-numbers.index', [
             'customerCode' => $customerCode,
             'mode' => $mode,
             'unitNo' => (string) $request->query('unit_no', ''),
-            'baseSeq' => (string) $request->query('base_seq', ''),
+            'baseNo' => (string) $request->query('base_no', ''),
             'allocation' => $allocation,
             'history' => $customerCode !== '' ? $allocator->history($customerCode, $mode ?: null) : collect(),
             'companyName' => $this->resolveCompanyName($customerCode),
@@ -51,7 +51,8 @@ class QuoteNumberController extends Controller
             'customer_code' => ['required', 'string', 'max:10', 'regex:/^[A-Za-z]{1,5}$/'],
             'mode' => ['required', Rule::in(array_keys(QuoteNumberAllocator::MODES))],
             'unit_no' => ['nullable', 'string', 'max:10'],
-            'base_seq' => ['nullable', 'string', 'max:4'],
+            // 元番号はハイフン以降そのもの。H は T/K/S/B の後ろにも付くため多段になりうる。
+            'base_no' => ['nullable', 'string', 'max:20'],
             'project_name' => ['required', 'string', 'max:255'],
             'company_name' => ['nullable', 'string', 'max:255'],
             'delivery_dest' => ['required', 'string', 'max:255'],
@@ -62,7 +63,7 @@ class QuoteNumberController extends Controller
             'customer_code.regex' => '客先番号はアルファベットで入力してください。',
         ]);
 
-        $allocation = $allocator->build($data['customer_code'], $data['mode'], $data['unit_no'] ?? null, $data['base_seq'] ?? null);
+        $allocation = $allocator->build($data['customer_code'], $data['mode'], $data['unit_no'] ?? null, $data['base_no'] ?? null);
 
         if ($allocation['candidate'] === null) {
             return back()->withInput()->withErrors(['candidate' => '採番に必要な項目が足りません：'.implode('、', $allocation['missing'])]);

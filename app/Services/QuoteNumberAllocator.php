@@ -14,7 +14,11 @@ use Illuminate\Support\Collection;
  *   新規案件            見積単位を老番+1、N01
  *   フェイク            見積単位を老番+1、F+通番
  *   構成や工事範囲の変更 見積単位は既存、Nの通番を+1
- *   追加請求/改造/修理/部品/変更 見積単位と元のN通番は既存、補足区分の通番を+1
+ *   追加請求/改造/修理/部品/変更 既存の注番の後ろに補足区分+通番を足す
+ *
+ * 補足区分は多段になりうる。特にH(変更)はNの後ろだけでなくT/K/S/Bの後ろにも付く
+ * (例: N01K01H01 = 改造案件K01の見積を変更したもの)。そのため元番号は「通番」ではなく
+ * ハイフン以降の注番そのもの(N01 / N01K01 など)で受け取る。
  */
 class QuoteNumberAllocator
 {
@@ -34,6 +38,13 @@ class QuoteNumberAllocator
     private const NEW_UNIT_MODES = ['new', 'fake'];
 
     /**
+     * 元注番が無ければ新規案件(N)として採る案件種別。
+     * 改造・修理・部品は「過去の自社装置にリンクさせやすいように」補足区分にしているだけで、
+     * 対象になる過去注番が無ければ普通の新規案件として採る。
+     */
+    private const OPTIONAL_BASE_MODES = ['remodel', 'repair', 'parts'];
+
+    /**
      * 採番候補を組み立てる。入力が足りない場合は candidate を null にして
      * 「何を入力すれば決まるか」を missing で返す。
      *
@@ -41,7 +52,7 @@ class QuoteNumberAllocator
      *     quote_seq: string|null, extra_code: string|null, extra_seq: string|null,
      *     missing: array<int, string>, duplicate: bool}
      */
-    public function build(string $customerCode, string $mode, ?string $unitNo, ?string $baseSeq): array
+    public function build(string $customerCode, string $mode, ?string $unitNo, ?string $baseNo): array
     {
         $customerCode = strtoupper(trim($customerCode));
         $extra = self::MODES[$mode]['extra'] ?? null;
@@ -51,8 +62,20 @@ class QuoteNumberAllocator
             return $this->result(null, null, null, null, null, ['客先番号'], false);
         }
 
-        // 見積単位: 新規・フェイクは老番+1、それ以外は入力(過去注番リストから引用)。
-        if (in_array($mode, self::NEW_UNIT_MODES, true)) {
+        $baseSuffix = $extra !== null ? $this->normalizeBaseNo($baseNo) : null;
+
+        // 改造・修理・部品で元注番が無い場合は、過去の自社装置に紐づかない案件なので
+        // 補足区分を付けず新規案件(N)として採番する。間違えやすいので画面側で注釈を出す。
+        $fellBackToNew = $extra !== null
+            && $baseSuffix === null
+            && in_array($mode, self::OPTIONAL_BASE_MODES, true);
+
+        if ($fellBackToNew) {
+            $extra = null;
+        }
+
+        // 見積単位: 新規・フェイク(と上の切り替わり)は老番+1、それ以外は入力(過去注番リストから引用)。
+        if ($fellBackToNew || in_array($mode, self::NEW_UNIT_MODES, true)) {
             $unitNo = $this->nextUnitNo($customerCode);
         } else {
             $unitNo = $this->normalizeUnit($unitNo);
@@ -65,34 +88,34 @@ class QuoteNumberAllocator
         $quoteSeq = null;
         $extraSeq = null;
 
-        // 補足区分を採る場合、元のN通番は入力してもらう。足りないものは
-        // 見積単位と合わせて一度に返す(1つずつ聞き返さないため)。
-        if ($extra !== null) {
-            $quoteSeq = $this->normalizeSeq($baseSeq);
-            if ($quoteSeq === null) {
-                $missing[] = '元の見積通番';
-            }
-        }
-
-        if ($missing === [] && $unitNo !== null) {
-            $quoteSeq = $extra !== null
-                ? $quoteSeq
-                // 見積区分側で採る(新規=01から、範囲変更・フェイクは老番+1)。
-                : $this->nextQuoteSeq($customerCode, $unitNo, $quoteType);
-
-            if ($extra !== null) {
-                $extraSeq = $this->nextExtraSeq($customerCode, $unitNo, $quoteType, $quoteSeq, $extra);
-            }
+        // 補足区分を採る場合、元番号(ハイフン以降)は必須。足りないものは見積単位と
+        // 合わせて一度に返す(1つずつ聞き返さないため)。
+        if ($extra !== null && $baseSuffix === null) {
+            $missing[] = '元の見積番号';
         }
 
         if ($missing !== []) {
-            return $this->result(null, $unitNo, $quoteType, $quoteSeq, $extra, $missing, false);
+            return $this->result(null, $unitNo, $quoteType, null, $extra, $missing, false);
         }
 
-        $candidate = $customerCode.$unitNo.'-'.$quoteType.$quoteSeq.($extra !== null ? $extra.$extraSeq : '');
+        if ($extra !== null) {
+            // 元番号の先頭グループを見積区分・見積通番として保持する。
+            $parsed = QuoteNumber::parseSuffix($baseSuffix);
+            $quoteType = $parsed['quote_type'] ?? $quoteType;
+            $quoteSeq = $parsed['quote_seq'] ?? null;
+            $extraSeq = $this->nextExtraSeq($customerCode, $unitNo, $baseSuffix, $extra);
+        } else {
+            // 見積区分側で採る(新規=01から、範囲変更・フェイクは老番+1)。
+            $quoteSeq = $this->nextQuoteSeq($customerCode, $unitNo, $quoteType);
+        }
+
+        $candidate = $extra !== null
+            ? $customerCode.$unitNo.'-'.$baseSuffix.$extra.$extraSeq
+            : $customerCode.$unitNo.'-'.$quoteType.$quoteSeq;
 
         return [
             'candidate' => $candidate,
+            'fell_back_to_new' => $fellBackToNew,
             'unit_no' => $unitNo,
             'quote_type' => $quoteType,
             'quote_seq' => $quoteSeq,
@@ -134,11 +157,13 @@ class QuoteNumberAllocator
     }
 
     /**
-     * 元の見積番号にぶら下がる補足区分の通番(老番+1、2桁ゼロ埋め)。
+     * 元番号にぶら下がる補足区分の通番(老番+1、2桁ゼロ埋め)。
+     * 元番号は N01 のような通常番号だけでなく、N01K01 のように補足区分付きも取りうる
+     * (H は T/K/S/B の後ろにも付くため)。
      */
-    public function nextExtraSeq(string $customerCode, string $unitNo, string $quoteType, string $quoteSeq, string $extra): string
+    public function nextExtraSeq(string $customerCode, string $unitNo, string $baseSuffix, string $extra): string
     {
-        $prefix = $customerCode.$unitNo.'-'.$quoteType.$quoteSeq.$extra;
+        $prefix = $customerCode.$unitNo.'-'.$baseSuffix.$extra;
 
         $max = $this->sameUnit($customerCode, $unitNo)
             ->filter(fn (QuoteNumber $q) => str_starts_with((string) $q->full_no, $prefix))
@@ -181,11 +206,23 @@ class QuoteNumberAllocator
         return $unitNo !== '' && ctype_digit($unitNo) ? str_pad($unitNo, 3, '0', STR_PAD_LEFT) : null;
     }
 
-    private function normalizeSeq(?string $seq): ?string
+    /**
+     * 元番号(ハイフン以降)を正規化する。数字だけなら通常番号の通番とみなして N を補う
+     * (「01」→「N01」)。すでに区分付きならそのまま使う(「N01K01」など)。
+     */
+    private function normalizeBaseNo(?string $baseNo): ?string
     {
-        $seq = trim((string) $seq);
+        $baseNo = strtoupper(trim((string) $baseNo));
 
-        return $seq !== '' && ctype_digit($seq) ? str_pad($seq, 2, '0', STR_PAD_LEFT) : null;
+        if ($baseNo === '') {
+            return null;
+        }
+
+        if (ctype_digit($baseNo)) {
+            $baseNo = QuoteNumber::TYPE_NORMAL.str_pad($baseNo, 2, '0', STR_PAD_LEFT);
+        }
+
+        return preg_match('/^[A-Z]\d{2,3}(?:[A-Z]\d{2,3})*$/', $baseNo) ? $baseNo : null;
     }
 
     /**
@@ -196,6 +233,7 @@ class QuoteNumberAllocator
     {
         return [
             'candidate' => $candidate,
+            'fell_back_to_new' => false,
             'unit_no' => $unitNo,
             'quote_type' => $quoteType,
             'quote_seq' => $quoteSeq,

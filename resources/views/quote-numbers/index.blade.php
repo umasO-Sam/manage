@@ -57,6 +57,12 @@
                             </label>
                         @endforeach
                     </div>
+                    {{-- 間違えやすいので常に出しておく注釈。 --}}
+                    <p class="mt-1.5 text-[11px] text-slate-500">
+                        改造（K）・修理（S）・部品（B）は<strong>元注番がある場合の補足区分</strong>です。
+                        過去の自社装置に紐づかない場合は、元の見積番号を空のままにすると
+                        <strong>新規案件として N で採番</strong>します。
+                    </p>
                 </div>
 
                 @if ($mode !== '' && ($allocation['missing'] ?? []) !== [])
@@ -70,20 +76,21 @@
                         @else
                             <input type="hidden" name="unit_no" value="{{ $unitNo }}">
                         @endif
-                        @if (in_array('元の見積通番', $allocation['missing'], true))
+                        @if (in_array('元の見積番号', $allocation['missing'], true))
                             <label class="block">
-                                <span class="block text-[11px] font-bold text-amber-800 mb-0.5">元の見積通番（N のうしろ）</span>
-                                <input type="text" name="base_seq" value="{{ $baseSeq }}"
-                                       class="border rounded-lg p-2 border-amber-300 text-sm font-mono w-20">
+                                <span class="block text-[11px] font-bold text-amber-800 mb-0.5">元の見積番号（ハイフン以降。N01 / N01K01 など）</span>
+                                <input type="text" name="base_no" value="{{ $baseNo }}" placeholder="N01"
+                                       class="border rounded-lg p-2 border-amber-300 text-sm font-mono uppercase w-32">
+                                <span class="block text-[10px] text-amber-700 mt-0.5">H（変更）は T/K/S/B の後ろにも付けられます。</span>
                             </label>
                         @else
-                            <input type="hidden" name="base_seq" value="{{ $baseSeq }}">
+                            <input type="hidden" name="base_no" value="{{ $baseNo }}">
                         @endif
                         <button type="submit" class="px-4 py-2 rounded-lg bg-amber-600 text-white text-sm font-bold hover:bg-amber-700">候補を計算</button>
                     </div>
                 @else
                     <input type="hidden" name="unit_no" value="{{ $unitNo }}">
-                    <input type="hidden" name="base_seq" value="{{ $baseSeq }}">
+                    <input type="hidden" name="base_no" value="{{ $baseNo }}">
                 @endif
             </form>
 
@@ -94,7 +101,7 @@
                     <input type="hidden" name="customer_code" value="{{ $customerCode }}">
                     <input type="hidden" name="mode" value="{{ $mode }}">
                     <input type="hidden" name="unit_no" value="{{ $unitNo }}">
-                    <input type="hidden" name="base_seq" value="{{ $baseSeq }}">
+                    <input type="hidden" name="base_no" value="{{ $baseNo }}">
 
                     <div>
                         <span class="block text-[11px] font-bold text-slate-600 mb-1">注番候補</span>
@@ -106,6 +113,12 @@
                                 <span class="text-blue-700">{{ $allocation['extra_code'] }}{{ $allocation['extra_seq'] }}</span>
                             @endif
                         </div>
+                        @if ($allocation['fell_back_to_new'] ?? false)
+                            <p class="mt-2 text-xs font-bold text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-2">
+                                元の見積番号が空のため、<strong>{{ $modes[$mode]['label'] }}ではなく新規案件（N）として採番</strong>しています。
+                                過去の自社装置に紐づける場合は、過去注番リストから元注番を「引用」してください。
+                            </p>
+                        @endif
                         @if ($allocation['duplicate'])
                             <p class="mt-1 text-xs font-bold text-red-700">この注番はすでに取得済みです。</p>
                         @endif
@@ -207,7 +220,7 @@
                                                             'customer_code' => $customerCode,
                                                             'mode' => $mode,
                                                             'unit_no' => $quote->unit_no,
-                                                            'base_seq' => $quote->quote_seq,
+                                                            'base_no' => $quote->suffix,
                                                         ]) }}"
                                                        class="px-2 py-1 rounded-lg border border-blue-300 text-blue-700 hover:bg-blue-50 font-bold">引用</a>
                                                 @endif
