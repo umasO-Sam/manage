@@ -85,9 +85,9 @@ class ProjectBoardController extends Controller
             'workflowType' => $this->workflowType(),
             'partners' => BusinessPartner::orderBy('name')->get(),
             // 社内担当者の既定候補は役員と営業担当。表示拡張で全員から選べる。
-            'primaryStaff' => Staff::orderedForRoster()->get()
+            'primaryStaff' => Staff::forRoster()->get()
                 ->filter(fn (Staff $s) => $s->is_executive || $s->role === Staff::ROLE_SALES)->values(),
-            'allStaff' => Staff::orderedForRoster()->get(),
+            'allStaff' => Staff::forRoster()->get(),
         ]);
     }
 

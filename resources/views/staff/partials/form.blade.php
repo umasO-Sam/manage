@@ -94,6 +94,12 @@
     </label>
     <x-input-error :messages="$errors->get('is_supervisor')" />
 
+    <label class="flex items-center gap-2 text-sm">
+        <input type="hidden" name="excluded_from_rosters" value="0">
+        <input type="checkbox" name="excluded_from_rosters" value="1" @checked(old('excluded_from_rosters', $staff?->excluded_from_rosters))>
+        名簿に表示しない（作業日報一覧・勤務状況一覧・社内担当者リストから除外。テスト用・管理用や退職者に使う）
+    </label>
+
     <label class="flex items-center gap-2 text-sm {{ $actor->canGrantExecutive() ? '' : 'text-slate-400' }}">
         @if ($actor->canGrantExecutive())
             <input type="hidden" name="is_executive" value="0">

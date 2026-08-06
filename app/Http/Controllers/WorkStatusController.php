@@ -50,7 +50,7 @@ class WorkStatusController extends Controller
             'nextAnchor' => $anchor->copy()->addDays(self::SHIFT_DAYS)->format('Y-m-d'),
             'rangeLabel' => $rangeStart->format('Y/m/d').'〜'.$rangeEnd->format('Y/m/d'),
             'holidaysByDate' => $holidaysByDate,
-            'staffGroups' => Staff::orderedForRoster()->get()->groupBy('department'),
+            'staffGroups' => Staff::forRoster()->get()->groupBy('department'),
             'leaveEntriesByStaffAndDate' => $this->buildLeaveEntriesByStaffAndDate($rangeStart, $rangeEnd),
             'isPrivileged' => $isPrivileged,
         ]);

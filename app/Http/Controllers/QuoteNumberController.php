@@ -41,7 +41,7 @@ class QuoteNumberController extends Controller
             'allocation' => $allocation,
             'history' => $customerCode !== '' ? $allocator->history($customerCode, $mode ?: null) : collect(),
             'companyName' => $this->resolveCompanyName($customerCode),
-            'staffList' => Staff::orderedForRoster()->get(),
+            'staffList' => Staff::forRoster()->get(),
             'modes' => QuoteNumberAllocator::MODES,
         ]);
     }

@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
-#[Fillable(['name', 'department', 'display_order', 'sid', 'login_id', 'email', 'role', 'is_labor_target', 'position_weight', 'password', 'must_change_password', 'hire_date', 'paid_leave_granted_current_year', 'paid_leave_granted_last_year', 'is_supervisor', 'is_executive', 'is_fund_manager', 'is_administrator'])]
+#[Fillable(['name', 'department', 'display_order', 'sid', 'login_id', 'email', 'role', 'is_labor_target', 'position_weight', 'password', 'must_change_password', 'hire_date', 'paid_leave_granted_current_year', 'paid_leave_granted_last_year', 'is_supervisor', 'excluded_from_rosters', 'is_executive', 'is_fund_manager', 'is_administrator'])]
 #[Hidden(['password', 'remember_token'])]
 class Staff extends Authenticatable
 {
@@ -47,6 +47,7 @@ class Staff extends Authenticatable
             'must_change_password' => 'boolean',
             'hire_date' => 'date',
             'is_supervisor' => 'boolean',
+            'excluded_from_rosters' => 'boolean',
             'is_executive' => 'boolean',
             'is_fund_manager' => 'boolean',
             'is_administrator' => 'boolean',
@@ -180,8 +181,18 @@ class Staff extends Authenticatable
     }
 
     /**
+     * 名簿(担当者リスト)に出す担当者を、部署順・表示順で並べる。
+     * 「名簿に表示しない」が付いたアカウント(テスト用・管理用・退職者など)は除外する。
+     * ＩＤ管理そのものは orderedForRoster() を使い、除外せず全件を扱う。
+     */
+    public static function forRoster(): Builder
+    {
+        return static::orderedForRoster()->where('excluded_from_rosters', false);
+    }
+
+    /**
      * DEPARTMENT_ORDERの部署順、同じ部署内はdisplay_order順(同値は氏名順)で並べる。
-     * DEPARTMENT_ORDERに無い部署名は末尾にまとめる。
+     * DEPARTMENT_ORDERに無い部署名は末尾にまとめる。除外フラグは考慮しない。
      */
     public static function orderedForRoster(): Builder
     {

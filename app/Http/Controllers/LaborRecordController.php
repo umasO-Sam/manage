@@ -62,7 +62,7 @@ class LaborRecordController extends Controller
 
         return view('labor-records.index', [
             'records' => $records,
-            'staffList' => Staff::orderedForRoster()->get(),
+            'staffList' => Staff::forRoster()->get(),
             'categories' => $this->categoriesUsedInLaborCosts(),
             // 絞り込み用(実際に使われている分類のみ)とは別に、修正時は全分類から選べるようにする。
             'editableCategories' => CategoryCode::orderBy('code')->get(),

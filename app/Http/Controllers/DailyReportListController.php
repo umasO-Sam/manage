@@ -45,7 +45,7 @@ class DailyReportListController extends Controller
             ->whereDate('date', '<=', $rangeEnd->toDateString())
             ->get()->keyBy(fn (Holiday $h) => $h->date->format('Y-m-d'));
 
-        $staffList = Staff::orderedForRoster()->get();
+        $staffList = Staff::forRoster()->get();
 
         return view('daily-reports.list.index', [
             'dates' => $dates,

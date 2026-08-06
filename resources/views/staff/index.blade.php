@@ -18,8 +18,10 @@
     <div class="py-8" x-data="{
         viewMode: localStorage.getItem('staffViewMode') || 'card',
         editMode: false,
+        saving: false,
     }" x-effect="localStorage.setItem('staffViewMode', viewMode)">
-        <div class="mx-auto sm:px-6 lg:px-8 space-y-4" x-bind:class="viewMode === 'table' ? 'max-w-6xl' : 'max-w-5xl'">
+        {{-- 表形式は項目が多いので画面幅いっぱいまで広げ、横スクロールを極力減らす。 --}}
+        <div class="mx-auto sm:px-6 lg:px-8 space-y-4" x-bind:class="viewMode === 'table' ? 'max-w-full' : 'max-w-5xl'">
 
             @if (session('status') === 'staff-created')
                 <div class="p-3 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-800 text-sm">担当者を登録しました。</div>
@@ -56,11 +58,12 @@
                         表形式表示
                     </button>
                 </div>
-                <template x-if="viewMode === 'table'">
-                    <button type="button" @click="editMode = ! editMode"
-                            class="text-xs font-semibold rounded-lg py-1.5 px-4 transition-colors border"
-                            :class="editMode ? 'bg-amber-100 border-amber-300 text-amber-800' : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-50'">
-                        <span x-text="editMode ? '直接編集を終了' : '直接編集'"></span>
+                {{-- 編集中はこのボタンを出さない。「直接編集を終了」だと保存されるのかが
+                     分からないため、抜け方は「編集をやめる」か「変更を保存」の2つに絞る。 --}}
+                <template x-if="viewMode === 'table' && ! editMode">
+                    <button type="button" @click="editMode = true"
+                            class="text-xs font-semibold rounded-lg py-1.5 px-4 transition-colors border bg-white border-slate-300 text-slate-700 hover:bg-slate-50">
+                        直接編集
                     </button>
                 </template>
             </div>
@@ -136,11 +139,17 @@
             </div>
 
             <div x-show="viewMode === 'table'" x-cloak>
-                <div x-show="editMode" x-cloak class="mb-3 bg-white border border-amber-200 rounded-xl p-3 shadow-sm flex flex-wrap justify-between items-center gap-2">
-                    <span class="text-xs text-amber-700 font-semibold">直接編集モード: パスワード以外の項目をセルで編集し、「変更を保存」を押してください。</span>
+                {{-- 直接編集は「変更を保存」を押すまでサーバーへ送らない。画面を離れると
+                     入力が消えるため、離脱時にブラウザの確認を出す。 --}}
+                <div x-show="editMode" x-cloak class="mb-3 bg-white border border-amber-200 rounded-xl p-3 shadow-sm flex flex-wrap justify-between items-center gap-2"
+                     x-init="window.addEventListener('beforeunload', (e) => { if (editMode && ! saving) { e.preventDefault(); e.returnValue = ''; } })">
+                    <span class="text-xs text-amber-700 font-semibold">
+                        直接編集モード: パスワード以外の項目をセルで編集し、「変更を保存」を押してください。
+                        保存せずにページを移動・更新すると変更は破棄されます。
+                    </span>
                     <div class="flex gap-2">
                         <button type="button" @click="editMode = false" class="text-xs font-semibold px-3 py-1.5 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50">編集をやめる</button>
-                        <button type="button" @click="document.getElementById('staff-bulk-edit-form').submit()" class="text-xs font-bold px-4 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white">変更を保存</button>
+                        <button type="button" @click="saving = true; document.getElementById('staff-bulk-edit-form').submit()" class="text-xs font-bold px-4 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white">変更を保存</button>
                     </div>
                 </div>
 
@@ -159,6 +168,7 @@
                                         <th class="p-2.5">メールアドレス</th>
                                         <th class="p-2.5">権限</th>
                                         <th class="p-2.5">上長</th>
+                                        <th class="p-2.5" title="作業日報一覧・勤務状況一覧・社内担当者リストから除外する">名簿非表示</th>
                                         <th class="p-2.5">有休 当年度</th>
                                         <th class="p-2.5">有休 前年度繰越</th>
                                         <th class="p-2.5">有休 残</th>
@@ -219,6 +229,14 @@
                                                 @endif
                                                 <input x-show="editMode" x-cloak @disabled(! $canEditRow) type="checkbox" name="updates[{{ $staff->id }}][is_supervisor]" value="1"
                                                        @checked($staff->is_supervisor) class="rounded border-slate-300">
+                                            </td>
+                                            <td class="p-2.5 text-center">
+                                                <span x-show="!editMode">{{ $staff->excluded_from_rosters ? '○' : '' }}</span>
+                                                @if ($canEditRow)
+                                                    <input type="hidden" name="updates[{{ $staff->id }}][excluded_from_rosters]" value="0">
+                                                @endif
+                                                <input x-show="editMode" x-cloak @disabled(! $canEditRow) type="checkbox" name="updates[{{ $staff->id }}][excluded_from_rosters]" value="1"
+                                                       @checked($staff->excluded_from_rosters) class="rounded border-slate-300">
                                             </td>
                                             <td class="p-2.5">
                                                 <span x-show="!editMode" class="font-mono">{{ $staff->paid_leave_granted_current_year }}</span>
