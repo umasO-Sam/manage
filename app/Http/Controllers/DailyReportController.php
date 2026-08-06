@@ -39,7 +39,7 @@ class DailyReportController extends Controller
                 'itemName' => $c->item_name,
             ])->values();
 
-        $orderNumbers = OrderNumber::orderBy('code')->get()
+        $orderNumbers = OrderNumber::forDropdown()->get()
             ->map(fn (OrderNumber $o) => ['code' => $o->code, 'label' => $o->displayLabel()])
             ->values();
 

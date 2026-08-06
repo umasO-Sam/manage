@@ -132,7 +132,7 @@ class CardController extends Controller
 
         return view('cards.create', [
             'workflowType' => $workflow,
-            'orderNumbers' => OrderNumber::orderBy('code')->get(),
+            'orderNumbers' => OrderNumber::forDropdown()->get(),
         ]);
     }
 
@@ -197,9 +197,13 @@ class CardController extends Controller
     {
         $this->authorize('update', $card);
 
+        // プルダウンから外した注番でも、このカードが今使っているものは選択肢に残す
+        // (残さないと注番を選び直さないと保存できなくなる)。
         return view('cards.edit', [
             'card' => $card,
-            'orderNumbers' => OrderNumber::orderBy('code')->get(),
+            'orderNumbers' => OrderNumber::forDropdown()
+                ->orWhere('id', $card->order_number_id)
+                ->orderBy('code')->get(),
         ]);
     }
 

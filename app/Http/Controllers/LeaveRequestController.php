@@ -27,7 +27,7 @@ class LeaveRequestController extends Controller
     {
         return view('leave-requests.create', [
             'approvers' => Staff::where('is_supervisor', true)->where('id', '!=', Auth::id())->orderBy('name')->get(),
-            'orderNumbers' => OrderNumber::orderBy('code')->get()
+            'orderNumbers' => OrderNumber::forDropdown()->get()
                 ->map(fn (OrderNumber $o) => ['code' => $o->code, 'label' => $o->displayLabel()])
                 ->values(),
             'paidLeaveBalance' => Auth::user()->paidLeaveBalance(),

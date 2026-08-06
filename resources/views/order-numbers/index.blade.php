@@ -6,7 +6,7 @@
                     <i data-lucide="hash" class="text-blue-600 w-6 h-6"></i>
                     <span>注番管理</span>
                 </h2>
-                <p class="text-xs text-slate-500 mt-1">依頼作成時にプルダウンから選べる注番の一覧です。「未定」「社内」は既定で用意されています。</p>
+                <p class="text-xs text-slate-500 mt-1">注番の一覧です（注番の昇順）。「プルダウンに表示」を外すと、依頼・作業日報・休暇申請の注番の選択肢から消えます（登録済みのレコードの注番はそのまま残ります）。「未定」「社内」は既定で用意されています。</p>
             </div>
             <a href="{{ route('order-numbers.create') }}" class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-xl shadow-sm hover:shadow flex items-center gap-2 text-sm transition-all">
                 <i data-lucide="plus-circle" class="w-4 h-4"></i>
@@ -40,7 +40,7 @@
                     <thead>
                         <tr class="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-600">
                             <th class="p-4">注番</th>
-                            <th class="p-4">工事名</th>
+                            <th class="p-4">工事名 / プルダウン表示</th>
                             <th class="p-4">種別</th>
                             <th class="p-4">利用件数</th>
                             <th class="p-4 text-center">操作</th>
@@ -51,11 +51,20 @@
                             <tr class="hover:bg-slate-50">
                                 <td class="p-4 font-semibold text-slate-800 {{ $orderNumber->matchesStandardFormat() ? 'font-mono' : '' }}">{{ $orderNumber->code }}</td>
                                 <td class="p-4">
-                                    <form method="POST" action="{{ route('order-numbers.update', $orderNumber) }}" class="flex items-center gap-1.5">
+                                    {{-- 工事名とプルダウン表示は同じ「保存」でまとめて更新する。 --}}
+                                    <form method="POST" action="{{ route('order-numbers.update', $orderNumber) }}" class="flex items-center gap-1.5 flex-wrap">
                                         @csrf
                                         @method('PUT')
                                         <input type="text" name="project_name" value="{{ $orderNumber->project_name }}" placeholder="未設定"
                                                class="text-xs border rounded-lg px-2 py-1 border-slate-300 w-40">
+                                        {{-- 未チェックでもキーが届くようhiddenを添える。 --}}
+                                        <label class="flex items-center gap-1 text-[11px] text-slate-600 whitespace-nowrap"
+                                               title="依頼・作業日報・休暇申請の注番プルダウンに出すかどうか">
+                                            <input type="hidden" name="show_in_dropdown" value="0">
+                                            <input type="checkbox" name="show_in_dropdown" value="1"
+                                                   @checked($orderNumber->show_in_dropdown) class="rounded border-slate-300">
+                                            プルダウンに表示
+                                        </label>
                                         <button type="submit" class="text-[11px] font-semibold px-2 py-1 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-50">保存</button>
                                     </form>
                                 </td>

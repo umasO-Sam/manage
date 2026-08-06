@@ -150,6 +150,67 @@ class OrderNumberTest extends TestCase
         $response->assertSee('自由入力（形式チェック解除）');
     }
 
+    public function test_the_list_is_sorted_by_code(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        // 登録順(id順)と昇順が食い違う並びで入れる
+        foreach (['TL050-N01', 'AB001-N01', 'MK200-N02'] as $code) {
+            OrderNumber::create(['code' => $code, 'is_protected' => false]);
+        }
+
+        $this->actingAs($manager)->get(route('order-numbers.index'))
+            ->assertOk()
+            ->assertSeeInOrder(['AB001-N01', 'MK200-N02', 'TL050-N01']);
+    }
+
+    /**
+     * 「プルダウンに表示」。注番が増えて選択肢が長くなるため、終わった案件を外せる。
+     * 外しても登録済みのレコードが持つ注番はそのまま残す。
+     */
+    public function test_order_numbers_hidden_from_the_dropdown_are_not_offered_as_choices(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        $hidden = OrderNumber::create(['code' => 'ZZ001-N01', 'is_protected' => false]);
+        $shown = OrderNumber::create(['code' => 'ZZ002-N01', 'is_protected' => false]);
+
+        $this->actingAs($manager)->put(route('order-numbers.update', $hidden), ['show_in_dropdown' => '0'])
+            ->assertRedirect(route('order-numbers.index'));
+        $this->assertFalse($hidden->fresh()->show_in_dropdown);
+
+        // 作業日報・休暇申請の注番プルダウン
+        foreach (['daily-reports.show', 'leave-requests.create'] as $routeName) {
+            $this->actingAs($manager)->get(route($routeName))
+                ->assertOk()->assertDontSee($hidden->code)->assertSee($shown->code);
+        }
+
+        // 注番管理の一覧からは消さない(消すと設定を戻せなくなる)
+        $this->actingAs($manager)->get(route('order-numbers.index'))->assertSee($hidden->code);
+    }
+
+    public function test_a_card_keeps_its_order_number_as_a_choice_even_when_hidden(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        $workflowType = WorkflowType::create([
+            'slug' => 'purchase', 'name' => '購入手配', 'due_date_label' => '希望納期',
+            'icon' => 'shopping-cart', 'accent' => 'blue',
+            'stage_definition' => [['label' => '新規依頼', 'actor_label' => '依頼者']],
+            'retention_days' => 7,
+        ]);
+        $hidden = OrderNumber::create(['code' => 'ZZ003-N01', 'is_protected' => false, 'show_in_dropdown' => false]);
+        $card = $workflowType->cards()->create([
+            'order_number_id' => $hidden->id, 'item_name' => 'テスト部品', 'manufacturer' => 'メーカーA',
+            'quantity' => 1, 'unit' => '個', 'due_date' => now()->addWeek(),
+            'created_by' => $manager->id, 'current_stage' => 0,
+        ]);
+
+        $this->actingAs($manager)->get(route('cards.edit', $card))
+            ->assertOk()->assertSee($hidden->code);
+
+        // 新規作成の選択肢には出さない
+        $this->actingAs($manager)->get(route('cards.create', $workflowType))
+            ->assertOk()->assertDontSee($hidden->code);
+    }
+
     public function test_unused_order_number_can_be_deleted(): void
     {
         $manager = Staff::factory()->procurementManager()->create();

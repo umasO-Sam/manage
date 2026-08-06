@@ -19,8 +19,9 @@ class OrderNumberController extends Controller
     public function index(): View
     {
         return view('order-numbers.index', [
+            // 注番の昇順。登録順(id順)だと同じ客先の注番が離れて探しにくいため。
             'orderNumbers' => OrderNumber::withCount(['cards' => fn ($q) => $q->withTrashed()])
-                ->orderByDesc('id')
+                ->orderBy('code')
                 ->get(),
         ]);
     }
@@ -60,15 +61,20 @@ class OrderNumberController extends Controller
     }
 
     /**
-     * 工事名だけを更新する(注番コード自体は既存参照との整合性のため変更不可)。
+     * 工事名とプルダウン表示の設定を更新する
+     * (注番コード自体は既存参照との整合性のため変更不可)。
      */
     public function update(Request $request, OrderNumber $orderNumber): RedirectResponse
     {
         $data = $request->validate([
             'project_name' => ['nullable', 'string', 'max:255'],
+            'show_in_dropdown' => ['nullable', 'boolean'],
         ]);
 
-        $orderNumber->update(['project_name' => $data['project_name'] ?? null]);
+        $orderNumber->update([
+            'project_name' => $data['project_name'] ?? null,
+            'show_in_dropdown' => filter_var($data['show_in_dropdown'] ?? false, FILTER_VALIDATE_BOOLEAN),
+        ]);
 
         return redirect()->route('order-numbers.index')->with('status', 'order-number-updated');
     }
