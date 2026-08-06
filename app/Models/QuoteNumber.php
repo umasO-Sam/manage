@@ -71,9 +71,18 @@ class QuoteNumber extends Model
         return $this->belongsTo(CustomerCode::class, 'customer_code', 'code');
     }
 
-    /** 見積単位を3桁ゼロ埋めで揃えた表示(過去データは2桁のこともある)。 */
+    /** 通番を3桁ゼロ埋めで揃えた表示(過去データは1〜2桁のこともある)。 */
     public function paddedUnitNo(): string
     {
         return ctype_digit($this->unit_no) ? str_pad($this->unit_no, 3, '0', STR_PAD_LEFT) : $this->unit_no;
+    }
+
+    /**
+     * 表示用の注番。原則3桁の通番で揃える(1 / 01 / 001 は同じものとして扱うため、
+     * 台帳に残っている桁違いの表記も画面上は3桁で見せる)。
+     */
+    public function canonicalNo(): string
+    {
+        return $this->customer_code.$this->paddedUnitNo().($this->suffix !== null ? '-'.$this->suffix : '');
     }
 }

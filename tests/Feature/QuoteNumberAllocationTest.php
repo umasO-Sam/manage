@@ -151,6 +151,9 @@ class QuoteNumberAllocationTest extends TestCase
         }
     }
 
+    /**
+     * 通番は 1 / 01 / 001 を同じものとして扱い、表示・保存は原則3桁に揃える。
+     */
     public function test_the_unit_number_is_zero_padded_and_old_two_digit_units_are_matched(): void
     {
         QuoteNumber::create([
@@ -158,8 +161,59 @@ class QuoteNumberAllocationTest extends TestCase
             'suffix' => 'N01', 'quote_type' => 'N', 'quote_seq' => '01', 'source' => 'legacy',
         ]);
 
-        // 過去分の「15」も見積単位015として同じ単位に数える
-        $this->assertSame('DH015-N02', $this->allocator->build('DH', 'scope_change', '15', null)['candidate']);
+        // 過去分の「15」も通番015として同じ通番に数える
+        foreach (['15', '015'] as $input) {
+            $this->assertSame('DH015-N02', $this->allocator->build('DH', 'scope_change', $input, null)['candidate']);
+        }
+
+        // 表示は3桁で揃える
+        $this->assertSame('DH015-N01', QuoteNumber::where('full_no', 'DH15-N01')->sole()->canonicalNo());
+    }
+
+    /**
+     * 桁が揃っていない過去分の後ろに補足区分を採るとき、老番を取りこぼさないこと。
+     */
+    public function test_supplementary_sequences_see_units_written_with_different_digits(): void
+    {
+        QuoteNumber::create([
+            'full_no' => 'DH20-N01K05', 'customer_code' => 'DH', 'unit_no' => '20',
+            'suffix' => 'N01K05', 'quote_type' => 'N', 'quote_seq' => '01', 'extra_code' => 'K', 'source' => 'legacy',
+        ]);
+
+        // 既存はDH20表記だが、DH020として採ってもK06になる
+        $this->assertSame('DH020-N01K06', $this->allocator->build('DH', 'remodel', '020', 'N01')['candidate']);
+    }
+
+    public function test_a_number_written_with_different_digits_counts_as_taken(): void
+    {
+        $this->assertTrue($this->allocator->isTaken('DH13-N01'));   // 台帳はDH013-N01
+        $this->assertTrue($this->allocator->isTaken('DH013-N01'));
+        $this->assertFalse($this->allocator->isTaken('DH013-N09'));
+    }
+
+    public function test_a_hand_edited_number_is_saved_with_a_three_digit_unit(): void
+    {
+        $staff = Staff::factory()->create(['role' => Staff::ROLE_SALES]);
+
+        $this->actingAs($staff)->post(route('quote-numbers.store'), [
+            'customer_code' => 'DH', 'mode' => 'new', 'full_no' => 'DH99-N05',
+            'project_name' => 'x', 'delivery_dest' => 'y', 'customer_contact' => 'z', 'staff_id' => $staff->id,
+        ])->assertRedirect();
+
+        $this->assertNotNull(QuoteNumber::where('full_no', 'DH099-N05')->first());
+    }
+
+    public function test_the_lookup_matches_across_digit_widths(): void
+    {
+        $staff = Staff::factory()->create(['role' => Staff::ROLE_SALES]);
+        QuoteNumber::create([
+            'full_no' => 'DH15-N01', 'customer_code' => 'DH', 'unit_no' => '15', 'suffix' => 'N01',
+            'quote_type' => 'N', 'quote_seq' => '01', 'project_name' => '桁違いの物件', 'source' => 'legacy',
+        ]);
+
+        $this->actingAs($staff)->getJson(route('quote-numbers.lookup', ['no' => 'DH015-N01']))
+            ->assertOk()
+            ->assertJson(['found' => true, 'order_no' => 'DH015-N01', 'project_name' => '桁違いの物件']);
     }
 
     public function test_taking_a_number_records_it_with_the_selected_staff(): void

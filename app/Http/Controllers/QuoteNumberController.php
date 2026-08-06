@@ -53,12 +53,8 @@ class QuoteNumberController extends Controller
             'unit_no' => ['nullable', 'string', 'max:10'],
             // 元番号はハイフン以降そのもの。H は T/K/S/B の後ろにも付くため多段になりうる。
             'base_no' => ['nullable', 'string', 'max:20'],
-            // 候補は手入力で直せる。重複はここで弾く。
-            'full_no' => [
-                'required', 'string', 'max:50',
-                'regex:/^[A-Za-z]{1,5}\d{1,4}-[A-Za-z0-9\-]+$/',
-                Rule::unique('quote_numbers', 'full_no'),
-            ],
+            // 候補は手入力で直せる。重複は通番の桁違い(1/01/001)も含めて下で弾く。
+            'full_no' => ['required', 'string', 'max:50', 'regex:/^[A-Za-z]{1,5}\d{1,4}-[A-Za-z0-9\-]+$/'],
             'project_name' => ['required', 'string', 'max:255'],
             'company_name' => ['nullable', 'string', 'max:255'],
             'delivery_dest' => ['required', 'string', 'max:255'],
@@ -67,8 +63,7 @@ class QuoteNumberController extends Controller
             'remarks' => ['nullable', 'string', 'max:2000'],
         ], [
             'customer_code.regex' => '客先番号はアルファベットで入力してください。',
-            'full_no.regex' => '注番は「客先番号＋見積単位－以降」の形式で入力してください（例 DH013-N01）。',
-            'full_no.unique' => 'この注番はすでに取得済みです。',
+            'full_no.regex' => '注番は「客先番号＋通番－以降」の形式で入力してください（例 DH013-N01）。',
         ]);
 
         $allocation = $allocator->build($data['customer_code'], $data['mode'], $data['unit_no'] ?? null, $data['base_no'] ?? null);
@@ -79,7 +74,17 @@ class QuoteNumberController extends Controller
 
         // 手入力で直された場合はその注番を採用し、構成要素も入力値から取り直す
         // (候補のまま取得したときは計算結果をそのまま使う)。
+        // 通番は原則3桁に揃えて保存する(1 / 01 / 001 は同じものとして扱うため)。
         $fullNo = strtoupper(trim($data['full_no']));
+
+        if ($canonical = $allocator->canonicalize($fullNo)) {
+            $fullNo = $canonical[0].$canonical[1].'-'.$canonical[2];
+        }
+
+        if ($allocator->isTaken($fullNo)) {
+            return back()->withInput()->withErrors(['full_no' => "「{$fullNo}」はすでに取得済みです。"]);
+        }
+
         $parts = $fullNo === $allocation['candidate'] ? $allocation : $this->splitFullNo($fullNo);
 
         QuoteNumber::create([
@@ -153,7 +158,7 @@ class QuoteNumberController extends Controller
     /**
      * 注番の完全一致検索。注番管理の新規登録・受注登録の「検索」ボタンから使う。
      */
-    public function lookup(Request $request): JsonResponse
+    public function lookup(Request $request, QuoteNumberAllocator $allocator): JsonResponse
     {
         $no = strtoupper(trim((string) $request->query('no', '')));
 
@@ -161,7 +166,18 @@ class QuoteNumberController extends Controller
             return response()->json(['found' => false]);
         }
 
+        // 通番の桁違い(TL61 と TL061)でも一致させる。
+        $canonical = $allocator->canonicalize($no);
+
         $quote = QuoteNumber::with('staff')->where('full_no', $no)->first();
+
+        if (! $quote && $canonical !== null) {
+            $quote = QuoteNumber::with('staff')
+                ->where('customer_code', $canonical[0])
+                ->where('suffix', $canonical[2])
+                ->get()
+                ->first(fn (QuoteNumber $q) => $q->paddedUnitNo() === $canonical[1]);
+        }
 
         if (! $quote) {
             return response()->json(['found' => false]);
@@ -169,7 +185,7 @@ class QuoteNumberController extends Controller
 
         return response()->json([
             'found' => true,
-            'order_no' => $quote->full_no,
+            'order_no' => $quote->canonicalNo(),
             'project_name' => $quote->project_name,
             'recipient' => $this->resolveCompanyName($quote->customer_code),
             'delivery_dest' => $quote->delivery_dest,

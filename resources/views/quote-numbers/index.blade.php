@@ -209,7 +209,11 @@
                             @forelse ($history as $quote)
                                 <tbody class="divide-y divide-slate-100 border-b border-slate-100" x-data="{ editing: false }">
                                     <tr class="hover:bg-blue-50">
-                                        <td class="p-2 font-mono whitespace-nowrap">{{ $quote->full_no }}</td>
+                                        {{-- 通番は原則3桁で表示する。台帳の原文と違う場合はツールチップで出す。 --}}
+                                        <td class="p-2 font-mono whitespace-nowrap"
+                                            @if ($quote->canonicalNo() !== $quote->full_no) title="台帳の表記: {{ $quote->full_no }}" @endif>
+                                            {{ $quote->canonicalNo() }}
+                                        </td>
                                         <td class="p-2 font-mono whitespace-nowrap">{{ $quote->paddedUnitNo() }}</td>
                                         <td class="p-2 whitespace-nowrap text-center">
                                             @if ($quote->extra_code)

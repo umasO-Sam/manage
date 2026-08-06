@@ -128,7 +128,7 @@ class QuoteNumberAllocator
             'extra_code' => $extra,
             'extra_seq' => $extraSeq,
             'missing' => [],
-            'duplicate' => QuoteNumber::where('full_no', $candidate)->exists(),
+            'duplicate' => $this->isTaken($candidate),
         ];
     }
 
@@ -169,14 +169,48 @@ class QuoteNumberAllocator
      */
     public function nextExtraSeq(string $customerCode, string $unitNo, string $baseSuffix, string $extra): string
     {
-        $prefix = $customerCode.$unitNo.'-'.$baseSuffix.$extra;
+        // 過去分は通番の桁が揃っていない(TL61 と TL061)。full_no を前方一致で見ると
+        // 桁違いを取りこぼすため、同じ通番の行をまとめてから suffix 側だけで比較する。
+        $prefix = $baseSuffix.$extra;
 
         $max = $this->sameUnit($customerCode, $unitNo)
-            ->filter(fn (QuoteNumber $q) => str_starts_with((string) $q->full_no, $prefix))
-            ->map(fn (QuoteNumber $q) => (int) substr((string) $q->full_no, strlen($prefix), 2))
+            ->filter(fn (QuoteNumber $q) => str_starts_with((string) $q->suffix, $prefix))
+            ->map(fn (QuoteNumber $q) => (int) substr((string) $q->suffix, strlen($prefix), 2))
             ->max() ?? 0;
 
         return str_pad((string) ($max + 1), 2, '0', STR_PAD_LEFT);
+    }
+
+    /**
+     * その注番がすでに取得済みか。通番の桁数の違い(1 / 01 / 001)は同じものとして扱う。
+     */
+    public function isTaken(string $fullNo): bool
+    {
+        $canonical = $this->canonicalize($fullNo);
+
+        if ($canonical === null) {
+            return QuoteNumber::where('full_no', strtoupper(trim($fullNo)))->exists();
+        }
+
+        [$customerCode, $unitNo, $suffix] = $canonical;
+
+        return $this->sameUnit($customerCode, $unitNo)
+            ->contains(fn (QuoteNumber $q) => (string) $q->suffix === $suffix);
+    }
+
+    /**
+     * 注番を「客先番号 / 3桁ゼロ埋めの通番 / ハイフン以降」に分解する。
+     * 分解できない書き方(過去台帳の枝番など)はnull。
+     *
+     * @return array{0: string, 1: string, 2: string}|null
+     */
+    public function canonicalize(string $fullNo): ?array
+    {
+        if (! preg_match('/^([A-Z]{1,5})(\d{1,4})-(.+)$/', strtoupper(trim($fullNo)), $m)) {
+            return null;
+        }
+
+        return [$m[1], str_pad($m[2], 3, '0', STR_PAD_LEFT), $m[3]];
     }
 
     /**
