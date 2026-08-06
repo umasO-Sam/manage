@@ -197,6 +197,13 @@
                     </div>
                     <div class="flex gap-3">
                         <a href="{{ route('purchasing.index') }}" class="text-xs text-slate-400 hover:text-slate-600 self-center">条件をクリア</a>
+                        {{-- 受注ヘッダ(物件)は既定では出さない。このボタンを押したとき、または
+                             受注日・売上日で絞り込んだときに検索結果の上へ並べる。 --}}
+                        <label class="text-sm font-semibold rounded-lg py-2 px-6 transition-colors border cursor-pointer self-center
+                                      {{ $showProjects ? 'bg-blue-100 border-blue-300 text-blue-800' : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-50' }}">
+                            <input type="checkbox" name="show_projects" value="1" @checked($showProjects) onchange="this.form.submit()" class="hidden">
+                            物件表示
+                        </label>
                         <button type="submit" class="text-sm font-semibold bg-slate-800 hover:bg-slate-900 text-white rounded-lg py-2 px-6 transition-colors">
                             検索
                         </button>
@@ -215,6 +222,65 @@
                     </div>
                 </div>
             </form>
+
+            {{-- 受注ヘッダ(物件)。受注先・納入先・受注日・受注金額・売上日は明細ではなく
+                 こちらが持つ情報のため、物件管理ボードと同じ内容をここで参照できるようにする。 --}}
+            @if ($showProjects)
+                <div class="bg-white rounded-xl border border-blue-200 shadow-sm overflow-hidden">
+                    <div class="px-4 py-2.5 bg-blue-50 border-b border-blue-100 flex items-center justify-between gap-2 flex-wrap">
+                        <span class="text-sm font-bold text-blue-900">物件（受注ヘッダ）{{ $projectOrders->count() }} 件</span>
+                        <span class="text-[11px] text-blue-700">注番・製品名・受注日・売上日の条件で絞り込んでいます（最大200件）。</span>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse text-xs">
+                            <thead>
+                                <tr class="bg-slate-50 border-b border-slate-200 font-semibold text-slate-600">
+                                    <th class="p-2.5 whitespace-nowrap">注番</th>
+                                    <th class="p-2.5">件名（製品名）</th>
+                                    <th class="p-2.5">受注先</th>
+                                    <th class="p-2.5">納入先</th>
+                                    <th class="p-2.5 whitespace-nowrap">受注日</th>
+                                    <th class="p-2.5 text-right whitespace-nowrap">受注金額</th>
+                                    <th class="p-2.5 whitespace-nowrap">売上日</th>
+                                    <th class="p-2.5 whitespace-nowrap">担当</th>
+                                    <th class="p-2.5 whitespace-nowrap">状態</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100">
+                                @forelse ($projectOrders as $order)
+                                    <tr class="hover:bg-blue-50">
+                                        <td class="p-2.5 font-mono whitespace-nowrap">
+                                            @if ($order->card)
+                                                <a href="{{ route('projects.show', $order->card) }}" class="text-blue-700 hover:text-blue-900">{{ $order->order_no }}</a>
+                                            @else
+                                                {{ $order->order_no }}
+                                            @endif
+                                        </td>
+                                        <td class="p-2.5 font-semibold">{{ $order->product_name }}</td>
+                                        <td class="p-2.5">{{ $order->recipient }}</td>
+                                        <td class="p-2.5">{{ $order->delivery_dest }}</td>
+                                        <td class="p-2.5 font-mono whitespace-nowrap">{{ $order->order_received_date?->format('Y/m/d') }}</td>
+                                        <td class="p-2.5 font-mono text-right whitespace-nowrap">¥{{ number_format((float) $order->order_amount) }}</td>
+                                        <td class="p-2.5 font-mono whitespace-nowrap">{{ $order->sales_date?->format('Y/m/d') ?: '—' }}</td>
+                                        <td class="p-2.5 whitespace-nowrap">{{ $order->staff?->name }}</td>
+                                        <td class="p-2.5 whitespace-nowrap">
+                                            @if (! $order->card)
+                                                <span class="text-[10px] text-slate-400">過去データ</span>
+                                            @elseif ($order->card->trashed())
+                                                <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-700 text-white">非表示</span>
+                                            @else
+                                                <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-100 text-blue-800">{{ $order->card->currentStageLabel() }}</span>
+                                            @endif
+                                        </td>
+                                    </tr>
+                                @empty
+                                    <tr><td colspan="9" class="p-6 text-center text-slate-400">該当する物件はありません。</td></tr>
+                                @endforelse
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            @endif
 
             @if (Auth::user()->is_procurement_manager)
                 <div x-show="editMode" x-cloak class="sticky top-2 z-10 bg-white border border-amber-200 rounded-xl p-3 shadow-sm flex flex-wrap justify-between items-center gap-2">

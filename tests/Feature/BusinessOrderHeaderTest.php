@@ -146,6 +146,59 @@ class BusinessOrderHeaderTest extends TestCase
         $this->assertNull(BusinessOrder::where('order_no', 'MIG002-N01')->first());
     }
 
+    /**
+     * 仕入管理の検索では受注ヘッダ(物件)を既定で出さず、「物件表示」または
+     * 受注日・売上日での絞り込みのときだけ並べる。
+     */
+    public function test_the_search_screen_hides_project_orders_by_default(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        BusinessOrder::create([
+            'order_no' => 'SRCH1-N01', 'product_name' => '検索対象物件', 'recipient' => '受注先Z',
+            'order_received_date' => '2026-07-01', 'order_amount' => 500000,
+        ]);
+
+        $this->actingAs($manager)->get(route('purchasing.index'))
+            ->assertOk()
+            ->assertDontSee('物件（受注ヘッダ）')
+            ->assertDontSee('検索対象物件');
+    }
+
+    public function test_the_project_display_button_shows_project_orders(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        BusinessOrder::create([
+            'order_no' => 'SRCH1-N01', 'product_name' => '検索対象物件', 'recipient' => '受注先Z',
+            'order_received_date' => '2026-07-01', 'order_amount' => 500000,
+        ]);
+
+        $this->actingAs($manager)->get(route('purchasing.index', ['show_projects' => 1]))
+            ->assertOk()
+            ->assertSee('物件（受注ヘッダ）')
+            ->assertSee('検索対象物件')
+            ->assertSee('受注先Z');
+    }
+
+    public function test_searching_by_order_or_sales_date_shows_project_orders_without_the_button(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        BusinessOrder::create([
+            'order_no' => 'SRCH2-N01', 'product_name' => '日付検索の物件',
+            'order_received_date' => '2026-07-01', 'order_amount' => 500000,
+        ]);
+        BusinessOrder::create([
+            'order_no' => 'SRCH3-N01', 'product_name' => '範囲外の物件',
+            'order_received_date' => '2020-01-01', 'order_amount' => 100,
+        ]);
+
+        $this->actingAs($manager)->get(route('purchasing.index', [
+            'order_received_date_mode' => 'exact',
+            'order_received_date_from' => '2026-07-01',
+        ]))->assertOk()
+            ->assertSee('日付検索の物件')
+            ->assertDontSee('範囲外の物件');
+    }
+
     public function test_migration_command_is_idempotent(): void
     {
         PurchaseDetail::create([

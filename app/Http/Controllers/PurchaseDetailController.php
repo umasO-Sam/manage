@@ -154,7 +154,80 @@ class PurchaseDetailController extends Controller
             'details' => $details,
             'filters' => $filters,
             'categories' => $categories,
+            'showProjects' => $this->shouldShowProjects($request, $filters),
+            'projectOrders' => $this->shouldShowProjects($request, $filters)
+                ? $this->searchProjectOrders($filters)
+                : collect(),
         ]);
+    }
+
+    /**
+     * 受注ヘッダ(物件)を検索結果に並べるかどうか。既定では出さず、「物件表示」ボタンを
+     * 押したとき、または受注日・売上日で絞り込んだときに出す
+     * (この2つは明細ではなく受注ヘッダが持つ情報を探している操作のため)。
+     *
+     * @param  array<string, mixed>  $filters
+     */
+    private function shouldShowProjects(Request $request, array $filters): bool
+    {
+        if ($request->boolean('show_projects')) {
+            return true;
+        }
+
+        foreach (['order_received_date', 'sales_date'] as $key) {
+            if ($filters["{$key}_mode"] !== '' && ($filters["{$key}_from"] !== '' || $filters["{$key}_to"] !== '')) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * 明細と同じ絞り込み条件のうち、受注ヘッダが持つ項目(注番・件名・受注先・受注日・売上日)
+     * だけを適用して物件を探す。
+     *
+     * @param  array<string, mixed>  $filters
+     * @return \Illuminate\Support\Collection<int, BusinessOrder>
+     */
+    private function searchProjectOrders(array $filters)
+    {
+        $query = BusinessOrder::query()->with(['businessPartner', 'staff', 'card' => fn ($q) => $q->withTrashed()]);
+
+        // 注番・製品名は明細側と同じキーで絞り込む(受注ヘッダ側の列名に読み替える)。
+        foreach (['item_code' => 'order_no', 'product_name' => 'product_name'] as $filterKey => $column) {
+            $value = $filters[$filterKey];
+            if ($value === '') {
+                continue;
+            }
+
+            $filters["{$filterKey}_match"] === 'perfect'
+                ? $query->where($column, $value)
+                : $query->where($column, 'like', "%{$value}%");
+        }
+
+        foreach (['order_received_date', 'sales_date'] as $key) {
+            $mode = $filters["{$key}_mode"];
+            $from = $filters["{$key}_from"];
+            $to = $filters["{$key}_to"];
+
+            if ($mode === 'exact' && $from !== '') {
+                $query->whereDate($key, $from);
+            } elseif ($mode === 'before' && $from !== '') {
+                $query->whereDate($key, '<=', $from);
+            } elseif ($mode === 'after' && $from !== '') {
+                $query->whereDate($key, '>=', $from);
+            } elseif ($mode === 'range' && ($from !== '' || $to !== '')) {
+                if ($from !== '') {
+                    $query->whereDate($key, '>=', $from);
+                }
+                if ($to !== '') {
+                    $query->whereDate($key, '<=', $to);
+                }
+            }
+        }
+
+        return $query->orderByDesc('order_received_date')->orderByDesc('id')->limit(200)->get();
     }
 
     /**

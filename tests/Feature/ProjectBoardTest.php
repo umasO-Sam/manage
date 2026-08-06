@@ -112,13 +112,35 @@ class ProjectBoardTest extends TestCase
             ]))->assertRedirect();
     }
 
-    public function test_the_first_move_needs_nothing(): void
+    public function test_the_first_move_needs_nothing_and_returns_to_the_board(): void
     {
         $card = $this->createCard($this->manager());
 
-        $this->actingAs($this->manager())->post(route('projects.advance', $card))->assertRedirect();
+        $this->actingAs($this->manager())->post(route('projects.advance', $card))
+            ->assertRedirect(route('projects.index'));
 
         $this->assertSame(1, $card->fresh()->current_stage);
+    }
+
+    public function test_the_history_screen_lists_hidden_cards_too(): void
+    {
+        $manager = $this->manager();
+        $visible = $this->createCard($manager);
+        $hidden = $this->createCard($manager, ['order_no' => 'PJ009-N01', 'new_partner_name' => '別商事']);
+        $hidden->update(['current_stage' => 5]);
+        $this->actingAs($this->fundManager())->delete(route('projects.hide', $hidden));
+
+        $response = $this->actingAs($manager)->get(route('projects.history'));
+        $response->assertOk()
+            ->assertSee($visible->businessOrder->order_no)
+            ->assertSee('PJ009-N01')
+            ->assertSee('非表示');
+
+        // 非表示だけに絞り込める
+        $this->actingAs($manager)->get(route('projects.history', ['hidden' => 1]))
+            ->assertOk()
+            ->assertSee('PJ009-N01')
+            ->assertDontSee($visible->businessOrder->order_no);
     }
 
     public function test_moving_to_shipped_requires_a_completion_proof_and_a_sales_date(): void

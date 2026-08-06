@@ -18,6 +18,16 @@
             @if (session('status') === 'project-hidden')
                 <div class="p-3 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-800 text-sm">カードを非表示にしました。データは削除されていません。</div>
             @endif
+            @if (session('status') === 'project-advanced')
+                <div class="p-3 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-800 text-sm">ステージを移動しました。</div>
+            @endif
+            @if ($errors->any())
+                <div class="p-3 rounded-xl bg-red-50 border border-red-100 text-red-800 text-sm">
+                    @foreach ($errors->all() as $error)
+                        <p>{{ $error }}</p>
+                    @endforeach
+                </div>
+            @endif
 
             {{-- カードは隣のステージへドラッグ&ドロップで移動できる。条件を満たしていない場合は
                  落とした時点で不足内容を出し、送信しない(サーバー側でも同じ判定で必ず弾く)。 --}}

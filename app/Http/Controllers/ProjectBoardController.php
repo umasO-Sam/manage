@@ -253,7 +253,8 @@ class ProjectBoardController extends Controller
             );
         });
 
-        return back()->with('status', 'project-advanced');
+        // 移動後はボードのトップへ戻る(続けて他のカードを動かす流れが多いため)。
+        return redirect()->route('projects.index')->with('status', 'project-advanced');
     }
 
     /**
