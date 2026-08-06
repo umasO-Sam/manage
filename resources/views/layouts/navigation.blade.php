@@ -102,23 +102,26 @@
                     @endif
 
                     {{-- 物件管理: 経理資材担当・役員・営業担当・資金管理者。
-                         物件履歴は調達ボードの「履歴」とは別で、取引先一覧もこの配下に置く。 --}}
-                    @if ($viewer->canUseProjectBoard())
+                         物件履歴は調達ボードの「履歴」とは別で、取引先一覧もこの配下に置く。
+                         見積番号の採番は上長も使えるため、ボードを使えない人にもこのメニューを出す。 --}}
+                    @if ($viewer->canUseProjectBoard() || $viewer->canAllocateQuoteNumber())
                         <x-dropdown align="left" width="56">
                             <x-slot name="trigger">
-                                <button class="px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 whitespace-nowrap transition-colors {{ request()->routeIs('projects.*') || request()->routeIs('business-partners.*') ? 'bg-slate-200 text-slate-800' : 'text-slate-600 hover:bg-slate-50' }}">
+                                <button class="px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 whitespace-nowrap transition-colors {{ request()->routeIs('projects.*') || request()->routeIs('business-partners.*') || request()->routeIs('quote-numbers.*') ? 'bg-slate-200 text-slate-800' : 'text-slate-600 hover:bg-slate-50' }}">
                                     <i data-lucide="building-2" class="w-4 h-4"></i>
                                     <span>物件管理</span>
                                     <i data-lucide="chevron-down" class="w-3.5 h-3.5"></i>
                                 </button>
                             </x-slot>
                             <x-slot name="content">
-                                <x-dropdown-link :href="route('projects.index')">
-                                    <i data-lucide="building-2" class="w-3.5 h-3.5 inline-block align-text-bottom mr-1"></i> 物件ボード
-                                </x-dropdown-link>
-                                <x-dropdown-link :href="route('projects.history')">
-                                    <i data-lucide="history" class="w-3.5 h-3.5 inline-block align-text-bottom mr-1"></i> 物件履歴
-                                </x-dropdown-link>
+                                @if ($viewer->canUseProjectBoard())
+                                    <x-dropdown-link :href="route('projects.index')">
+                                        <i data-lucide="building-2" class="w-3.5 h-3.5 inline-block align-text-bottom mr-1"></i> 物件ボード
+                                    </x-dropdown-link>
+                                    <x-dropdown-link :href="route('projects.history')">
+                                        <i data-lucide="history" class="w-3.5 h-3.5 inline-block align-text-bottom mr-1"></i> 物件履歴
+                                    </x-dropdown-link>
+                                @endif
                                 @if ($viewer->canAllocateQuoteNumber())
                                     <x-dropdown-link :href="route('quote-numbers.index')">
                                         <i data-lucide="hash" class="w-3.5 h-3.5 inline-block align-text-bottom mr-1"></i> 見積番号の採番
@@ -379,14 +382,17 @@
                 </a>
             @endif
 
-            @if ($viewer->canUseProjectBoard())
+            {{-- 見積番号の採番は上長も使えるため、ボードを使えない人にもこの区画を出す。 --}}
+            @if ($viewer->canUseProjectBoard() || $viewer->canAllocateQuoteNumber())
                 <div class="px-3 py-2 text-xs font-bold text-slate-400 uppercase tracking-wider">物件管理</div>
-                <a href="{{ route('projects.index') }}" class="block px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap {{ request()->routeIs('projects.index') || request()->routeIs('projects.show') || request()->routeIs('projects.create') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
-                    物件ボード
-                </a>
-                <a href="{{ route('projects.history') }}" class="block px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap {{ request()->routeIs('projects.history') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
-                    物件履歴
-                </a>
+                @if ($viewer->canUseProjectBoard())
+                    <a href="{{ route('projects.index') }}" class="block px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap {{ request()->routeIs('projects.index') || request()->routeIs('projects.show') || request()->routeIs('projects.create') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
+                        物件ボード
+                    </a>
+                    <a href="{{ route('projects.history') }}" class="block px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap {{ request()->routeIs('projects.history') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
+                        物件履歴
+                    </a>
+                @endif
                 @if ($viewer->canAllocateQuoteNumber())
                     <a href="{{ route('quote-numbers.index') }}" class="block px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap {{ request()->routeIs('quote-numbers.*') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
                         見積番号の採番

@@ -428,6 +428,24 @@ class QuoteNumberAllocationTest extends TestCase
             ->get(route('quote-numbers.index'))->assertOk()->assertDontSee('取得ログ');
     }
 
+    /**
+     * 採番は上長も使えるが、物件ボードは使えない。採番リンクを物件管理メニューの
+     * 中に置いているため、ボードの権限でメニューごと隠すと上長から辿れなくなる。
+     */
+    public function test_a_supervisor_can_reach_the_allocation_screen_from_the_menu(): void
+    {
+        $supervisor = Staff::factory()->create(['role' => Staff::ROLE_GENERAL, 'is_supervisor' => true]);
+
+        $this->assertTrue($supervisor->canAllocateQuoteNumber());
+        $this->assertFalse($supervisor->canUseProjectBoard());
+
+        $html = $this->actingAs($supervisor)->get(route('my-calendar.show'))->getContent();
+
+        $this->assertStringContainsString('見積番号の採番', $html);
+        // ボードは使えないのでリンクは出ない
+        $this->assertStringNotContainsString('物件ボード', $html);
+    }
+
     public function test_general_staff_cannot_allocate(): void
     {
         $this->actingAs(Staff::factory()->create())->get(route('quote-numbers.index'))->assertForbidden();
