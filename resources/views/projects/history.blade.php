@@ -7,7 +7,7 @@
     </x-slot>
 
     <div class="py-8">
-        <div class="max-w-6xl mx-auto sm:px-6 lg:px-8 space-y-4">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-4">
 
             <p class="text-xs text-slate-500">
                 物件管理ボードの受注を、非表示にしたものも含めて一覧します。調達ボードの「履歴」とは別の一覧で、
@@ -31,32 +31,33 @@
 
             <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
                 <div class="overflow-x-auto">
-                    <table class="w-full text-left border-collapse text-xs">
+                    {{-- 1件1行。件名・受注先も折り返さず、入り切らない画面でだけ横スクロールする。 --}}
+                    <table class="w-full text-left border-collapse text-xs whitespace-nowrap">
                         <thead>
                             <tr class="bg-slate-50 border-b border-slate-200 font-semibold text-slate-600">
-                                <th class="p-2.5 whitespace-nowrap">注番</th>
-                                <th class="p-2.5">件名</th>
-                                <th class="p-2.5">受注先</th>
-                                <th class="p-2.5 whitespace-nowrap">受注日</th>
-                                <th class="p-2.5 text-right whitespace-nowrap">受注金額</th>
-                                <th class="p-2.5 whitespace-nowrap">売上日</th>
-                                <th class="p-2.5 whitespace-nowrap">担当</th>
-                                <th class="p-2.5 whitespace-nowrap">状態</th>
+                                <th class="px-2 py-2 w-px">注番</th>
+                                <th class="px-2 py-2 w-full">件名</th>
+                                <th class="px-2 py-2 w-px">受注先</th>
+                                <th class="px-2 py-2 w-px">受注日</th>
+                                <th class="px-2 py-2 w-px text-right">受注金額</th>
+                                <th class="px-2 py-2 w-px">売上日</th>
+                                <th class="px-2 py-2 w-px">担当</th>
+                                <th class="px-2 py-2 w-px">状態</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100">
                             @forelse ($orders as $order)
                                 <tr class="hover:bg-blue-50 {{ $order->card?->trashed() ? 'bg-slate-50/60' : '' }}">
-                                    <td class="p-2.5 font-mono whitespace-nowrap">
+                                    <td class="px-2 py-1 w-px font-mono">
                                         <a href="{{ route('projects.show', $order->card) }}" class="text-blue-700 hover:text-blue-900">{{ $order->order_no }}</a>
                                     </td>
-                                    <td class="p-2.5 font-semibold">{{ $order->product_name }}</td>
-                                    <td class="p-2.5">{{ $order->recipient }}</td>
-                                    <td class="p-2.5 font-mono whitespace-nowrap">{{ $order->order_received_date?->format('Y/m/d') }}</td>
-                                    <td class="p-2.5 font-mono text-right whitespace-nowrap">¥{{ number_format((float) $order->order_amount) }}</td>
-                                    <td class="p-2.5 font-mono whitespace-nowrap">{{ $order->sales_date?->format('Y/m/d') ?: '—' }}</td>
-                                    <td class="p-2.5 whitespace-nowrap">{{ $order->staff?->name }}</td>
-                                    <td class="p-2.5 whitespace-nowrap">
+                                    <td class="px-2 py-1 w-full font-semibold">{{ $order->product_name }}</td>
+                                    <td class="px-2 py-1 w-px">{{ $order->recipient }}</td>
+                                    <td class="px-2 py-1 w-px font-mono">{{ $order->order_received_date?->format('Y/m/d') }}</td>
+                                    <td class="px-2 py-1 w-px font-mono text-right">¥{{ number_format((float) $order->order_amount) }}</td>
+                                    <td class="px-2 py-1 w-px font-mono">{{ $order->sales_date?->format('Y/m/d') ?: '—' }}</td>
+                                    <td class="px-2 py-1 w-px">{{ $order->staff?->name }}</td>
+                                    <td class="px-2 py-1 w-px">
                                         @if ($order->card?->trashed())
                                             <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-700 text-white">非表示</span>
                                         @else
