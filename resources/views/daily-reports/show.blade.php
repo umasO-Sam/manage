@@ -188,8 +188,8 @@
                             終わりの時間帯をタップしてください（同じところをもう一度タップすると取り消します）。この行だけでよければ「反映」を押します。
                         </p>
                         <p class="text-[11px] text-slate-400">
-                            「終日」は8:00〜17:10を選択中の内容で埋めます（休憩はそのまま残ります）。ドラッグ選択が休憩をまたいだ場合も休憩部分は上書きされません。<br>
-                            休憩時間を変更する場合、下部（本日の入力内容）の対象となる休憩時間を「×」で削除してから入力してください。<br>
+                            「終日」は8:00〜17:10を選択中の内容で埋めます。作業内容を反映するときは、休憩をまたいでも休憩部分は上書きされません（休憩はそのまま残ります）。<br>
+                            休憩を消したいときは「削除」を選んでからなぞってください。下部（本日の入力内容）の「×」でも消せます。<br>
                             10分未満の作業登録は「時刻入力」から行ってください。<br>
                             パソコンは、なぞって選択します。Ctrlキーを押しながらなぞると、離れた時間帯を追加で選択できます。<br>
                             スマホ・タブレットは、始めの時間帯をタップしてから終わりの時間帯をタップすると、その間が選択されます（途中でスクロールしてかまいません）。<br>
@@ -869,11 +869,14 @@
                     this.selectedIndices = new Set();
                 },
 
-                // 既存の休憩(is_break)エントリは、なぞって選択・終日ボタンのどちらで
-                // 上書きしようとしても一切変更しない。休憩をまたいで範囲を反映した場合は、
-                // 休憩を除いた残りの区間だけを選択中の内容で埋める。休憩そのものを
-                // 編集・削除したい場合は時刻入力モードで直接操作する。
+                // 既存の休憩(is_break)エントリは、作業内容を反映するときは上書きしない。
+                // 休憩をまたいで範囲を反映した場合は、休憩を除いた残りの区間だけを
+                // 選択中の内容で埋める。
+                // ただし「削除」を選んでいるときは休憩も消す。消す意思をもって選んだ操作
+                // なので、ここで休憩だけ残ると「削除が効かない」ように見えるため。
                 commitRange(startMinute, endMinute) {
+                    const deleting = this.selection.type === 'delete';
+
                     const breaksInRange = this.entries
                         .filter((e) => e.is_break && e.start_minute !== null && e.end_minute !== null
                             && e.start_minute < endMinute && e.end_minute > startMinute)
@@ -888,7 +891,7 @@
                     if (cursor < endMinute) gaps.push([cursor, endMinute]);
 
                     this.entries = this.entries.flatMap((e) => {
-                        if (e.is_break) return [e];
+                        if (e.is_break && ! deleting) return [e];
                         if (e.start_minute === null || e.end_minute === null) return [e];
                         if (e.end_minute <= startMinute || e.start_minute >= endMinute) return [e];
                         const pieces = [];
@@ -897,8 +900,8 @@
                         return pieces;
                     });
 
-                    // 削除選択時は、既存内容(休憩を除く)を取り除くだけで新しい内容は入れない。
-                    if (this.selection.type === 'delete') return;
+                    // 削除選択時は、既存内容を取り除くだけで新しい内容は入れない。
+                    if (deleting) return;
 
                     gaps.forEach(([gapStart, gapEnd]) => {
                         if (gapEnd <= gapStart) return;
@@ -953,8 +956,8 @@
 
                 // 時刻未入力の行はまだ重なり判定ができないので、そのまま選択中の内容を
                 // セットするだけにする。開始・終了が入力済みの行は、なぞって選択と同じ
-                // commitRange()を通すことで、休憩と重なる場合は休憩を必ず残し(休憩を優先)、
-                // 休憩以外の既存内容と重なる場合は上書き前に確認するようにする。
+                // commitRange()を通すことで、休憩と重なる場合は休憩を残し(「削除」選択時を
+                // 除く)、休憩以外の既存内容と重なる場合は上書き前に確認するようにする。
                 applySelectionToRow(entry) {
                     const start = entry.start_minute;
                     const end = entry.end_minute;
