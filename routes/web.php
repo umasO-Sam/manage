@@ -64,6 +64,8 @@ Route::middleware('auth')->group(function () {
     // 指定された社員であればPolicyで許可する(メール内リンクから詳細経由で操作できる)。
     Route::get('/leave-requests/approvals', [LeaveRequestController::class, 'approvals'])
         ->middleware('supervisor.or.manager')->name('leave-requests.approvals');
+    Route::post('/leave-requests/approvals/bulk-approve', [LeaveRequestController::class, 'bulkApprove'])
+        ->middleware('supervisor.or.manager')->name('leave-requests.bulk-approve');
     // 勤怠管理者の反映確認一覧。{leaveRequest} より前に置かないとIDとして食われる。
     Route::get('/leave-requests/cancellations', [LeaveRequestController::class, 'cancellations'])
         ->middleware('attendance.manager')->name('leave-requests.cancellations');

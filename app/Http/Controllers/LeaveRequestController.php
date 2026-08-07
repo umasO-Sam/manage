@@ -372,6 +372,60 @@ class LeaveRequestController extends Controller
     }
 
     /**
+     * 承認待ちの申請をまとめて承認する。却下は理由が要るため一括にはしない。
+     *
+     * 自分が承認者でないものや、すでに処理済みのものが紛れていても黙って
+     * 通さないよう、1件ずつ権限を確かめてから更新する。
+     */
+    public function bulkApprove(Request $request): RedirectResponse
+    {
+        $data = $request->validate([
+            'ids' => ['required', 'array', 'min:1'],
+            'ids.*' => ['integer'],
+        ], ['ids.required' => '承認する申請を選択してください。']);
+
+        $leaveRequests = LeaveRequest::with(['staff', 'approver'])
+            ->whereIn('id', $data['ids'])
+            ->where('approver_id', Auth::id())
+            ->where('status', LeaveRequest::STATUS_PENDING)
+            ->get();
+
+        if ($leaveRequests->isEmpty()) {
+            return redirect()->route('leave-requests.approvals')
+                ->withErrors(['ids' => '承認できる申請がありませんでした。ほかの端末で処理済みの可能性があります。']);
+        }
+
+        DB::transaction(function () use ($leaveRequests) {
+            foreach ($leaveRequests as $leaveRequest) {
+                $this->authorize('decide', $leaveRequest);
+
+                $leaveRequest->update([
+                    'status' => LeaveRequest::STATUS_APPROVED,
+                    'rejection_reason' => null,
+                    'approved_at' => now(),
+                ]);
+
+                OperationLog::record(
+                    OperationLog::ACTION_LEAVE_REQUEST_APPROVE,
+                    $leaveRequest,
+                    $leaveRequest->staff_id
+                );
+            }
+        });
+
+        foreach ($leaveRequests as $leaveRequest) {
+            $this->sendNotification(
+                $leaveRequest->staff->email,
+                new LeaveRequestNotificationMail($leaveRequest, '申請が承認されました')
+            );
+        }
+
+        return redirect()->route('leave-requests.approvals')
+            ->with('status', 'leave-requests-bulk-approved')
+            ->with('bulkApprovedCount', $leaveRequests->count());
+    }
+
+    /**
      * 承認済み申請の取消を本人が申請する。理由は必須(上長と勤怠管理者が
      * 可否を判断する材料になるため)。
      */

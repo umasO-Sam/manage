@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\LeaveRequest;
+use App\Models\OperationLog;
 use App\Models\Staff;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -562,6 +563,101 @@ class LeaveRequestTest extends TestCase
         // 他の種別は日付の向きを問わない。
         $this->assertNull($make('paid_leave', now()->subMonth()->toDateString())->dateWarning());
         $this->assertNull($make('telework', now()->addMonth()->toDateString())->dateWarning());
+    }
+
+    public function test_a_supervisor_can_approve_several_requests_at_once(): void
+    {
+        $approver = Staff::factory()->create(['is_supervisor' => true]);
+        $requests = collect(range(1, 3))->map(
+            fn () => $this->createPendingPaidLeave(Staff::factory()->create(), $approver)
+        );
+
+        $this->actingAs($approver)->post(route('leave-requests.bulk-approve'), [
+            'ids' => $requests->pluck('id')->all(),
+        ])->assertRedirect(route('leave-requests.approvals'))
+            ->assertSessionHas('bulkApprovedCount', 3);
+
+        foreach ($requests as $leaveRequest) {
+            $this->assertSame('approved', $leaveRequest->fresh()->status);
+            $this->assertNotNull($leaveRequest->fresh()->approved_at);
+        }
+
+        // 1件ずつの承認と同じように操作ログを残す。
+        $this->assertSame(3, OperationLog::where('action', OperationLog::ACTION_LEAVE_REQUEST_APPROVE)->count());
+    }
+
+    public function test_bulk_approval_ignores_requests_the_supervisor_does_not_approve(): void
+    {
+        $approver = Staff::factory()->create(['is_supervisor' => true]);
+        $otherApprover = Staff::factory()->create(['is_supervisor' => true]);
+
+        $mine = $this->createPendingPaidLeave(Staff::factory()->create(), $approver);
+        $someoneElses = $this->createPendingPaidLeave(Staff::factory()->create(), $otherApprover);
+
+        $this->actingAs($approver)->post(route('leave-requests.bulk-approve'), [
+            'ids' => [$mine->id, $someoneElses->id],
+        ])->assertRedirect(route('leave-requests.approvals'));
+
+        $this->assertSame('approved', $mine->fresh()->status);
+        $this->assertSame('pending', $someoneElses->fresh()->status, '他人が承認者の申請は触らない');
+    }
+
+    public function test_bulk_approval_skips_requests_that_are_no_longer_pending(): void
+    {
+        $approver = Staff::factory()->create(['is_supervisor' => true]);
+        $pending = $this->createPendingPaidLeave(Staff::factory()->create(), $approver);
+        $withdrawn = $this->createPendingPaidLeave(Staff::factory()->create(), $approver);
+        $withdrawn->update(['status' => LeaveRequest::STATUS_WITHDRAWN]);
+
+        $this->actingAs($approver)->post(route('leave-requests.bulk-approve'), [
+            'ids' => [$pending->id, $withdrawn->id],
+        ])->assertRedirect(route('leave-requests.approvals'))
+            ->assertSessionHas('bulkApprovedCount', 1);
+
+        $this->assertSame('approved', $pending->fresh()->status);
+        $this->assertSame('withdrawn', $withdrawn->fresh()->status);
+    }
+
+    public function test_bulk_approval_reports_when_nothing_could_be_approved(): void
+    {
+        $approver = Staff::factory()->create(['is_supervisor' => true]);
+        $alreadyDone = $this->createPendingPaidLeave(Staff::factory()->create(), $approver);
+        $alreadyDone->update(['status' => LeaveRequest::STATUS_APPROVED]);
+
+        $this->actingAs($approver)->post(route('leave-requests.bulk-approve'), [
+            'ids' => [$alreadyDone->id],
+        ])->assertSessionHasErrors('ids');
+    }
+
+    public function test_bulk_approval_needs_at_least_one_selection(): void
+    {
+        $approver = Staff::factory()->create(['is_supervisor' => true]);
+
+        $this->actingAs($approver)->post(route('leave-requests.bulk-approve'), [])
+            ->assertSessionHasErrors('ids');
+    }
+
+    public function test_bulk_approval_is_limited_to_supervisors_and_managers(): void
+    {
+        $approver = Staff::factory()->create(['is_supervisor' => true]);
+        $leaveRequest = $this->createPendingPaidLeave(Staff::factory()->create(), $approver);
+
+        $this->actingAs(Staff::factory()->create())
+            ->post(route('leave-requests.bulk-approve'), ['ids' => [$leaveRequest->id]])
+            ->assertForbidden();
+
+        $this->assertSame('pending', $leaveRequest->fresh()->status);
+    }
+
+    public function test_the_approvals_screen_offers_bulk_approval(): void
+    {
+        $approver = Staff::factory()->create(['is_supervisor' => true]);
+        $this->createPendingPaidLeave(Staff::factory()->create(), $approver);
+
+        $this->actingAs($approver)->get(route('leave-requests.approvals'))
+            ->assertOk()
+            ->assertSee('すべて選択')
+            ->assertSee('選択した申請を承認');
     }
 
     private function createPendingPaidLeave(Staff $applicant, Staff $approver): LeaveRequest
