@@ -30,9 +30,16 @@ class CardUnreadStatusTest extends TestCase
         ]);
     }
 
+    private int $orderNumberSequence = 0;
+
     private function makeCard(WorkflowType $workflowType, Staff $creator): Card
     {
-        $orderNumber = OrderNumber::create(['code' => 'ZZ'.random_int(100, 999).'-N99T99', 'is_protected' => false]);
+        // 注番はユニーク制約があるため連番で作る(乱数だと同一テスト内で
+        // 衝突して、テスト全体がまれに落ちる)。
+        $orderNumber = OrderNumber::create([
+            'code' => sprintf('ZZ%03d-N99T99', ++$this->orderNumberSequence),
+            'is_protected' => false,
+        ]);
 
         return $workflowType->cards()->create([
             'order_number_id' => $orderNumber->id, 'item_name' => 'テスト部品', 'manufacturer' => 'メーカーA',
