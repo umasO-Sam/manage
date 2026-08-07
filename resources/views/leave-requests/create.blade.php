@@ -127,7 +127,8 @@
                         </div>
                         <x-input-error class="mt-2" :messages="$errors->get('granularity')" />
                     </div>
-                    <div x-show="granularity === 'half_day'" x-cloak>
+                    {{-- 半日・2時間はどちらも午前/午後の単位で取得する --}}
+                    <div x-show="granularity === 'half_day' || granularity === 'hours'" x-cloak>
                         <x-input-label value="午前/午後" />
                         <div class="flex gap-3 mt-1 text-sm">
                             <label class="flex items-center gap-1"><input type="radio" name="half_day_period" value="am" @checked(old('half_day_period') === 'am')> 午前(AM)</label>

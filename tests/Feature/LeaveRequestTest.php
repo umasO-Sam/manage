@@ -48,11 +48,26 @@ class LeaveRequestTest extends TestCase
             'approver_id' => $approver->id,
             'start_date' => '2026-08-10',
             'granularity' => 'hours',
+            'half_day_period' => 'am',
         ]);
 
         $leaveRequest = LeaveRequest::first();
         $this->assertSame(0.25, (float) $leaveRequest->day_count);
         $this->assertSame(2.0, (float) $leaveRequest->hours);
+        $this->assertSame('am', $leaveRequest->half_day_period);
+    }
+
+    public function test_paid_leave_hours_requires_am_pm_period(): void
+    {
+        $applicant = Staff::factory()->create(['paid_leave_granted_current_year' => 10]);
+        $approver = Staff::factory()->create(['is_supervisor' => true]);
+
+        $this->actingAs($applicant)->post(route('leave-requests.store'), [
+            'type' => 'paid_leave', 'approver_id' => $approver->id,
+            'start_date' => '2026-08-10', 'granularity' => 'hours',
+        ])->assertSessionHasErrors('half_day_period');
+
+        $this->assertSame(0, LeaveRequest::count());
     }
 
     public function test_paid_leave_half_day_requires_am_pm_period(): void
@@ -84,6 +99,37 @@ class LeaveRequestTest extends TestCase
         $this->assertSame('PM半休', $leaveRequest->shortLabel());
     }
 
+    /**
+     * 承認者は承認画面から詳細へ遷移して判断するため、午前/午後は詳細に出ている必要がある。
+     */
+    public function test_detail_page_shows_am_pm_period_for_half_day_and_hours(): void
+    {
+        $applicant = Staff::factory()->create(['paid_leave_granted_current_year' => 10]);
+        $approver = Staff::factory()->create(['is_supervisor' => true]);
+
+        $make = fn (string $granularity, string $period) => LeaveRequest::create([
+            'staff_id' => $applicant->id, 'type' => 'paid_leave',
+            'start_date' => '2026-08-10', 'end_date' => '2026-08-10',
+            'granularity' => $granularity, 'half_day_period' => $period,
+            'day_count' => 0.5, 'approver_id' => $approver->id, 'status' => 'pending',
+        ]);
+
+        $this->actingAs($approver)->get(route('leave-requests.show', $make('hours', 'pm')))
+            ->assertOk()->assertSee('午前/午後')->assertSee('午後(PM)');
+        $this->actingAs($approver)->get(route('leave-requests.show', $make('half_day', 'am')))
+            ->assertOk()->assertSee('午前(AM)');
+
+        // 午前/午後を持たない1日有休では、この行ごと出さない。
+        $fullDay = LeaveRequest::create([
+            'staff_id' => $applicant->id, 'type' => 'paid_leave',
+            'start_date' => '2026-08-11', 'end_date' => '2026-08-11',
+            'granularity' => 'full_day', 'day_count' => 1.0,
+            'approver_id' => $approver->id, 'status' => 'pending',
+        ]);
+        $this->actingAs($approver)->get(route('leave-requests.show', $fullDay))
+            ->assertOk()->assertDontSee('午前/午後');
+    }
+
     public function test_short_label_covers_paid_leave_variants(): void
     {
         $staff = Staff::factory()->create();
@@ -95,7 +141,10 @@ class LeaveRequestTest extends TestCase
         ]);
 
         $this->assertSame('1日有休', $make(['granularity' => 'full_day'])->shortLabel());
-        $this->assertSame('2H有休', $make(['granularity' => 'hours'])->shortLabel());
+        $this->assertSame('AM2H休', $make(['granularity' => 'hours', 'half_day_period' => 'am'])->shortLabel());
+        $this->assertSame('PM2H休', $make(['granularity' => 'hours', 'half_day_period' => 'pm'])->shortLabel());
+        // AM/PM必須化より前に登録された2時間有休のフォールバック
+        $this->assertSame('2H休', $make(['granularity' => 'hours'])->shortLabel());
         $this->assertSame('AM半休', $make(['granularity' => 'half_day', 'half_day_period' => 'am'])->shortLabel());
         $this->assertSame('PM半休', $make(['granularity' => 'half_day', 'half_day_period' => 'pm'])->shortLabel());
 

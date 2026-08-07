@@ -66,6 +66,9 @@
                     @if ($leaveRequest->day_count !== null)
                         <div class="py-2 flex justify-between"><dt class="text-slate-500">日数</dt><dd>{{ $leaveRequest->day_count }}日</dd></div>
                     @endif
+                    @if ($leaveRequest->halfDayPeriodLabel())
+                        <div class="py-2 flex justify-between"><dt class="text-slate-500">午前/午後</dt><dd>{{ $leaveRequest->halfDayPeriodLabel() }}</dd></div>
+                    @endif
                     @if ($leaveRequest->isFuneral())
                         @if ($leaveRequest->funeral_venue_address)
                             <div class="py-2 flex justify-between"><dt class="text-slate-500">葬儀場住所</dt><dd>{{ $leaveRequest->funeral_venue_address }}</dd></div>

@@ -165,13 +165,46 @@ class LeaveRequest extends Model
     {
         return match (true) {
             $this->type === 'paid_leave' && $this->granularity === 'full_day' => '1日有休',
-            $this->type === 'paid_leave' && $this->granularity === 'hours' => '2H有休',
+            $this->type === 'paid_leave' && $this->granularity === 'hours' && $this->half_day_period === 'am' => 'AM2H休',
+            $this->type === 'paid_leave' && $this->granularity === 'hours' && $this->half_day_period === 'pm' => 'PM2H休',
+            // 午前/午後を持たない2時間有休は、AM/PM必須化より前に登録されたもの。
+            $this->type === 'paid_leave' && $this->granularity === 'hours' => '2H休',
             $this->type === 'paid_leave' && $this->granularity === 'half_day' && $this->half_day_period === 'am' => 'AM半休',
             $this->type === 'paid_leave' && $this->granularity === 'half_day' && $this->half_day_period === 'pm' => 'PM半休',
             $this->type === 'paid_leave' && $this->granularity === 'half_day' => '半休',
             $this->type === 'telework' => '在宅',
             $this->type === 'holiday_work' => '休出',
             default => mb_substr($this->typeLabel(), 0, 4),
+        };
+    }
+
+    /**
+     * start_date〜end_dateが終日休みになるか（＝その日は作業日報が不要）。
+     *
+     * 半日・2時間の有給休暇は残りの時間を勤務するため日報が必要で、falseを返す。
+     * テレワークと休日勤務は勤務日、代休申請のstart_dateは「実際に勤務した日」なので
+     * いずれもfalse。代休で休む日はcompensatory_date、振替休日は
+     * substitute_holiday_dateにあり、どちらも終日休みとして呼び出し側で扱う。
+     *
+     * 上記以外（慶弔・特別休暇・裁判員・ボランティア・積立有給）は日単位で取得する
+     * 休暇のためtrue。新しい休暇種別を追加したときも既定で終日休み扱いになる。
+     */
+    public function isFullDayOff(): bool
+    {
+        return match ($this->type) {
+            'telework', 'holiday_work', 'compensatory_leave' => false,
+            'paid_leave' => $this->granularity === 'full_day',
+            default => true,
+        };
+    }
+
+    /** 半日・2時間有休の午前/午後。設定が無ければnull（詳細画面では行ごと出さない）。 */
+    public function halfDayPeriodLabel(): ?string
+    {
+        return match ($this->half_day_period) {
+            'am' => '午前(AM)',
+            'pm' => '午後(PM)',
+            default => null,
         };
     }
 

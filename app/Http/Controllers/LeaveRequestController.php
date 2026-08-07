@@ -161,8 +161,13 @@ class LeaveRequestController extends Controller
             throw ValidationException::withMessages(['granularity' => '有給休暇の粒度（1日/半日/2時間）を選択してください。']);
         }
 
-        if ($data['granularity'] === 'half_day' && empty($data['half_day_period'])) {
-            throw ValidationException::withMessages(['half_day_period' => '半休の午前/午後を選択してください。']);
+        // 半日・2時間はどちらも午前/午後の単位で取得する（2時間は始業側/終業側の2時間）。
+        if (in_array($data['granularity'], ['half_day', 'hours'], true) && empty($data['half_day_period'])) {
+            throw ValidationException::withMessages([
+                'half_day_period' => $data['granularity'] === 'half_day'
+                    ? '半休の午前/午後を選択してください。'
+                    : '2時間有休の午前/午後を選択してください。',
+            ]);
         }
 
         $dayCount = match ($data['granularity']) {
@@ -183,7 +188,7 @@ class LeaveRequestController extends Controller
             'start_date' => $data['start_date'],
             'end_date' => $data['start_date'],
             'granularity' => $data['granularity'],
-            'half_day_period' => $data['granularity'] === 'half_day' ? $data['half_day_period'] : null,
+            'half_day_period' => in_array($data['granularity'], ['half_day', 'hours'], true) ? $data['half_day_period'] : null,
             'hours' => $data['granularity'] === 'hours' ? 2.0 : null,
             'day_count' => $dayCount,
         ];
