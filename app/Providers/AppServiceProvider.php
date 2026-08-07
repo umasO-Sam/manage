@@ -36,6 +36,7 @@ class AppServiceProvider extends ServiceProvider
 
             $view->with('unreadCardCountsByWorkflow', $staff?->unreadCardCountsByWorkflow() ?? []);
             $view->with('pendingApprovalsCount', $staff?->pendingApprovalsCount() ?? 0);
+            $view->with('pendingCancelReflectionCount', $staff?->pendingCancelReflectionCount() ?? 0);
             // 未確認バッジは確認を担当する日報管理者にだけ出す。
             $view->with('pendingDailyReportReviewCount', $staff?->canReviewDailyReports()
                 ? DailyReport::whereNull('rejected_at')

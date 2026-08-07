@@ -64,8 +64,14 @@ Route::middleware('auth')->group(function () {
     // 指定された社員であればPolicyで許可する(メール内リンクから詳細経由で操作できる)。
     Route::get('/leave-requests/approvals', [LeaveRequestController::class, 'approvals'])
         ->middleware('supervisor.or.manager')->name('leave-requests.approvals');
+    // 勤怠管理者の反映確認一覧。{leaveRequest} より前に置かないとIDとして食われる。
+    Route::get('/leave-requests/cancellations', [LeaveRequestController::class, 'cancellations'])
+        ->middleware('attendance.manager')->name('leave-requests.cancellations');
     Route::get('/leave-requests/{leaveRequest}', [LeaveRequestController::class, 'show'])->name('leave-requests.show');
     Route::put('/leave-requests/{leaveRequest}/decide', [LeaveRequestController::class, 'decide'])->name('leave-requests.decide');
+    Route::post('/leave-requests/{leaveRequest}/cancel-request', [LeaveRequestController::class, 'requestCancel'])->name('leave-requests.cancel.request');
+    Route::put('/leave-requests/{leaveRequest}/cancel-decide', [LeaveRequestController::class, 'decideCancel'])->name('leave-requests.cancel.decide');
+    Route::put('/leave-requests/{leaveRequest}/cancel-reflect', [LeaveRequestController::class, 'reflectCancel'])->name('leave-requests.cancel.reflect');
     Route::delete('/leave-requests/{leaveRequest}', [LeaveRequestController::class, 'withdraw'])->name('leave-requests.withdraw');
 
     // 他の社員の勤怠・原価情報をまとめて見る画面は経理資材担当・上長限定。
@@ -113,6 +119,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/projects', [ProjectBoardController::class, 'index'])->name('projects.index');
         Route::get('/projects/history', [ProjectBoardController::class, 'history'])->name('projects.history');
         Route::get('/projects/create', [ProjectBoardController::class, 'create'])->name('projects.create');
+        Route::get('/projects/orders/search', [ProjectBoardController::class, 'searchOrders'])->name('projects.orders.search');
         Route::post('/projects', [ProjectBoardController::class, 'store'])->name('projects.store');
         Route::get('/projects/{card}', [ProjectBoardController::class, 'show'])->name('projects.show')->withTrashed();
         Route::get('/projects/{card}/order', [ProjectBoardController::class, 'editOrder'])->name('projects.order.edit');

@@ -21,6 +21,11 @@
             @if (session('status') === 'leave-request-withdrawn')
                 <div class="p-3 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-800 text-sm">申請を取り消しました。</div>
             @endif
+            @if (session('status') === 'leave-request-cancel-requested')
+                <div class="p-3 rounded-xl bg-amber-50 border border-amber-100 text-amber-800 text-sm">
+                    取消を申請しました。上長が承認したあと、勤怠管理者が反映してよいかを確認します。確定するまでこの申請は承認済みのままです。
+                </div>
+            @endif
 
             <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
                 <table class="w-full text-left border-collapse text-sm">

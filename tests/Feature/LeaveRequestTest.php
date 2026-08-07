@@ -411,7 +411,7 @@ class LeaveRequestTest extends TestCase
             ->assertForbidden();
     }
 
-    public function test_cannot_select_self_as_approver(): void
+    public function test_non_supervisor_cannot_select_self_as_approver(): void
     {
         $applicant = Staff::factory()->create();
 
@@ -421,6 +421,147 @@ class LeaveRequestTest extends TestCase
             'start_date' => '2026-08-10',
             'granularity' => 'full_day',
         ])->assertSessionHasErrors('approver_id');
+
+        $this->assertSame(0, LeaveRequest::count());
+    }
+
+    public function test_supervisor_can_select_self_as_approver(): void
+    {
+        $applicant = Staff::factory()->create([
+            'is_supervisor' => true,
+            'paid_leave_granted_current_year' => 10,
+        ]);
+
+        $this->actingAs($applicant)->post(route('leave-requests.store'), [
+            'type' => 'paid_leave',
+            'approver_id' => $applicant->id,
+            'start_date' => '2026-08-10',
+            'granularity' => 'full_day',
+        ])->assertRedirect(route('leave-requests.index'));
+
+        $this->assertSame($applicant->id, LeaveRequest::first()->approver_id);
+    }
+
+    public function test_supervisor_is_listed_as_approver_candidate_for_own_request(): void
+    {
+        $applicant = Staff::factory()->create(['is_supervisor' => true, 'name' => '上長本人']);
+
+        $this->actingAs($applicant)->get(route('leave-requests.create'))
+            ->assertOk()
+            ->assertSee('上長本人（自分）');
+    }
+
+    public function test_supervisor_can_approve_own_request(): void
+    {
+        $applicant = Staff::factory()->create(['is_supervisor' => true]);
+        $leaveRequest = $this->createPendingPaidLeave($applicant, $applicant);
+
+        $this->actingAs($applicant)->put(route('leave-requests.decide', $leaveRequest), [
+            'action' => 'approve',
+        ])->assertRedirect(route('leave-requests.approvals'));
+
+        $this->assertSame('approved', $leaveRequest->fresh()->status);
+    }
+
+    public function test_own_pending_request_appears_in_approvals_list(): void
+    {
+        $applicant = Staff::factory()->create(['is_supervisor' => true]);
+        $this->createPendingPaidLeave($applicant, $applicant);
+
+        $this->actingAs($applicant)->get(route('leave-requests.approvals'))
+            ->assertOk()
+            ->assertSee($applicant->name);
+    }
+
+    public function test_holiday_work_request_can_be_self_approved_by_supervisor(): void
+    {
+        $applicant = Staff::factory()->create(['is_supervisor' => true]);
+
+        $this->actingAs($applicant)->post(route('leave-requests.store'), [
+            'type' => 'holiday_work',
+            'approver_id' => $applicant->id,
+            'start_date' => '2026-08-10',
+            'order_no' => 'A-1',
+            'work_location' => '本社',
+            'no_substitute_needed' => true,
+        ])->assertRedirect(route('leave-requests.index'));
+
+        $leaveRequest = LeaveRequest::first();
+
+        $this->actingAs($applicant)->put(route('leave-requests.decide', $leaveRequest), [
+            'action' => 'approve',
+        ])->assertRedirect(route('leave-requests.approvals'));
+
+        $this->assertSame('approved', $leaveRequest->fresh()->status);
+    }
+
+    /**
+     * 勤務日の向きが制度と食い違う場合は注意喚起する。ただし実運用では逆順の
+     * 申請も起こりうるため、登録そのものは止めない。
+     */
+    public function test_a_past_holiday_work_request_is_warned_but_still_accepted(): void
+    {
+        $applicant = Staff::factory()->create();
+        $approver = Staff::factory()->create(['is_supervisor' => true]);
+
+        $this->actingAs($applicant)->post(route('leave-requests.store'), [
+            'type' => 'holiday_work',
+            'approver_id' => $approver->id,
+            'start_date' => now()->subWeek()->format('Y/m/d'),
+            'order_no' => 'A-1',
+            'work_location' => '本社',
+            'no_substitute_needed' => true,
+        ])->assertRedirect(route('leave-requests.index'));
+
+        $leaveRequest = LeaveRequest::sole();
+        $this->assertStringContainsString('勤務日が過去の日付です', $leaveRequest->dateWarning());
+
+        // 申請者にも承認者にも見える。
+        $this->actingAs($applicant)->get(route('leave-requests.show', $leaveRequest))
+            ->assertOk()->assertSee('代休申請の方が合っている', false);
+        $this->actingAs($approver)->get(route('leave-requests.approvals'))
+            ->assertOk()->assertSee('要確認');
+    }
+
+    public function test_a_future_compensatory_leave_request_is_warned_but_still_accepted(): void
+    {
+        $applicant = Staff::factory()->create();
+        $approver = Staff::factory()->create(['is_supervisor' => true]);
+
+        $this->actingAs($applicant)->post(route('leave-requests.store'), [
+            'type' => 'compensatory_leave',
+            'approver_id' => $approver->id,
+            'start_date' => now()->addWeek()->format('Y/m/d'),
+            'order_no' => 'A-1',
+            'work_location' => '本社',
+            'actual_worked_hours' => 8,
+            'compensatory_date' => now()->addDays(10)->format('Y/m/d'),
+        ])->assertRedirect(route('leave-requests.index'));
+
+        $leaveRequest = LeaveRequest::sole();
+        $this->assertStringContainsString('勤務した日が未来の日付です', $leaveRequest->dateWarning());
+        $this->assertStringContainsString('休日勤務申請の方が合っている', $leaveRequest->dateWarning());
+    }
+
+    public function test_dates_in_the_expected_direction_are_not_warned(): void
+    {
+        $staff = Staff::factory()->create();
+        $approver = Staff::factory()->create(['is_supervisor' => true]);
+
+        $make = fn (string $type, string $date) => LeaveRequest::create([
+            'staff_id' => $staff->id, 'type' => $type, 'approver_id' => $approver->id,
+            'start_date' => $date, 'end_date' => $date, 'status' => 'pending',
+        ]);
+
+        // 休日勤務は今日以降、代休は今日以前が想定どおり。当日はどちらも警告しない。
+        $this->assertNull($make('holiday_work', now()->addWeek()->toDateString())->dateWarning());
+        $this->assertNull($make('holiday_work', now()->toDateString())->dateWarning());
+        $this->assertNull($make('compensatory_leave', now()->subWeek()->toDateString())->dateWarning());
+        $this->assertNull($make('compensatory_leave', now()->toDateString())->dateWarning());
+
+        // 他の種別は日付の向きを問わない。
+        $this->assertNull($make('paid_leave', now()->subMonth()->toDateString())->dateWarning());
+        $this->assertNull($make('telework', now()->addMonth()->toDateString())->dateWarning());
     }
 
     private function createPendingPaidLeave(Staff $applicant, Staff $approver): LeaveRequest

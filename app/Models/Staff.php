@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
-#[Fillable(['name', 'department', 'display_order', 'sid', 'login_id', 'email', 'role', 'is_labor_target', 'position_weight', 'password', 'must_change_password', 'hire_date', 'paid_leave_granted_current_year', 'paid_leave_granted_last_year', 'is_supervisor', 'excluded_from_rosters', 'is_daily_report_reviewer', 'is_executive', 'is_fund_manager', 'is_administrator'])]
+#[Fillable(['name', 'department', 'display_order', 'sid', 'login_id', 'email', 'role', 'is_labor_target', 'position_weight', 'password', 'must_change_password', 'hire_date', 'paid_leave_granted_current_year', 'paid_leave_granted_last_year', 'is_supervisor', 'excluded_from_rosters', 'is_daily_report_reviewer', 'is_attendance_manager', 'is_executive', 'is_fund_manager', 'is_administrator'])]
 #[Hidden(['password', 'remember_token'])]
 class Staff extends Authenticatable
 {
@@ -49,6 +49,7 @@ class Staff extends Authenticatable
             'is_supervisor' => 'boolean',
             'excluded_from_rosters' => 'boolean',
             'is_daily_report_reviewer' => 'boolean',
+            'is_attendance_manager' => 'boolean',
             'is_executive' => 'boolean',
             'is_fund_manager' => 'boolean',
             'is_administrator' => 'boolean',
@@ -149,6 +150,15 @@ class Staff extends Authenticatable
     {
         return (bool) $this->is_administrator
             || ($this->is_procurement_manager && (bool) $this->is_daily_report_reviewer);
+    }
+
+    /**
+     * 承認済み申請の取消を、上長の承認後に反映してよいか判断できるか。
+     * 日報管理者と違いロールは問わない(勤怠は部署をまたいで見る必要があるため)。
+     */
+    public function canManageAttendance(): bool
+    {
+        return (bool) $this->is_administrator || (bool) $this->is_attendance_manager;
     }
 
     /**
@@ -256,8 +266,28 @@ class Staff extends Authenticatable
      */
     public function pendingApprovalsCount(): int
     {
+        // 承認待ちに加えて、承認済みのあとに出された取消申請も自分の判断待ち。
         return LeaveRequest::where('approver_id', $this->id)
-            ->where('status', LeaveRequest::STATUS_PENDING)
+            ->where(fn ($q) => $q
+                ->where('status', LeaveRequest::STATUS_PENDING)
+                ->orWhere(fn ($w) => $w
+                    ->where('status', LeaveRequest::STATUS_APPROVED)
+                    ->where('cancel_status', LeaveRequest::CANCEL_REQUESTED)))
+            ->count();
+    }
+
+    /**
+     * 勤怠管理者の反映確認待ち件数。担当が1人に固定されていないため、
+     * 勤怠管理者全員に同じ件数を出す。
+     */
+    public function pendingCancelReflectionCount(): int
+    {
+        if (! $this->canManageAttendance()) {
+            return 0;
+        }
+
+        return LeaveRequest::where('status', LeaveRequest::STATUS_APPROVED)
+            ->where('cancel_status', LeaveRequest::CANCEL_PENDING_REFLECTION)
             ->count();
     }
 

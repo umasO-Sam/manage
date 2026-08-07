@@ -38,6 +38,9 @@
                                     @if ($leaveRequest->end_date && ! $leaveRequest->end_date->equalTo($leaveRequest->start_date))
                                         〜{{ $leaveRequest->end_date->format('Y/m/d') }}
                                     @endif
+                                    @if ($leaveRequest->dateWarning())
+                                        <span class="block text-[11px] font-bold text-amber-600" title="{{ $leaveRequest->dateWarning() }}">要確認</span>
+                                    @endif
                                 </td>
                                 <td class="p-3 text-center">
                                     <a href="{{ route('leave-requests.show', $leaveRequest) }}" class="text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 font-medium py-1 px-2.5 rounded-lg border border-blue-200 transition-colors">
@@ -51,6 +54,48 @@
                     </tbody>
                 </table>
             </div>
+
+            {{-- 承認済みになったあとに出された取消の申請。承認しても確定はせず、
+                 勤怠管理者の反映確認へ回る。 --}}
+            @if ($cancelRequests->isNotEmpty())
+                <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                    <div class="px-3 py-2 bg-amber-50 border-b border-amber-100">
+                        <p class="text-xs font-bold text-amber-700">承認済み申請の取消申請（{{ $cancelRequests->count() }}件）</p>
+                        <p class="text-[11px] text-amber-600">承認すると勤怠管理者へ反映確認の依頼が飛びます。</p>
+                    </div>
+                    <table class="w-full text-left border-collapse text-sm">
+                        <thead>
+                            <tr class="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-600">
+                                <th class="p-3">申請者</th>
+                                <th class="p-3">種別</th>
+                                <th class="p-3">対象日</th>
+                                <th class="p-3">取消の理由</th>
+                                <th class="p-3 text-center">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            @foreach ($cancelRequests as $leaveRequest)
+                                <tr class="hover:bg-slate-50">
+                                    <td class="p-3 font-semibold">{{ $leaveRequest->staff->name }}</td>
+                                    <td class="p-3">{{ $leaveRequest->typeLabel() }}</td>
+                                    <td class="p-3 font-mono">
+                                        {{ $leaveRequest->start_date->format('Y/m/d') }}
+                                        @if ($leaveRequest->end_date && ! $leaveRequest->end_date->equalTo($leaveRequest->start_date))
+                                            〜{{ $leaveRequest->end_date->format('Y/m/d') }}
+                                        @endif
+                                    </td>
+                                    <td class="p-3 text-xs text-slate-600">{{ Str::limit($leaveRequest->cancel_reason, 40) }}</td>
+                                    <td class="p-3 text-center">
+                                        <a href="{{ route('leave-requests.show', $leaveRequest) }}" class="text-xs bg-amber-50 hover:bg-amber-100 text-amber-700 font-medium py-1 px-2.5 rounded-lg border border-amber-200 transition-colors">
+                                            判断する
+                                        </a>
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            @endif
         </div>
     </div>
 </x-app-layout>

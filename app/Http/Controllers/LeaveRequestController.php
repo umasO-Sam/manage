@@ -26,7 +26,9 @@ class LeaveRequestController extends Controller
     public function create(Request $request): View
     {
         return view('leave-requests.create', [
-            'approvers' => Staff::where('is_supervisor', true)->where('id', '!=', Auth::id())->orderBy('name')->get(),
+            // 上長は自分自身も承認者に選べる(上長本人の申請を承認できる者が
+            // 他にいない運用があるため)。上長でなければ自分は候補に出ない。
+            'approvers' => Staff::where('is_supervisor', true)->orderBy('name')->get(),
             'orderNumbers' => OrderNumber::forDropdown()->get()
                 ->map(fn (OrderNumber $o) => ['code' => $o->code, 'label' => $o->displayLabel()])
                 ->values(),
@@ -63,9 +65,7 @@ class LeaveRequestController extends Controller
             'approver_id' => [
                 'required', 'integer', 'exists:staff,id',
                 function ($attribute, $value, $fail) {
-                    if ((int) $value === Auth::id()) {
-                        $fail('承認者には自分以外を選択してください。');
-                    } elseif (! Staff::where('id', $value)->where('is_supervisor', true)->exists()) {
+                    if (! Staff::where('id', $value)->where('is_supervisor', true)->exists()) {
                         $fail('承認者には上長フラグが設定された担当者を選択してください。');
                     }
                 },
@@ -318,6 +318,13 @@ class LeaveRequestController extends Controller
                 ->where('status', LeaveRequest::STATUS_PENDING)
                 ->orderBy('start_date')
                 ->get(),
+            // 承認済みのあとに出された取消申請も同じ画面で捌く。
+            'cancelRequests' => LeaveRequest::with('staff')
+                ->where('approver_id', Auth::id())
+                ->where('status', LeaveRequest::STATUS_APPROVED)
+                ->where('cancel_status', LeaveRequest::CANCEL_REQUESTED)
+                ->orderBy('start_date')
+                ->get(),
         ]);
     }
 
@@ -362,6 +369,157 @@ class LeaveRequestController extends Controller
         );
 
         return redirect()->route('leave-requests.approvals')->with('status', 'leave-request-decided');
+    }
+
+    /**
+     * 承認済み申請の取消を本人が申請する。理由は必須(上長と勤怠管理者が
+     * 可否を判断する材料になるため)。
+     */
+    public function requestCancel(Request $request, LeaveRequest $leaveRequest): RedirectResponse
+    {
+        $this->authorize('requestCancel', $leaveRequest);
+
+        $data = $request->validate(
+            ['cancel_reason' => ['required', 'string', 'max:2000']],
+            ['cancel_reason.required' => '取消の理由を入力してください。']
+        );
+
+        DB::transaction(function () use ($leaveRequest, $data) {
+            $leaveRequest->update([
+                'cancel_status' => LeaveRequest::CANCEL_REQUESTED,
+                'cancel_reason' => $data['cancel_reason'],
+                'cancel_rejection_reason' => null,
+                'cancel_requested_at' => now(),
+            ]);
+
+            OperationLog::record(
+                OperationLog::ACTION_LEAVE_REQUEST_CANCEL_REQUEST,
+                $leaveRequest,
+                $leaveRequest->staff_id,
+                $data['cancel_reason']
+            );
+        });
+
+        $this->sendNotification(
+            $leaveRequest->approver->email,
+            new LeaveRequestNotificationMail($leaveRequest, '承認済み申請の取消申請が届きました')
+        );
+
+        return redirect()->route('leave-requests.index')->with('status', 'leave-request-cancel-requested');
+    }
+
+    /**
+     * 上長が取消を認めるか差し戻すかを判断する。認めた場合は確定させず、
+     * 勤怠管理者の反映確認へ回す。
+     */
+    public function decideCancel(Request $request, LeaveRequest $leaveRequest): RedirectResponse
+    {
+        $this->authorize('decideCancel', $leaveRequest);
+
+        $data = $request->validate([
+            'action' => ['required', 'in:approve,reject'],
+            'cancel_rejection_reason' => ['nullable', 'string', 'max:2000', 'required_if:action,reject'],
+        ], ['cancel_rejection_reason.required_if' => '差し戻しの理由を入力してください。']);
+
+        $approved = $data['action'] === 'approve';
+
+        DB::transaction(function () use ($leaveRequest, $data, $approved) {
+            $leaveRequest->update($approved
+                ? ['cancel_status' => LeaveRequest::CANCEL_PENDING_REFLECTION]
+                : [
+                    'cancel_status' => null,
+                    'cancel_rejection_reason' => $data['cancel_rejection_reason'],
+                ]);
+
+            OperationLog::record(
+                $approved ? OperationLog::ACTION_LEAVE_REQUEST_CANCEL_APPROVE : OperationLog::ACTION_LEAVE_REQUEST_CANCEL_REJECT,
+                $leaveRequest,
+                $leaveRequest->staff_id,
+                $approved ? null : $data['cancel_rejection_reason']
+            );
+        });
+
+        if ($approved) {
+            // 反映確認は勤怠管理者全員に依頼する(担当が1人に固定されていないため)。
+            foreach (Staff::where('is_attendance_manager', true)->orWhere('is_administrator', true)->get() as $manager) {
+                $this->sendNotification(
+                    $manager->email,
+                    new LeaveRequestNotificationMail($leaveRequest, '取消の反映確認をお願いします')
+                );
+            }
+        } else {
+            $this->sendNotification(
+                $leaveRequest->staff->email,
+                new LeaveRequestNotificationMail($leaveRequest, '取消申請が差し戻されました')
+            );
+        }
+
+        return redirect()->route('leave-requests.approvals')->with('status', 'leave-request-cancel-decided');
+    }
+
+    /**
+     * 勤怠管理者の反映確認。法律やルールに照らして取り消してよければ反映し、
+     * 別の申請を出し直してもらうべきなら差し戻す。
+     */
+    public function reflectCancel(Request $request, LeaveRequest $leaveRequest): RedirectResponse
+    {
+        $this->authorize('reflectCancel', $leaveRequest);
+
+        $data = $request->validate([
+            'action' => ['required', 'in:reflect,send_back'],
+            'cancel_rejection_reason' => ['nullable', 'string', 'max:2000', 'required_if:action,send_back'],
+        ], ['cancel_rejection_reason.required_if' => '差し戻しの理由を入力してください。']);
+
+        $reflected = $data['action'] === 'reflect';
+
+        DB::transaction(function () use ($leaveRequest, $data, $reflected) {
+            // 反映して初めてstatusを変える。ここまでは承認済みのままなので、
+            // 勤務状況一覧や有給残日数からは消えない。
+            $leaveRequest->update($reflected
+                ? [
+                    'status' => LeaveRequest::STATUS_CANCELLED,
+                    'cancel_status' => null,
+                    'cancelled_at' => now(),
+                ]
+                : [
+                    'cancel_status' => null,
+                    'cancel_rejection_reason' => $data['cancel_rejection_reason'],
+                ]);
+
+            OperationLog::record(
+                $reflected ? OperationLog::ACTION_LEAVE_REQUEST_CANCEL_REFLECT : OperationLog::ACTION_LEAVE_REQUEST_CANCEL_SEND_BACK,
+                $leaveRequest,
+                $leaveRequest->staff_id,
+                $reflected ? null : $data['cancel_rejection_reason']
+            );
+        });
+
+        // 本人と、取消を認めた上長の双方に結果を伝える。
+        foreach ([$leaveRequest->staff->email, $leaveRequest->approver->email] as $email) {
+            $this->sendNotification(
+                $email,
+                new LeaveRequestNotificationMail(
+                    $leaveRequest,
+                    $reflected ? '申請の取消が確定しました' : '取消が差し戻されました'
+                )
+            );
+        }
+
+        return redirect()->route('leave-requests.cancellations')->with('status', 'leave-request-cancel-reflected');
+    }
+
+    /**
+     * 勤怠管理者向けの反映確認一覧。
+     */
+    public function cancellations(): View
+    {
+        return view('leave-requests.cancellations', [
+            'leaveRequests' => LeaveRequest::with(['staff', 'approver'])
+                ->where('status', LeaveRequest::STATUS_APPROVED)
+                ->where('cancel_status', LeaveRequest::CANCEL_PENDING_REFLECTION)
+                ->orderBy('cancel_requested_at')
+                ->get(),
+        ]);
     }
 
     /**

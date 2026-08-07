@@ -32,6 +32,16 @@ class OperationLog extends Model
 
     public const ACTION_LEAVE_REQUEST_REJECT = 'leave_request_reject';
 
+    public const ACTION_LEAVE_REQUEST_CANCEL_REQUEST = 'leave_request_cancel_request';
+
+    public const ACTION_LEAVE_REQUEST_CANCEL_APPROVE = 'leave_request_cancel_approve';
+
+    public const ACTION_LEAVE_REQUEST_CANCEL_REJECT = 'leave_request_cancel_reject';
+
+    public const ACTION_LEAVE_REQUEST_CANCEL_REFLECT = 'leave_request_cancel_reflect';
+
+    public const ACTION_LEAVE_REQUEST_CANCEL_SEND_BACK = 'leave_request_cancel_send_back';
+
     public const ACTION_LABOR_RECORD_UPDATE = 'labor_record_update';
 
     public const ACTION_LABOR_RECORD_DELETE = 'labor_record_delete';
@@ -46,6 +56,11 @@ class OperationLog extends Model
         self::ACTION_LEAVE_REQUEST_WITHDRAW => '申請を取消',
         self::ACTION_LEAVE_REQUEST_APPROVE => '申請を承認',
         self::ACTION_LEAVE_REQUEST_REJECT => '申請を却下',
+        self::ACTION_LEAVE_REQUEST_CANCEL_REQUEST => '承認済み申請の取消を申請',
+        self::ACTION_LEAVE_REQUEST_CANCEL_APPROVE => '取消申請を承認（上長）',
+        self::ACTION_LEAVE_REQUEST_CANCEL_REJECT => '取消申請を差し戻し（上長）',
+        self::ACTION_LEAVE_REQUEST_CANCEL_REFLECT => '取消を反映（勤怠管理者）',
+        self::ACTION_LEAVE_REQUEST_CANCEL_SEND_BACK => '取消を差し戻し（勤怠管理者）',
         self::ACTION_LABOR_RECORD_UPDATE => '人工レコードを修正',
         self::ACTION_LABOR_RECORD_DELETE => '人工レコードを削除',
     ];

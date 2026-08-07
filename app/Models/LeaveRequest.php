@@ -12,6 +12,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'substitute_holiday_date', 'no_substitute_needed', 'actual_worked_hours',
     'compensatory_date', 'approver_id', 'status', 'rejection_reason',
     'approved_at', 'remarks',
+    'cancel_status', 'cancel_reason', 'cancel_rejection_reason',
+    'cancel_requested_at', 'cancelled_at',
     'funeral_venue_address', 'funeral_venue_phone', 'wake_datetime',
     'funeral_datetime', 'flowers_declined', 'telegram_declined',
 ])]
@@ -24,6 +26,15 @@ class LeaveRequest extends Model
     public const STATUS_REJECTED = 'rejected';
 
     public const STATUS_WITHDRAWN = 'withdrawn';
+
+    /** 承認済みのあと、取消が確定した状態。 */
+    public const STATUS_CANCELLED = 'cancelled';
+
+    /** 取消申請中。上長の判断待ち。 */
+    public const CANCEL_REQUESTED = 'requested';
+
+    /** 上長が取消を認めた。勤怠管理者の反映確認待ち。 */
+    public const CANCEL_PENDING_REFLECTION = 'pending_reflection';
 
     /** @var array<string, string> type値 => 表示名 */
     public const TYPES = [
@@ -75,6 +86,8 @@ class LeaveRequest extends Model
             'compensatory_date' => 'date',
             'no_substitute_needed' => 'boolean',
             'approved_at' => 'datetime',
+            'cancel_requested_at' => 'datetime',
+            'cancelled_at' => 'datetime',
             'hours' => 'decimal:1',
             'day_count' => 'decimal:2',
             'actual_worked_hours' => 'decimal:1',
@@ -98,6 +111,30 @@ class LeaveRequest extends Model
     public function isPending(): bool
     {
         return $this->status === self::STATUS_PENDING;
+    }
+
+    /**
+     * 勤務日の向きが制度の想定と食い違っていれば、その理由を返す。
+     *
+     * 休日勤務申請は事前に振替休日を決める申請なので勤務日は今日以降、代休は
+     * 実際に勤務したあとに出す申請なので勤務日は今日以前になるはず。ただし
+     * 実運用では逆になることもあるため、登録は止めずに注意喚起だけを行う。
+     */
+    public function dateWarning(): ?string
+    {
+        if ($this->start_date === null) {
+            return null;
+        }
+
+        return match ($this->type) {
+            'holiday_work' => $this->start_date->startOfDay()->isBefore(today())
+                ? '勤務日が過去の日付です。すでに勤務した分であれば代休申請の方が合っている可能性があります。'
+                : null,
+            'compensatory_leave' => $this->start_date->startOfDay()->isAfter(today())
+                ? '勤務した日が未来の日付です。これから勤務する分であれば休日勤務申請の方が合っている可能性があります。'
+                : null,
+            default => null,
+        };
     }
 
     public function isApproved(): bool
@@ -145,12 +182,45 @@ class LeaveRequest extends Model
 
     public function statusLabel(): string
     {
+        // 取消手続き中は承認済みのままだが、どこまで進んでいるかを出す。
+        if ($this->status === self::STATUS_APPROVED && $this->cancel_status !== null) {
+            return match ($this->cancel_status) {
+                self::CANCEL_REQUESTED => '取消申請中',
+                self::CANCEL_PENDING_REFLECTION => '取消の反映確認中',
+                default => '承認済み',
+            };
+        }
+
         return match ($this->status) {
             self::STATUS_PENDING => '承認待ち',
             self::STATUS_APPROVED => '承認済み',
             self::STATUS_REJECTED => '却下',
             self::STATUS_WITHDRAWN => '取消済み',
+            self::STATUS_CANCELLED => '取消済み（承認後）',
             default => $this->status,
         };
+    }
+
+    /** 本人が取消を申請できるか。承認済みで、まだ取消手続きに入っていないもの。 */
+    public function canRequestCancel(): bool
+    {
+        return $this->status === self::STATUS_APPROVED && $this->cancel_status === null;
+    }
+
+    /** 上長の取消判断を待っている状態か。 */
+    public function isCancelRequested(): bool
+    {
+        return $this->status === self::STATUS_APPROVED && $this->cancel_status === self::CANCEL_REQUESTED;
+    }
+
+    /** 勤怠管理者の反映確認を待っている状態か。 */
+    public function isCancelPendingReflection(): bool
+    {
+        return $this->status === self::STATUS_APPROVED && $this->cancel_status === self::CANCEL_PENDING_REFLECTION;
+    }
+
+    public function isCancelled(): bool
+    {
+        return $this->status === self::STATUS_CANCELLED;
     }
 }

@@ -19,6 +19,34 @@
             ceremonialReason: '{{ old('reason_code', '') }}',
             specialPaidReason: '{{ old('reason_code', '') }}',
             get compensatoryEligible() { return parseFloat(this.actualWorkedHours || 0) >= 6; },
+
+            // 勤務日の注意喚起。制度上おかしい向きの日付でも登録は止めない
+            // (実運用では事後の休日勤務申請などが起こりうるため)。
+            startDateText: '{{ old('start_date', $prefillDate ?? null) }}',
+            init() {
+                // 種別を変えると入力欄が別のfieldsetに切り替わるので、そのつど読み直す。
+                this.$watch('type', () => this.$nextTick(() => this.syncStartDate()));
+            },
+            syncStartDate() {
+                const el = document.querySelector('fieldset:not([disabled]) input[name=&quot;start_date&quot;]');
+                this.startDateText = el ? el.value : '';
+            },
+            get dateWarning() {
+                const m = (this.startDateText || '').match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})$/);
+                if (! m) return null;
+
+                const target = new Date(+m[1], +m[2] - 1, +m[3]);
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+
+                if (this.type === 'holiday_work' && target < today) {
+                    return '休日勤務申請は、事前に振替休日を決めるための申請です。勤務日が過去の日付になっています。すでに勤務した分であれば代休申請の方が合っている可能性があります。';
+                }
+                if (this.type === 'compensatory_leave' && target > today) {
+                    return '代休申請は、実際に休日勤務したあとに出す申請です。勤務した日が未来の日付になっています。これから勤務する分であれば休日勤務申請の方が合っている可能性があります。';
+                }
+                return null;
+            },
         }">
         <div class="max-w-3xl mx-auto sm:px-6 lg:px-8 space-y-6">
 
@@ -30,7 +58,9 @@
                 </div>
             @endif
 
-            <form method="POST" action="{{ route('leave-requests.store') }}" class="space-y-4">
+            {{-- 日付欄は種別ごとのfieldsetに分かれているため、フォーム全体で入力を拾う。 --}}
+            <form method="POST" action="{{ route('leave-requests.store') }}" class="space-y-4"
+                  @input="if ($event.target.name === 'start_date') startDateText = $event.target.value">
                 @csrf
 
                 <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-4"
@@ -216,6 +246,9 @@
                     <div>
                         <x-input-label value="勤務日" />
                         <x-date-text-input name="start_date" class="mt-1 block w-full" :value="old('start_date', $prefillDate ?? null)" />
+                        <template x-if="dateWarning">
+                            <p class="mt-1 text-[11px] font-bold text-amber-600" x-text="dateWarning"></p>
+                        </template>
                     </div>
                     <div x-data="{ showHiddenOrderNumbers: {{ $hiddenOrderNumbers->contains(fn ($o) => $o['value'] === old('order_no')) ? 'true' : 'false' }} }">
                         <x-input-label value="注番" />
@@ -250,6 +283,9 @@
                     <div>
                         <x-input-label value="実際に勤務した日" />
                         <x-date-text-input name="start_date" class="mt-1 block w-full" :value="old('start_date', $prefillDate ?? null)" />
+                        <template x-if="dateWarning">
+                            <p class="mt-1 text-[11px] font-bold text-amber-600" x-text="dateWarning"></p>
+                        </template>
                     </div>
                     <div x-data="{ showHiddenOrderNumbers: {{ $hiddenOrderNumbers->contains(fn ($o) => $o['value'] === old('order_no')) ? 'true' : 'false' }} }">
                         <x-input-label value="注番" />
@@ -347,7 +383,7 @@
                         <select name="approver_id" class="mt-1 block w-full rounded-lg border-slate-300 text-sm">
                             <option value="">選択してください</option>
                             @foreach ($approvers as $approver)
-                                <option value="{{ $approver->id }}" @selected((string) old('approver_id') === (string) $approver->id)>{{ $approver->name }}</option>
+                                <option value="{{ $approver->id }}" @selected((string) old('approver_id') === (string) $approver->id)>{{ $approver->name }}@if ($approver->id === auth()->id())（自分）@endif</option>
                             @endforeach
                         </select>
                         @if ($approvers->isEmpty())

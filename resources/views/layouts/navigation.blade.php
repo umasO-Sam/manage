@@ -201,6 +201,16 @@
                                     @endif
                                 </x-dropdown-link>
                             @endif
+                            @if (auth()->user()->canManageAttendance())
+                                <x-dropdown-link :href="route('leave-requests.cancellations')">
+                                    <i data-lucide="calendar-x" class="w-3.5 h-3.5 inline-block align-text-bottom mr-1"></i> 取消の反映確認
+                                    @if ($pendingCancelReflectionCount > 0)
+                                        <span class="inline-flex items-center justify-center min-w-[1.125rem] h-[1.125rem] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold leading-none align-text-bottom">
+                                            {{ $pendingCancelReflectionCount }}
+                                        </span>
+                                    @endif
+                                </x-dropdown-link>
+                            @endif
                             <x-dropdown-link :href="route('work-status.index')">
                                 <i data-lucide="users-round" class="w-3.5 h-3.5 inline-block align-text-bottom mr-1"></i> 勤務状況一覧
                             </x-dropdown-link>
@@ -452,6 +462,16 @@
                     @if ($pendingApprovalsCount > 0)
                         <span class="inline-flex items-center justify-center min-w-[1.125rem] h-[1.125rem] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold leading-none">
                             {{ $pendingApprovalsCount }}
+                        </span>
+                    @endif
+                </a>
+            @endif
+            @if (auth()->user()->canManageAttendance())
+                <a href="{{ route('leave-requests.cancellations') }}" class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap {{ request()->routeIs('leave-requests.cancellations') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
+                    <span>取消の反映確認</span>
+                    @if ($pendingCancelReflectionCount > 0)
+                        <span class="inline-flex items-center justify-center min-w-[1.125rem] h-[1.125rem] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold leading-none">
+                            {{ $pendingCancelReflectionCount }}
                         </span>
                     @endif
                 </a>

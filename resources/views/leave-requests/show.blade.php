@@ -39,6 +39,12 @@
                     @endif
                 </div>
 
+                @if ($leaveRequest->dateWarning())
+                    <p class="mb-2 p-2 rounded-lg bg-amber-50 border border-amber-200 text-[11px] font-bold text-amber-700">
+                        {{ $leaveRequest->dateWarning() }}
+                    </p>
+                @endif
+
                 <dl class="divide-y divide-slate-100 text-xs">
                     <div class="py-2 flex justify-between"><dt class="text-slate-500">申請者</dt><dd class="font-semibold">{{ $leaveRequest->staff->name }}</dd></div>
                     <div class="py-2 flex justify-between"><dt class="text-slate-500">承認者</dt><dd class="font-semibold">{{ $leaveRequest->approver->name }}</dd></div>
@@ -107,8 +113,90 @@
                     @if ($leaveRequest->isRejected() && $leaveRequest->rejection_reason)
                         <div class="py-2 flex justify-between"><dt class="text-slate-500">却下理由</dt><dd class="text-red-700">{{ $leaveRequest->rejection_reason }}</dd></div>
                     @endif
+                    @if ($leaveRequest->cancel_reason)
+                        <div class="py-2 flex justify-between"><dt class="text-slate-500">取消理由</dt><dd>{{ $leaveRequest->cancel_reason }}</dd></div>
+                    @endif
+                    @if ($leaveRequest->cancel_rejection_reason && $leaveRequest->cancel_status === null && ! $leaveRequest->isCancelled())
+                        <div class="py-2 flex justify-between"><dt class="text-slate-500">取消の差し戻し理由</dt><dd class="text-red-700">{{ $leaveRequest->cancel_rejection_reason }}</dd></div>
+                    @endif
+                    @if ($leaveRequest->cancelled_at)
+                        <div class="py-2 flex justify-between"><dt class="text-slate-500">取消の確定</dt><dd class="font-mono">{{ $leaveRequest->cancelled_at->format('Y/m/d H:i') }}</dd></div>
+                    @endif
                 </dl>
             </div>
+
+            {{-- 承認済みになったあとの取消は、本人が理由を書いて上長に申請する。 --}}
+            @can('requestCancel', $leaveRequest)
+                <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5 space-y-3">
+                    <h3 class="text-sm font-bold text-slate-800">承認済み申請の取消を申請する</h3>
+                    <p class="text-[11px] text-slate-500">
+                        上長が取消を認めたあと、勤怠管理者が法律やルールに照らして反映してよいかを確認します。
+                        確定するまでこの申請は承認済みのままです。
+                    </p>
+                    <form method="POST" action="{{ route('leave-requests.cancel.request', $leaveRequest) }}" class="space-y-3">
+                        @csrf
+                        <div>
+                            <x-input-label value="取消の理由（必須）" />
+                            <textarea name="cancel_reason" rows="3" class="mt-1 block w-full rounded-lg border-slate-300 text-sm">{{ old('cancel_reason') }}</textarea>
+                            <x-input-error class="mt-1" :messages="$errors->get('cancel_reason')" />
+                        </div>
+                        <div class="flex justify-end">
+                            <button type="submit" class="text-xs font-bold px-4 py-2 rounded-lg border border-red-300 text-red-700 hover:bg-red-50">
+                                取消を申請する
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            @endcan
+
+            {{-- 上長の判断。認めても確定はせず、勤怠管理者の反映確認へ回す。 --}}
+            @can('decideCancel', $leaveRequest)
+                <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5 space-y-3">
+                    <h3 class="text-sm font-bold text-slate-800">取消申請の判断</h3>
+                    <p class="text-[11px] text-slate-500">承認すると、勤怠管理者へ反映確認の依頼が飛びます。</p>
+                    <form method="POST" action="{{ route('leave-requests.cancel.decide', $leaveRequest) }}" class="space-y-3">
+                        @csrf
+                        @method('PUT')
+                        <div>
+                            <x-input-label value="差し戻し理由（差し戻す場合のみ）" />
+                            <textarea name="cancel_rejection_reason" rows="2" class="mt-1 block w-full rounded-lg border-slate-300 text-sm">{{ old('cancel_rejection_reason') }}</textarea>
+                            <x-input-error class="mt-1" :messages="$errors->get('cancel_rejection_reason')" />
+                        </div>
+                        <div class="flex justify-end gap-2">
+                            <button type="submit" name="action" value="reject"
+                                    class="text-xs font-bold px-4 py-2 rounded-lg border border-red-300 text-red-700 hover:bg-red-50">差し戻し</button>
+                            <button type="submit" name="action" value="approve"
+                                    class="text-xs font-bold px-4 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700">取消を承認</button>
+                        </div>
+                    </form>
+                </div>
+            @endcan
+
+            {{-- 勤怠管理者の反映確認。ここで反映して初めて取消が確定する。 --}}
+            @can('reflectCancel', $leaveRequest)
+                <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5 space-y-3">
+                    <h3 class="text-sm font-bold text-slate-800">取消の反映確認</h3>
+                    <p class="text-[11px] text-slate-500">
+                        法律やルールに照らして取り消してよければ反映してください。
+                        別の申請を出し直してもらうべき場合は、理由を書いて差し戻します。
+                    </p>
+                    <form method="POST" action="{{ route('leave-requests.cancel.reflect', $leaveRequest) }}" class="space-y-3">
+                        @csrf
+                        @method('PUT')
+                        <div>
+                            <x-input-label value="差し戻し理由（差し戻す場合のみ）" />
+                            <textarea name="cancel_rejection_reason" rows="2" class="mt-1 block w-full rounded-lg border-slate-300 text-sm">{{ old('cancel_rejection_reason') }}</textarea>
+                            <x-input-error class="mt-1" :messages="$errors->get('cancel_rejection_reason')" />
+                        </div>
+                        <div class="flex justify-end gap-2">
+                            <button type="submit" name="action" value="send_back"
+                                    class="text-xs font-bold px-4 py-2 rounded-lg border border-red-300 text-red-700 hover:bg-red-50">差し戻し</button>
+                            <button type="submit" name="action" value="reflect"
+                                    class="text-xs font-bold px-4 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700">取消を反映する</button>
+                        </div>
+                    </form>
+                </div>
+            @endcan
 
             @if ($leaveRequest->isPending() && $leaveRequest->approver_id === auth()->id())
                 <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5 space-y-3">
