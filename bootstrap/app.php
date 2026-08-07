@@ -15,6 +15,7 @@ use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
+use Illuminate\Session\Middleware\AuthenticateSession;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -36,6 +37,9 @@ return Application::configure(basePath: dirname(__DIR__))
             'supervisor.or.manager' => EnsureSupervisorOrManager::class,
         ]);
         $middleware->web(append: [
+            // パスワードが変わったら、変更前から続いている他端末のセッションを
+            // 次のリクエストで無効にする(ログイン中のスマホがそのまま使えてしまうのを防ぐ)。
+            AuthenticateSession::class,
             RequirePasswordChange::class,
         ]);
     })

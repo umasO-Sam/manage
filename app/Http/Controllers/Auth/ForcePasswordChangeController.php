@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Rules\NotSimilarToLoginId;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\View\View;
@@ -31,6 +32,9 @@ class ForcePasswordChangeController extends Controller
             'password' => Hash::make($validated['password']),
             'must_change_password' => false,
         ]);
+
+        // 経理資材担当が設定した仮パスワードで他端末にログインしたままの状態を残さない。
+        Auth::logoutOtherDevices($validated['password']);
 
         return redirect()->intended(route('cards.index', 'purchase', absolute: false))
             ->with('status', 'password-force-updated');
