@@ -188,7 +188,7 @@ ssh -i ~/.ssh/xserver_manage -p 10022 saitokoken@saitokoken.xsrv.jp 'cd ~/manage
 - **テストアカウント（test）・管理アカウント（admin）の「名簿に表示しない」が未設定**。
   既存レコードの変更のため、指示待ち
 - **新サーバー簡単移行**（Xserverの案内分）。休日出勤のない日に別途計画する。
-  現環境は sv8637
+  現環境は sv8637。**手順とチェックリストは10章**
 - ログの日次ローテーション未設定
 - **この環境では `npm run build` を実行できない**（node/npm がPATHに無い）。Tailwind は
   ビルド済みCSSに含まれるクラスしか効かないため、画面を直すときは既存クラスで組む。
@@ -236,3 +236,84 @@ ssh -i ~/.ssh/xserver_manage -p 10022 saitokoken@saitokoken.xsrv.jp 'cd ~/manage
 - 経過は操作ログに5種類のアクションで残る（取消申請／上長の承認・差し戻し／反映・差し戻し）
 
 承認前の取り下げは従来どおり申請詳細の「取消」ボタン（`withdrawn`）で、このフローは通らない。
+
+---
+
+## 10. 新サーバー簡単移行（Xserver）
+
+現環境 `sv8637.xserver.jp`。**移行はサーバー単位**なので、下の3ドメインと manage が同時に移る。
+
+| 対象 | 構成 | 壊れやすさ |
+|---|---|---|
+| **manage**（manage.saito-koken.co.jp） | Laravel。`.env` に接続先を直書き | **高。要手当て** |
+| saito-koken.co.jp（会社HP・採用） | 静的HTML＋PHPフォーム、WordPress(`koichi2`) | 低 |
+| hakubosha.com | 静的HTML中心 | ほぼ無し |
+| saitokoken.xsrv.jp | PHP＋DB接続 | 低（自動修正の対象） |
+
+### 最重要: `.env` は自動修正されない
+
+Xserverが自動で書き換えるのは **`.php` / `.cgi` / `.pl` / `.yml` / `.ini`**。
+**`.env` は拡張子が無く対象外**なので、切り替え後に手で直す。
+
+```
+DB_HOST=mysql8064.xserver.jp   ← 変わると DB に繋がらず manage が落ちる
+MAIL_HOST=sv8637.xserver.jp    ← 変わると申請の通知メールが止まる
+```
+
+`MAIL_HOST` は特に危険。`sendNotification()` は送信に失敗してもログに残すだけで
+エラーにしない設計のため、**誰も気づかないまま通知だけ止まり続ける**。
+
+会社HPのフォーム（`recruit/mail.php` 等）は PHP の `mail()` を使いホスト名を
+持たないので、この問題は起きない。WordPress の `wp-config.php` は `.php` なので自動修正される。
+
+### 事前準備（切り替え前日まで）
+
+- [ ] DBバックアップ（3章のコマンド）をローカルへ取得
+- [ ] `.env` の控えを取る
+- [ ] 現在値をメモ: ホスト名 `sv8637`、`DB_HOST=mysql8064.xserver.jp`、cron、SSH公開鍵
+- [ ] **メールソフトの設定を先にドメイン名へ変える**（`sv86xx.xserver.jp` 直指定をやめ
+      `mail.saito-koken.co.jp` 等にしておけば、移行後の設定変更が不要になる）
+- [ ] `api_proxy.php` のGemini APIキーの置き場所を確認（移行対象外の場所にあると動かなくなる）
+
+### 手順
+
+1. **データコピー申請** — XServerアカウント →「新サーバー簡単移行」→ 対象サーバー選択。
+   データ量が大きい（仕入明細24万件・DB75MB）ため数時間かかる。
+   **開始からコピー完了までキャンセル不可**。この間、現サーバーは通常どおり動く
+2. **動作確認（切り替え前）** — hostsに新サーバーのIPを書いて確認する。
+   ファイルマネージャ・phpMyAdmin も使える。**データコピー実行ログでエラーを見る**
+3. **サーバー切り替え** — Webの参照先とメールの配送先が新サーバーになる。
+   **移行後14日間は元に戻せる**
+
+### 切り替え直後のチェック（壊れやすい順）
+
+```bash
+ssh -i ~/.ssh/xserver_manage -p 10022 saitokoken@saitokoken.xsrv.jp \
+  'hostname; grep -E "^(DB_HOST|MAIL_HOST)=" ~/manage/.env; crontab -l | grep -v "^#"; composer --version'
+```
+
+- [ ] **`.env` の `MAIL_HOST` を新ホスト名に更新**（`DB_HOST` も変わっていれば更新）
+- [ ] `php artisan config:cache` で再キャッシュ（`.env` を変えたら必須）
+- [ ] **cron** — コマンドパス `/usr/bin/php8.3` が変わる可能性。`schedule:run` が動くか
+- [ ] **SSH公開鍵** — 引き継がれない場合は再登録（デプロイが止まる）
+- [ ] **採用フォームのテスト送信** — `mail()` は失敗しても画面上は成功に見える。
+      応募が届かない事故が一番痛いので必ず実際に送る
+- [ ] manage: ログイン→調達ボード表示（＝DB接続）→申請登録→**通知メール受信**
+- [ ] `api_proxy.php`（AI機能）の動作
+- [ ] WordPress（`koichi2`）の表示
+- [ ] 1章の健康チェック
+
+### ついでに確認すると良いこと
+
+本番の composer は 1.9.1 と古く `composer install` を実行できない（3章）。
+新環境では更新されている可能性があり、**依存を変更できるようになるかもしれない**。
+
+### メールについて
+
+- 新仕様サーバーは**メール送信に SMTP認証（SMTP-AUTH）が必須**
+- 切り替え後 数時間〜24時間は新旧どちらのサーバーで受信されるか読めない。
+  この間は**両方で受信できる状態**にしておく（公式案内）
+- 移行対象外: アクセスログ・エラーログ・自動バックアップデータ
+
+参考: [ご利用手順](https://www.xserver.ne.jp/manual/man_order_servertransfer_flow.php) /
+[仕様詳細](https://www.xserver.ne.jp/manual/man_order_servertransfer_detail.php)
