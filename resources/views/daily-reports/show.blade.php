@@ -169,24 +169,37 @@
                                     </label>
                                 </div>
                             </div>
-                            <div class="flex items-center gap-2" x-show="hasSelection()" x-cloak>
-                                <span class="text-xs font-bold text-blue-700" x-text="pendingRangeLabel()"></span>
-                                <button type="button" @click="applyDrag()" :disabled="!isSelectionValid()"
-                                        class="text-xs font-bold px-3 py-1.5 rounded-lg bg-blue-600 text-white disabled:opacity-40">反映</button>
-                                <button type="button" @click="clearSelection()"
-                                        class="text-xs font-bold px-3 py-1.5 rounded-lg border border-slate-300 text-slate-600">選択解除</button>
+                            <div class="flex items-center gap-2">
+                                <button type="button" @click="additiveSelection = !additiveSelection"
+                                        :class="additiveSelection ? 'bg-blue-600 text-white border-blue-600' : 'border-slate-300 text-slate-600'"
+                                        class="text-xs font-bold px-3 py-1.5 rounded-lg border">＋追加</button>
+                                <template x-if="hasSelection()">
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-xs font-bold text-blue-700" x-text="pendingRangeLabel()"></span>
+                                        <button type="button" @click="applyDrag()" :disabled="!isSelectionValid()"
+                                                class="text-xs font-bold px-3 py-1.5 rounded-lg bg-blue-600 text-white disabled:opacity-40">反映</button>
+                                        <button type="button" @click="clearSelection()"
+                                                class="text-xs font-bold px-3 py-1.5 rounded-lg border border-slate-300 text-slate-600">選択解除</button>
+                                    </div>
+                                </template>
                             </div>
                         </div>
+                        <p class="text-[11px] font-bold text-blue-700" x-show="tapAnchor !== null" x-cloak>
+                            終わりの時間帯をタップしてください（同じところをもう一度タップすると取り消します）。この行だけでよければ「反映」を押します。
+                        </p>
                         <p class="text-[11px] text-slate-400">
                             「終日」は8:00〜17:10を選択中の内容で埋めます（休憩はそのまま残ります）。ドラッグ選択が休憩をまたいだ場合も休憩部分は上書きされません。<br>
                             休憩時間を変更する場合、下部（本日の入力内容）の対象となる休憩時間を「×」で削除してから入力してください。<br>
                             10分未満の作業登録は「時刻入力」から行ってください。<br>
-                            Ctrlキーを押しながらなぞると、離れた時間帯を追加で選択できます。
+                            パソコンは、なぞって選択します。Ctrlキーを押しながらなぞると、離れた時間帯を追加で選択できます。<br>
+                            スマホ・タブレットは、始めの時間帯をタップしてから終わりの時間帯をタップすると、その間が選択されます（途中でスクロールしてかまいません）。<br>
+                            「＋追加」を押しておくと、離れた時間帯を続けて選択できます（Ctrlキーと同じ働きです）。
                         </p>
                         <div x-ref="grid" class="border border-slate-200 rounded-lg overflow-hidden select-none max-h-[60vh] overflow-y-auto"
                              @mouseup.window="endDrag()" @mouseleave="endDrag()">
                             <template x-for="i in slotIndexes" :key="i">
                                 <div @mousedown.prevent="startDrag(i, $event)" @mouseenter="dragOver(i)" @mouseup="endDrag()"
+                                     @touchstart="onTouchStart($event)" @touchend="onTouchEnd(i, $event)"
                                      :class="[slotClass(i), boundaryLineClass(i)]" :style="slotBackgroundStyle(i)"
                                      class="flex items-center h-6 border-b border-slate-100 cursor-pointer text-[11px] px-1 gap-2">
                                     <span class="w-24 shrink-0 font-mono text-slate-400"
@@ -400,6 +413,14 @@
                 dragging: false,
                 dragAnchor: null,
                 dragCurrent: null,
+                // スマホ(タッチ)用。なぞる操作は縦スクロールと奪い合いになるため、
+                // 始点をタップ→終点をタップで範囲を決める。始点だけ決まっている間の
+                // インデックスを持つ。touchStartPointは、指が動いた場合に
+                // 「スクロールであってタップではない」と判定するための開始座標。
+                tapAnchor: null,
+                touchStartPoint: null,
+                // Ctrlキーの代わりに離れた時間帯を追加選択するためのトグル(スマホにはCtrlが無い)。
+                additiveSelection: false,
                 // Ctrlキーを押しながらのなぞり操作で追加された、離れた時間帯を含む
                 // 確定済みの選択スロット(インデックス)の集合。「反映」を押すまでは
                 // 内容を書き込まず、ハイライトだけの状態で保持する。
@@ -668,11 +689,11 @@
 
                 // Ctrlで追加済みの確定済みスロット + 現在進行中のなぞり範囲、両方を合わせた選択状態。
                 isSelected(i) {
-                    return this.selectedIndices.has(i) || this.isInCurrentDrag(i);
+                    return this.selectedIndices.has(i) || this.isInCurrentDrag(i) || this.tapAnchor === i;
                 },
 
                 hasSelection() {
-                    return this.selectedIndices.size > 0 || this.dragAnchor !== null;
+                    return this.selectedIndices.size > 0 || this.dragAnchor !== null || this.tapAnchor !== null;
                 },
 
                 slotClass(i) {
@@ -713,11 +734,64 @@
                 // 新しいなぞり操作を始める。Ctrl押下時は既存の選択を残したまま追加する。
                 startDrag(i, event) {
                     this.dragging = true;
-                    if (!event || (!event.ctrlKey && !event.metaKey)) {
+                    if (!this.additiveSelection && (!event || (!event.ctrlKey && !event.metaKey))) {
                         this.selectedIndices = new Set();
                     }
+                    this.tapAnchor = null;
                     this.dragAnchor = i;
                     this.dragCurrent = i;
+                },
+
+                // タッチ操作。touchstartでは何も確定させない(ここでpreventDefaultすると
+                // グリッドがスクロールできなくなる)。指の移動量で、タップかスクロールかを
+                // touchendの時点で振り分ける。
+                onTouchStart(event) {
+                    const touch = event.changedTouches[0];
+                    this.touchStartPoint = touch ? { x: touch.clientX, y: touch.clientY } : null;
+                },
+
+                onTouchEnd(i, event) {
+                    const start = this.touchStartPoint;
+                    this.touchStartPoint = null;
+                    if (!start) return;
+
+                    const touch = event.changedTouches[0];
+                    if (!touch) return;
+
+                    // 指が動いていたらスクロール操作。選択には使わない。
+                    if (Math.abs(touch.clientX - start.x) > 10 || Math.abs(touch.clientY - start.y) > 10) return;
+
+                    // 続けて発生する合成マウスイベント(mousedown/mouseup)で
+                    // 同じスロットが二重に処理されるのを防ぐ。
+                    event.preventDefault();
+                    this.tapSlot(i);
+                },
+
+                // 1回目のタップで始点、2回目のタップで終点。同じ行をもう一度タップした
+                // 場合は始点の取り消しとして扱う(押し間違えたときにそのまま直せる)。
+                tapSlot(i) {
+                    if (this.tapAnchor === null) {
+                        if (!this.additiveSelection) this.selectedIndices = new Set();
+                        this.tapAnchor = i;
+                        return;
+                    }
+
+                    if (this.tapAnchor === i) {
+                        this.tapAnchor = null;
+                        return;
+                    }
+
+                    const lo = Math.min(this.tapAnchor, i);
+                    const hi = Math.max(this.tapAnchor, i);
+                    for (let n = lo; n <= hi; n++) this.selectedIndices.add(n);
+                    this.tapAnchor = null;
+                },
+
+                // 始点だけタップした状態で「反映」を押したときに、その1行を選択として確定する。
+                commitTapAnchor() {
+                    if (this.tapAnchor === null) return;
+                    this.selectedIndices.add(this.tapAnchor);
+                    this.tapAnchor = null;
                 },
 
                 dragOver(i) {
@@ -740,6 +814,7 @@
                     this.selectedIndices = new Set();
                     this.dragAnchor = null;
                     this.dragCurrent = null;
+                    this.tapAnchor = null;
                 },
 
                 // 選択中の全スロット(離れた範囲を含む)を、連続する区間ごとにまとめて
@@ -751,6 +826,7 @@
                         const hi = Math.max(this.dragAnchor, this.dragCurrent);
                         for (let i = lo; i <= hi; i++) all.add(i);
                     }
+                    if (this.tapAnchor !== null) all.add(this.tapAnchor);
                     const sorted = [...all].sort((a, b) => a - b);
                     if (sorted.length === 0) return '';
 
@@ -771,6 +847,7 @@
                 // 選択中の全スロットを連続区間ごとにまとめ、区間ごとにcommitRangeを適用する。
                 applyDrag() {
                     this.endDrag();
+                    this.commitTapAnchor();
                     if (this.selectedIndices.size === 0 || !this.isSelectionValid()) return;
 
                     const sorted = [...this.selectedIndices].sort((a, b) => a - b);
