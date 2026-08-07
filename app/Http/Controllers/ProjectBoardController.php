@@ -8,15 +8,19 @@ use App\Models\BusinessPartner;
 use App\Models\Card;
 use App\Models\CardStageLog;
 use App\Models\OrderNumber;
+use App\Models\PurchaseDetail;
 use App\Models\Staff;
 use App\Models\WorkflowType;
 use App\Services\ProjectStageGate;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 /**
@@ -79,6 +83,124 @@ class ProjectBoardController extends Controller
         ]);
     }
 
+    /**
+     * 移行用。仕入管理から引き継いだ受注ヘッダのうち、まだ物件カードになって
+     * いないものを検索する。全件(本番で約1,700件)が対象になるため、キーワード
+     * 指定を必須にして一覧を出しっぱなしにはしない。
+     */
+    public function searchOrders(Request $request): JsonResponse
+    {
+        $keyword = trim((string) $request->query('q', ''));
+
+        if ($keyword === '') {
+            return response()->json(['orders' => []]);
+        }
+
+        // カード済みのものも返す。除外してしまうと「受注が無い」のか「すでに
+        // 登録済み」なのかが画面で区別できず、原因を探せなくなるため。
+        $orders = BusinessOrder::query()
+            ->with(['card' => fn ($q) => $q->withTrashed()])
+            ->where(fn ($w) => $w
+                ->where('order_no', 'like', "%{$keyword}%")
+                ->orWhere('product_name', 'like', "%{$keyword}%")
+                ->orWhere('recipient', 'like', "%{$keyword}%"))
+            ->orderByDesc('order_received_date')
+            ->orderByDesc('id')
+            ->limit(50)
+            ->get();
+
+        $results = $orders->map(fn (BusinessOrder $o) => [
+            'source' => 'order',
+            'business_order_id' => $o->id,
+            'order_no' => $o->order_no,
+            'product_name' => $o->product_name,
+            'recipient' => $o->recipient,
+            'delivery_dest' => $o->delivery_dest,
+            // 受注日・金額は未設定のものが本番に残っているため、空でも返して画面側で補わせる。
+            'order_received_date' => $o->order_received_date?->format('Y/m/d'),
+            'order_amount' => $o->order_amount,
+            // 非表示にしたカードも「登録済み」として扱う(受注1件＝カード1枚のため)。
+            'card_id' => $o->card?->id,
+            'card_hidden' => (bool) $o->card?->trashed(),
+            'order_number_taken' => false,
+            'detail_count' => 0,
+            // Eloquent\Collection のまま merge するとモデル前提の処理に入るため、素のコレクションに落とす。
+        ])->toBase()->values();
+
+        return response()->json([
+            'orders' => $results
+                ->merge($this->searchLegacyDetails($keyword, $orders->pluck('order_no')))
+                ->take(50)
+                ->values(),
+        ]);
+    }
+
+    /**
+     * 受注ヘッダが無い注番を、受注ヘッダ代わりに使っていた仕入明細から拾う。
+     * 明細は同じ注番で複数行あり、受注情報が入っている行と空の行が混在する
+     * ため、行をまたいで代表値を組み立てる。
+     *
+     * @param  \Illuminate\Support\Collection<int, string>  $excludeCodes
+     * @return \Illuminate\Support\Collection<int, array<string, mixed>>
+     */
+    private function searchLegacyDetails(string $keyword, Collection $excludeCodes): Collection
+    {
+        $codes = PurchaseDetail::query()
+            ->whereNotNull('item_code')
+            ->where('item_code', '!=', '')
+            ->whereNotIn('item_code', $excludeCodes)
+            ->where(fn ($w) => $w
+                ->where('item_code', 'like', "%{$keyword}%")
+                ->orWhere('product_name', 'like', "%{$keyword}%")
+                ->orWhere('recipient', 'like', "%{$keyword}%"))
+            ->distinct()
+            ->limit(50)
+            ->pluck('item_code');
+
+        if ($codes->isEmpty()) {
+            return collect();
+        }
+
+        // 注番マスタに既にある注番は新規登録できないため、画面で選ばせない。
+        $taken = OrderNumber::whereIn('code', $codes)->pluck('code')->all();
+
+        return PurchaseDetail::query()
+            ->select(['item_code', 'product_name', 'recipient', 'delivery_dest', 'order_received_date', 'order_amount'])
+            ->whereIn('item_code', $codes)
+            ->get()
+            ->groupBy('item_code')
+            ->map(fn (Collection $rows, string $code) => [
+                'source' => 'detail',
+                'business_order_id' => null,
+                'order_no' => $code,
+                'product_name' => $this->representative($rows, 'product_name'),
+                'recipient' => $this->representative($rows, 'recipient'),
+                'delivery_dest' => $this->representative($rows, 'delivery_dest'),
+                'order_received_date' => $this->representative($rows, 'order_received_date'),
+                'order_amount' => $this->representative($rows, 'order_amount'),
+                'card_id' => null,
+                'card_hidden' => false,
+                'order_number_taken' => in_array($code, $taken, true),
+                'detail_count' => $rows->count(),
+            ])
+            ->values();
+    }
+
+    /**
+     * 同じ注番でも行によって値が違う(納入先など)。最も多く出てくる値を代表に
+     * する。空欄の行は数えない。
+     *
+     * @param  \Illuminate\Support\Collection<int, PurchaseDetail>  $rows
+     */
+    private function representative(Collection $rows, string $column): ?string
+    {
+        $values = $rows->pluck($column)
+            ->map(fn ($v) => $v instanceof \DateTimeInterface ? $v->format('Y/m/d') : trim((string) $v))
+            ->filter(fn (string $v) => $v !== '');
+
+        return $values->isEmpty() ? null : (string) $values->countBy()->sortDesc()->keys()->first();
+    }
+
     public function create(): View
     {
         return view('projects.create', [
@@ -96,8 +218,13 @@ class ProjectBoardController extends Controller
         $isNewPartner = $request->boolean('is_new_partner');
         $bypassFormat = $request->boolean('bypass_order_no_format');
 
+        // 移行用の経路。既存の受注ヘッダを選んだ場合は注番を新規発番せず、その
+        // 受注をそのままカード化する。注番は選んだ受注のものを正とし、画面から
+        // 送られた値は使わない(付け替えを防ぐ)。
+        $existingOrder = $this->resolveExistingOrder($request);
+
         $data = $request->validate([
-            'order_no' => [
+            'order_no' => $existingOrder ? ['nullable'] : [
                 'required', 'string', 'max:255',
                 // 注番マスタと受注ヘッダの両方で重複を見る。過去の注番の大半は
                 // 注番マスタに存在しないため、マスタだけ見てもすり抜ける。
@@ -118,21 +245,28 @@ class ProjectBoardController extends Controller
             'order_no.unique' => 'この注番はすでに登録されています。',
         ]);
 
-        $card = DB::transaction(function () use ($data, $request, $isNewPartner) {
+        $card = DB::transaction(function () use ($data, $request, $isNewPartner, $existingOrder) {
             $partner = $isNewPartner
                 // 新規取引先は受注先名だけの仮登録として作る。取引条件は資金管理者が
                 // 取引先一覧で入力し、「取引条件調整完了」で本登録になる。
                 ? BusinessPartner::create(['name' => $data['new_partner_name'], 'is_provisional' => true])
                 : BusinessPartner::find($data['business_partner_id']);
 
-            // 件名は受注ヘッダを正とし、注番マスタの工事名にも同じ値を入れて同期する。
-            $orderNumber = OrderNumber::create([
-                'code' => $data['order_no'],
-                'project_name' => $data['product_name'],
-            ]);
+            $orderNo = $existingOrder ? $existingOrder->order_no : $data['order_no'];
 
-            $order = BusinessOrder::create([
-                'order_no' => $data['order_no'],
+            // 件名は受注ヘッダを正とし、注番マスタの工事名にも同じ値を入れて同期する。
+            // 移行分は注番マスタに無いことが多いが、あればそれを流用する。
+            $orderNumber = OrderNumber::firstOrCreate(
+                ['code' => $orderNo],
+                ['project_name' => $data['product_name']]
+            );
+
+            if (! $orderNumber->wasRecentlyCreated) {
+                $orderNumber->update(['project_name' => $data['product_name']]);
+            }
+
+            $attributes = [
+                'order_no' => $orderNo,
                 'product_name' => $data['product_name'],
                 'recipient' => $partner->name,
                 'business_partner_id' => $partner->id,
@@ -141,7 +275,16 @@ class ProjectBoardController extends Controller
                 'order_amount' => $data['order_amount'],
                 'staff_id' => $data['staff_id'],
                 'is_direct_delivery_only' => $request->boolean('is_direct_delivery_only'),
-            ]);
+            ];
+
+            // 既存受注は取引先・担当者が未設定のまま引き継いでいるため、ここで埋める。
+            // 仕入明細が既にぶら下がっているので、受注ヘッダは作り直さず更新する。
+            if ($existingOrder) {
+                $existingOrder->update($attributes);
+                $order = $existingOrder;
+            } else {
+                $order = BusinessOrder::create($attributes);
+            }
 
             $card = Card::create([
                 'workflow_type_id' => $this->workflowType()->id,
@@ -152,12 +295,42 @@ class ProjectBoardController extends Controller
                 'current_stage' => 0,
             ]);
 
-            BusinessOrderLog::record($order, BusinessOrderLog::ACTION_CREATED, "{$order->order_no}／{$order->product_name}");
+            BusinessOrderLog::record(
+                $order,
+                BusinessOrderLog::ACTION_CREATED,
+                $existingOrder
+                    ? "{$order->order_no}／{$order->product_name}（既存の受注から登録）"
+                    : "{$order->order_no}／{$order->product_name}"
+            );
 
             return $card;
         });
 
         return redirect()->route('projects.show', $card)->with('status', 'project-created');
+    }
+
+    /**
+     * 画面で選ばれた既存受注を取り出す。まだカードになっていないものだけを
+     * 対象にし、他人が先にカード化していた場合はここで弾く。
+     */
+    private function resolveExistingOrder(Request $request): ?BusinessOrder
+    {
+        if (! $request->filled('business_order_id')) {
+            return null;
+        }
+
+        // 非表示にしたカードも「作成済み」とみなす。withTrashedを付けないと、
+        // 非表示にした物件の受注をもう一度カード化できてしまう。
+        $order = BusinessOrder::whereDoesntHave('card', fn ($q) => $q->withTrashed())
+            ->find($request->input('business_order_id'));
+
+        if (! $order) {
+            throw ValidationException::withMessages([
+                'business_order_id' => '選択した受注が見つからないか、すでに物件カードが作成されています。',
+            ]);
+        }
+
+        return $order;
     }
 
     public function show(Card $card, ProjectStageGate $gate): View

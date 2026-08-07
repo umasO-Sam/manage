@@ -7,6 +7,7 @@ use App\Models\BusinessOrderLog;
 use App\Models\BusinessPartner;
 use App\Models\Card;
 use App\Models\OrderNumber;
+use App\Models\PurchaseDetail;
 use App\Models\Staff;
 use App\Models\WorkflowType;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -75,6 +76,251 @@ class ProjectBoardTest extends TestCase
         $this->assertSame($partner->id, $order->business_partner_id);
 
         $this->assertSame(BusinessOrderLog::ACTION_CREATED, $order->logs->first()->action);
+    }
+
+    /**
+     * 移行期間中は、仕入管理から引き継いだ受注(＝すでに受注ヘッダがある案件)を
+     * 物件カードにする必要がある。注番の重複チェックに掛けず、受注ヘッダは
+     * 作り直さずに更新する。
+     */
+    private function migratedOrder(array $overrides = []): BusinessOrder
+    {
+        return BusinessOrder::create([
+            'order_no' => 'OLD001-N01',
+            'product_name' => '既存の搬送装置',
+            'recipient' => '既存商事',
+            'delivery_dest' => '旧工場',
+            'order_received_date' => '2025-04-01',
+            'order_amount' => 1500000,
+            ...$overrides,
+        ]);
+    }
+
+    public function test_an_existing_order_can_be_turned_into_a_card(): void
+    {
+        $existing = $this->migratedOrder();
+        $staff = Staff::factory()->create(['role' => Staff::ROLE_SALES]);
+
+        $this->actingAs($this->manager())->post(route('projects.store'), [
+            'business_order_id' => $existing->id,
+            'order_no' => 'OLD001-N01',
+            'product_name' => '既存の搬送装置',
+            'delivery_dest' => '旧工場',
+            'order_received_date' => '2025/04/01',
+            'order_amount' => 1500000,
+            'staff_id' => $staff->id,
+            'is_new_partner' => '1',
+            'new_partner_name' => '既存商事',
+        ])->assertRedirect();
+
+        // 受注ヘッダは増やさず、既存のものに取引先と担当者が入る。
+        $this->assertSame(1, BusinessOrder::count());
+        $existing->refresh();
+        $this->assertSame($staff->id, $existing->staff_id);
+        $this->assertNotNull($existing->business_partner_id);
+        $this->assertSame('既存商事', $existing->businessPartner->name);
+
+        // カードは作られ、注番マスタにも登録される。
+        $card = Card::latest('id')->sole();
+        $this->assertSame($existing->id, $card->business_order_id);
+        $this->assertSame('OLD001-N01', OrderNumber::sole()->code);
+    }
+
+    public function test_an_existing_order_keeps_its_purchase_details(): void
+    {
+        $existing = $this->migratedOrder();
+        $originalId = $existing->id;
+
+        $this->actingAs($this->manager())->post(route('projects.store'), [
+            'business_order_id' => $existing->id,
+            'product_name' => '既存の搬送装置',
+            'delivery_dest' => '旧工場',
+            'order_received_date' => '2025/04/01',
+            'order_amount' => 1500000,
+            'staff_id' => Staff::factory()->create()->id,
+            'is_new_partner' => '1',
+            'new_partner_name' => '既存商事',
+        ])->assertRedirect();
+
+        // idが変わっていない＝ぶら下がっている仕入明細との紐付きが切れていない。
+        $this->assertSame($originalId, Card::latest('id')->sole()->business_order_id);
+    }
+
+    public function test_an_existing_order_that_already_has_a_card_is_rejected(): void
+    {
+        $existing = $this->migratedOrder();
+        $this->createCard($this->manager(), ['order_no' => 'PJ777-N01']);
+        // 別カードを既存受注に紐づけて、カード済みの状態を作る。
+        Card::latest('id')->sole()->update(['business_order_id' => $existing->id]);
+
+        $this->actingAs($this->manager())->post(route('projects.store'), [
+            'business_order_id' => $existing->id,
+            'product_name' => '既存の搬送装置',
+            'delivery_dest' => '旧工場',
+            'order_received_date' => '2025/04/01',
+            'order_amount' => 1500000,
+            'staff_id' => Staff::factory()->create()->id,
+            'is_new_partner' => '1',
+            'new_partner_name' => '別商事',
+        ])->assertSessionHasErrors('business_order_id');
+    }
+
+    public function test_the_order_search_lists_orders_without_a_card(): void
+    {
+        $this->migratedOrder();
+        $this->migratedOrder(['order_no' => 'OLD002-N01', 'product_name' => '別の装置']);
+
+        $response = $this->actingAs($this->manager())
+            ->getJson(route('projects.orders.search', ['q' => 'OLD']));
+
+        $response->assertOk();
+        $orders = collect($response->json('orders'));
+        $this->assertSame(['OLD002-N01', 'OLD001-N01'], $orders->pluck('order_no')->sort()->reverse()->values()->all());
+        $this->assertNull($orders->firstWhere('order_no', 'OLD001-N01')['card_id']);
+    }
+
+    /**
+     * カード済みの受注も検索には出す。除外すると「受注が無い」のか「すでに
+     * 登録済み」なのかが画面で区別できず、原因を探せなくなるため。
+     */
+    public function test_the_order_search_marks_orders_that_already_have_a_card(): void
+    {
+        $withCard = $this->createCard($this->manager(), ['order_no' => 'PJ900-N01']);
+
+        $response = $this->actingAs($this->manager())
+            ->getJson(route('projects.orders.search', ['q' => 'PJ900']));
+
+        $response->assertOk();
+        $found = collect($response->json('orders'))->firstWhere('order_no', 'PJ900-N01');
+        $this->assertNotNull($found, 'カード済みの受注も検索結果に出ること');
+        $this->assertSame($withCard->id, $found['card_id']);
+        $this->assertFalse($found['card_hidden']);
+    }
+
+    public function test_a_hidden_card_still_counts_as_registered(): void
+    {
+        $card = $this->createCard($this->fundManager(), ['order_no' => 'PJ901-N01']);
+        $order = $card->businessOrder;
+        $card->delete(); // 非表示にする
+
+        // 検索では「登録済み（非表示）」として出る。
+        $found = collect($this->actingAs($this->manager())
+            ->getJson(route('projects.orders.search', ['q' => 'PJ901']))->json('orders'))
+            ->firstWhere('order_no', 'PJ901-N01');
+        $this->assertSame($card->id, $found['card_id']);
+        $this->assertTrue($found['card_hidden']);
+
+        // 非表示にしただけの受注を、もう一度カード化できてはいけない。
+        $this->actingAs($this->manager())->post(route('projects.store'), [
+            'business_order_id' => $order->id,
+            'product_name' => '二重登録',
+            'delivery_dest' => '工場',
+            'order_received_date' => '2025/04/01',
+            'order_amount' => 100,
+            'staff_id' => Staff::factory()->create()->id,
+            'is_new_partner' => '1',
+            'new_partner_name' => '二重商事',
+        ])->assertSessionHasErrors('business_order_id');
+    }
+
+    public function test_the_order_search_needs_a_keyword(): void
+    {
+        $this->migratedOrder();
+
+        $this->actingAs($this->manager())
+            ->getJson(route('projects.orders.search', ['q' => '']))
+            ->assertOk()
+            ->assertJsonCount(0, 'orders');
+    }
+
+    /**
+     * 受注ヘッダが無い注番は、受注ヘッダ代わりに使っていた仕入明細から拾う。
+     * 明細は受注情報が入っている行と空の行が混在し、行によって値が違うこともある。
+     */
+    public function test_an_order_number_only_in_the_purchase_details_is_offered(): void
+    {
+        PurchaseDetail::create(['item_code' => 'LEG001-N01']); // 受注情報が空の行
+        PurchaseDetail::create([
+            'item_code' => 'LEG001-N01', 'product_name' => 'レガシー装置',
+            'recipient' => '旧商事', 'delivery_dest' => 'JRA',
+            'order_received_date' => '2025-12-15', 'order_amount' => 22352000,
+        ]);
+        PurchaseDetail::create([
+            'item_code' => 'LEG001-N01', 'product_name' => 'レガシー装置',
+            'recipient' => '旧商事', 'delivery_dest' => '第二工場',
+            'order_received_date' => '2025-12-15', 'order_amount' => 22352000,
+        ]);
+        PurchaseDetail::create([
+            'item_code' => 'LEG001-N01', 'product_name' => 'レガシー装置',
+            'recipient' => '旧商事', 'delivery_dest' => '第二工場',
+            'order_received_date' => '2025-12-15', 'order_amount' => 22352000,
+        ]);
+
+        $found = collect($this->actingAs($this->manager())
+            ->getJson(route('projects.orders.search', ['q' => 'LEG001']))->json('orders'))
+            ->firstWhere('order_no', 'LEG001-N01');
+
+        $this->assertSame('detail', $found['source']);
+        $this->assertNull($found['business_order_id'], '受注ヘッダが無いので新規登録扱いになること');
+        $this->assertSame('レガシー装置', $found['product_name']);
+        $this->assertSame('旧商事', $found['recipient']);
+        $this->assertSame('2025/12/15', $found['order_received_date']);
+        $this->assertSame('22352000.00', $found['order_amount']);
+        $this->assertSame(4, $found['detail_count']);
+        // 納入先は行によって違う。多い方(第二工場が2行)を代表にする。
+        $this->assertSame('第二工場', $found['delivery_dest']);
+    }
+
+    public function test_the_purchase_details_do_not_duplicate_an_existing_order_header(): void
+    {
+        $this->migratedOrder(['order_no' => 'DUP001-N01']);
+        PurchaseDetail::create(['item_code' => 'DUP001-N01', 'product_name' => '明細側の名前']);
+
+        $rows = collect($this->actingAs($this->manager())
+            ->getJson(route('projects.orders.search', ['q' => 'DUP001']))->json('orders'))
+            ->where('order_no', 'DUP001-N01');
+
+        $this->assertCount(1, $rows, '受注ヘッダがある注番は明細側から重ねて出さない');
+        $this->assertSame('order', $rows->first()['source']);
+    }
+
+    public function test_a_purchase_detail_whose_order_number_is_taken_cannot_be_picked(): void
+    {
+        PurchaseDetail::create(['item_code' => 'TAKEN01-N01', 'product_name' => '既に採番済み']);
+        OrderNumber::create(['code' => 'TAKEN01-N01']);
+
+        $found = collect($this->actingAs($this->manager())
+            ->getJson(route('projects.orders.search', ['q' => 'TAKEN01']))->json('orders'))
+            ->firstWhere('order_no', 'TAKEN01-N01');
+
+        $this->assertTrue($found['order_number_taken'], '注番マスタにある＝新規登録できないので選ばせない');
+    }
+
+    public function test_a_card_can_be_created_from_a_purchase_detail_order_number(): void
+    {
+        PurchaseDetail::create([
+            'item_code' => 'LEG002-N01', 'product_name' => 'レガシー装置B',
+            'recipient' => '旧商事', 'delivery_dest' => '第二工場',
+            'order_received_date' => '2025-12-15', 'order_amount' => 500000,
+        ]);
+
+        // 明細から拾った内容をそのまま送る(business_order_id は無い＝新規登録)。
+        $this->actingAs($this->manager())->post(route('projects.store'), [
+            'order_no' => 'LEG002-N01',
+            'product_name' => 'レガシー装置B',
+            'delivery_dest' => '第二工場',
+            'order_received_date' => '2025/12/15',
+            'order_amount' => 500000,
+            'staff_id' => Staff::factory()->create()->id,
+            'is_new_partner' => '1',
+            'new_partner_name' => '旧商事',
+        ])->assertRedirect();
+
+        $order = BusinessOrder::where('order_no', 'LEG002-N01')->sole();
+        $this->assertSame('レガシー装置B', $order->product_name);
+        $this->assertSame('2025-12-15', $order->order_received_date->format('Y-m-d'));
+        $this->assertNotNull($order->card);
+        $this->assertSame('LEG002-N01', OrderNumber::where('code', 'LEG002-N01')->sole()->code);
     }
 
     public function test_an_order_number_that_already_exists_is_rejected(): void
