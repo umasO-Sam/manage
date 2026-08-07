@@ -35,6 +35,14 @@ class OrderNumberController extends Controller
     {
         $bypassFormatCheck = $request->boolean('bypass_format_check');
 
+        // 重複判定も整えたあとの値で行うため、検証の前に置き換える。
+        // 形式チェックを解除しているときは日本語などをそのまま登録するので前後の空白だけ落とす。
+        $request->merge([
+            'code' => $bypassFormatCheck
+                ? trim((string) $request->input('code'))
+                : OrderNumber::normalizeCode($request->input('code')),
+        ]);
+
         $codeRules = ['required', 'string', 'max:50', 'unique:order_numbers,code'];
         if (! $bypassFormatCheck) {
             $codeRules[] = 'regex:'.OrderNumber::FORMAT_REGEX;
@@ -44,7 +52,7 @@ class OrderNumberController extends Controller
             'code' => $codeRules,
             'project_name' => ['nullable', 'string', 'max:255'],
         ], [
-            'code.regex' => '注番は「英数1〜8文字-英数2〜12文字」の形式で入力してください（例: ZZ999-N99T99）。形式に合わない注番を登録する場合は「形式チェックを解除する」にチェックしてください。',
+            'code.regex' => '注番は「英字1〜3文字＋数字」-「見積区分1文字＋2桁通番」の形式で入力してください（例: Q001-N01、R101-N01B01、JSS11-N05B01H01）。装置番号だけを入力した場合は「-N01」を補います。この形式に当てはまらない注番を登録する場合は「形式チェックを解除する」にチェックしてください。',
             'code.unique' => 'この注番はすでに登録されています。',
         ]);
 

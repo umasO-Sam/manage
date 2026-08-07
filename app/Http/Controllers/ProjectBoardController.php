@@ -223,6 +223,12 @@ class ProjectBoardController extends Controller
         // 送られた値は使わない(付け替えを防ぐ)。
         $existingOrder = $this->resolveExistingOrder($request);
 
+        // 注番管理と同じ整え方をしてから検証する(全角の半角化と「-N01」の補完)。
+        // 既存受注の取り込み時は画面の値を使わないため触らない。
+        if (! $existingOrder && ! $bypassFormat) {
+            $request->merge(['order_no' => OrderNumber::normalizeCode($request->input('order_no'))]);
+        }
+
         $data = $request->validate([
             'order_no' => $existingOrder ? ['nullable'] : [
                 'required', 'string', 'max:255',
@@ -241,7 +247,7 @@ class ProjectBoardController extends Controller
             'staff_id' => ['required', 'integer', 'exists:staff,id'],
             'is_direct_delivery_only' => ['nullable', 'boolean'],
         ], [
-            'order_no.regex' => '注番は「英数1〜8文字」-「英数2〜12文字」の形式で入力してください（形式チェックを解除する場合はチェックを入れてください）。',
+            'order_no.regex' => '注番は「英字1〜3文字＋数字」-「見積区分1文字＋2桁通番」の形式で入力してください（例: Q001-N01、R101-N01B01）。装置番号だけを入力した場合は「-N01」を補います。この形式に当てはまらない注番は「形式チェックを解除する」にチェックを入れてください。',
             'order_no.unique' => 'この注番はすでに登録されています。',
         ]);
 

@@ -9,8 +9,15 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 #[Fillable(['code', 'is_protected', 'project_name', 'show_in_dropdown'])]
 class OrderNumber extends Model
 {
-    /** 標準形式: 「英数1〜8文字」-「英数2〜12文字」。OrderNumberControllerの登録バリデーションと共有する。 */
-    public const FORMAT_REGEX = '/^[A-Za-z0-9]{1,8}-[A-Za-z0-9]{2,12}$/';
+    /**
+     * 標準形式: 「英字1〜3文字＋数字」-「見積区分1英字＋2桁通番」の繰り返し。
+     * 例: Q001-N01 / R101-N01B01 / MEI001-N01 / JSS11-N05B01H01
+     * OrderNumberController・ProjectBoardControllerの登録バリデーションと共有する。
+     */
+    public const FORMAT_REGEX = '/^[A-Za-z]{1,3}\d{1,5}-(?:[A-Za-z]\d{2})+$/';
+
+    /** ハイフン以降を持たない装置番号だけの入力に補う既定の見積区分・通番。 */
+    public const DEFAULT_SUFFIX = 'N01';
 
     protected function casts(): array
     {
@@ -46,6 +53,25 @@ class OrderNumber extends Model
     public static function hiddenFromDropdown(): \Illuminate\Database\Eloquent\Builder
     {
         return static::where('show_in_dropdown', false)->orderBy('code');
+    }
+
+    /**
+     * 入力された注番を登録前に整える。
+     *
+     * 全角で入力された英数字・ハイフンは半角に直す(過去に全角のＱで登録された注番が
+     * 混ざっており、形式チェックにも検索にも掛からなくなるため)。
+     * 「Q511」のように装置番号だけが入力された場合は、見積区分・通番の既定値を補って
+     * 「Q511-N01」として扱う。
+     */
+    public static function normalizeCode(?string $code): string
+    {
+        $code = trim(mb_convert_kana((string) $code, 'as'));
+
+        if (preg_match('/^[A-Za-z]{1,3}\d{1,5}$/', $code)) {
+            $code .= '-'.self::DEFAULT_SUFFIX;
+        }
+
+        return $code;
     }
 
     /**

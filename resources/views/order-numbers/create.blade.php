@@ -46,7 +46,10 @@
                                 検索
                             </button>
                         </div>
-                        <p class="mt-1 text-[11px] text-slate-400" x-show="! bypass">英数1〜8文字 - 英数2〜12文字</p>
+                        <p class="mt-1 text-[11px] text-slate-400" x-show="! bypass">
+                            「英字1〜3文字＋数字」-「見積区分1文字＋2桁通番」（例: Q001-N01、R101-N01B01、JSS11-N05B01H01）。
+                            装置番号だけを入力すると「-N01」を補います（Q511 → Q511-N01）。
+                        </p>
                         <p class="mt-1 text-[11px] text-amber-600" x-show="bypass" x-cloak>形式チェックを解除しています。日本語を含む自由な文字列で登録できます。</p>
                         <template x-if="lookupMessage">
                             <p class="mt-1 text-[11px] font-bold" :class="lookupMessage.ok ? 'text-emerald-700' : 'text-amber-600'" x-text="lookupMessage.text"></p>

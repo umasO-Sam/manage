@@ -56,28 +56,63 @@ class OrderNumberTest extends TestCase
         $this->assertDatabaseHas('order_numbers', ['code' => '〇〇工事現場支給品', 'is_protected' => false]);
     }
 
-    public function test_order_number_format_allows_short_codes(): void
+    /**
+     * 実運用で使われている書き方をひととおり通す。英字は1〜3文字、ハイフン以降は
+     * 「見積区分1文字＋2桁通番」の繰り返し。
+     */
+    public function test_order_number_format_accepts_the_shapes_used_in_practice(): void
     {
         $manager = Staff::factory()->procurementManager()->create();
 
-        // 「英数1〜8文字-英数2〜12文字」の緩和後の下限(1文字-2文字)を確認する。
-        $response = $this->actingAs($manager)->post(route('order-numbers.store'), [
-            'code' => 'A-11',
-        ]);
-
-        $response->assertRedirect(route('order-numbers.index'));
-        $this->assertDatabaseHas('order_numbers', ['code' => 'A-11', 'is_protected' => false]);
+        foreach (['Q001-N01', 'R101-N01B01', 'MEI001-N01', 'JSS11-N05B01H01', 'A1-N01'] as $code) {
+            $this->actingAs($manager)->post(route('order-numbers.store'), ['code' => $code])
+                ->assertRedirect(route('order-numbers.index'));
+            $this->assertDatabaseHas('order_numbers', ['code' => $code, 'is_protected' => false]);
+        }
     }
 
-    public function test_order_number_format_rejects_prefix_over_eight_chars(): void
+    /**
+     * 英字4文字以上・数字が続かない・ハイフン以降が区分＋2桁でないものは弾く。
+     * 「X-3808」は旧台帳にある書き方だが、標準形式としては認めない(ユーザー確定済み)。
+     */
+    public function test_order_number_format_rejects_shapes_outside_the_standard(): void
     {
         $manager = Staff::factory()->procurementManager()->create();
 
-        $response = $this->actingAs($manager)->post(route('order-numbers.store'), [
-            'code' => 'ABCDEFGHI-N99T99',
-        ]);
+        foreach (['ABCDEFGHI-N99T99', 'ABCD001-N01', 'X-3808', 'Q001-N1', 'Q001-1'] as $code) {
+            $this->actingAs($manager)->post(route('order-numbers.store'), ['code' => $code])
+                ->assertSessionHasErrors('code');
+            $this->assertDatabaseMissing('order_numbers', ['code' => $code]);
+        }
+    }
 
-        $response->assertSessionHasErrors('code');
+    /**
+     * 装置番号だけを入れた場合は「-N01」を補う。過去注番の大半がこの書き方のため、
+     * 見積番号の採番で「N01があったものとみなす」扱いと揃えている。
+     */
+    public function test_code_without_a_suffix_gets_the_default_n01(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+
+        $this->actingAs($manager)->post(route('order-numbers.store'), ['code' => 'Q511'])
+            ->assertRedirect(route('order-numbers.index'));
+
+        $this->assertDatabaseHas('order_numbers', ['code' => 'Q511-N01']);
+        $this->assertDatabaseMissing('order_numbers', ['code' => 'Q511']);
+    }
+
+    /**
+     * 全角で入力された注番は半角に直してから登録する(本番に全角のＱで登録された
+     * 注番が混ざっており、形式チェックにも検索にも掛からなくなるため)。
+     */
+    public function test_full_width_input_is_converted_to_half_width(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+
+        $this->actingAs($manager)->post(route('order-numbers.store'), ['code' => 'Ｑ５１１－Ｎ０１'])
+            ->assertRedirect(route('order-numbers.index'));
+
+        $this->assertDatabaseHas('order_numbers', ['code' => 'Q511-N01']);
     }
 
     public function test_without_bypass_japanese_text_is_still_rejected(): void
