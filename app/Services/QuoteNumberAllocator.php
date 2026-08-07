@@ -64,6 +64,17 @@ class QuoteNumberAllocator
 
         $baseSuffix = $extra !== null ? $this->normalizeBaseNo($baseNo) : null;
 
+        // 過去注番リストから引用したのに元番号を読み取れない場合は、N01があったものとして扱う。
+        // 見積台帳の大半は「Q511」のようにハイフン以降を持たない旧形式で、そのままでは
+        // 元番号が空として新規案件に倒れてしまうため。補ったことは画面側で注意喚起する。
+        $quotedOldFormat = $extra !== null
+            && $baseSuffix === null
+            && $this->normalizeUnit($unitNo) !== null;
+
+        if ($quotedOldFormat) {
+            $baseSuffix = QuoteNumber::TYPE_NORMAL.'01';
+        }
+
         // 改造・修理・部品で元注番が無い場合は、過去の自社装置に紐づかない案件なので
         // 補足区分を付けず新規案件(N)として採番する。間違えやすいので画面側で注釈を出す。
         $fellBackToNew = $extra !== null
@@ -120,6 +131,7 @@ class QuoteNumberAllocator
         return [
             'candidate' => $candidate,
             'fell_back_to_new' => $fellBackToNew,
+            'quoted_old_format' => $quotedOldFormat,
             'unit_no' => $unitNo,
             'base_suffix' => $baseSuffix,
             'suffix' => $suffix,
@@ -239,11 +251,17 @@ class QuoteNumberAllocator
             ->values();
     }
 
+    /**
+     * 見積単位を3桁ゼロ埋めにする。旧形式の過去注番は見積単位に区分が混ざるため
+     * (「511B」「511T」)、先頭の数字だけを見積単位として扱う。
+     */
     private function normalizeUnit(?string $unitNo): ?string
     {
-        $unitNo = trim((string) $unitNo);
+        if (! preg_match('/^(\d{1,4})/', trim((string) $unitNo), $m)) {
+            return null;
+        }
 
-        return $unitNo !== '' && ctype_digit($unitNo) ? str_pad($unitNo, 3, '0', STR_PAD_LEFT) : null;
+        return str_pad($m[1], 3, '0', STR_PAD_LEFT);
     }
 
     /**
@@ -274,6 +292,7 @@ class QuoteNumberAllocator
         return [
             'candidate' => $candidate,
             'fell_back_to_new' => false,
+            'quoted_old_format' => false,
             'unit_no' => $unitNo,
             'base_suffix' => null,
             'suffix' => null,

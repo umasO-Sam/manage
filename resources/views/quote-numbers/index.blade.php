@@ -39,7 +39,7 @@
                 <form method="GET" action="{{ route('quote-numbers.index') }}" class="flex items-end gap-3 flex-wrap">
                     <label class="block">
                         <span class="block text-[11px] font-bold text-slate-600 mb-0.5">客先番号（アルファベット1〜3文字）</span>
-                        <input type="text" name="customer_code" value="{{ $customerCode }}" required
+                        <input type="text" name="customer_code" value="{{ $searchTerm }}" required
                                class="border rounded-lg p-2 border-slate-300 text-sm font-mono uppercase w-32">
                     </label>
                     @if ($companyName)
@@ -50,7 +50,10 @@
                         <a href="{{ route('quote-numbers.logs') }}"
                            class="px-4 py-2 rounded-lg border border-slate-300 text-slate-600 text-sm font-bold hover:bg-slate-50">取得ログ</a>
                     @endif
-                    <span class="text-[11px] text-slate-400 pb-2">検索すると案件種別の選択はリセットされます。客先番号だけなら過去注番リストの参照のみです。</span>
+                    <span class="text-[11px] text-slate-400 pb-2">
+                        検索すると案件種別の選択はリセットされます。客先番号だけなら過去注番リストの参照のみです。
+                        <strong>「Q511」のように通番まで入れると過去注番リストを絞り込みます。</strong>
+                    </span>
                 </form>
 
                 {{-- 案件種別と元番号。変えるたびに候補を計算し直すためGETで送る。 --}}
@@ -136,6 +139,13 @@
                             （{{ $customerCode }}{{ $allocation['unit_no'] }} －
                             {{ $allocation['base_suffix'] }}@if ($allocation['extra_code']){{ $allocation['extra_code'] }}{{ $allocation['extra_seq'] }}@endif）
                         </p>
+                        @if ($allocation['quoted_old_format'] ?? false)
+                            <p class="mt-2 text-xs font-bold text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-2">
+                                引用した過去注番が<strong>今の形式に合わない</strong>ため（ハイフン以降の見積区分・通番を持たない旧形式）、
+                                <strong>元の見積番号を「{{ $allocation['base_suffix'] }}」として補って</strong>採番しています。
+                                実際の元注番が別の通番であれば、「元の見積番号」を直してから取得してください。
+                            </p>
+                        @endif
                         @if ($allocation['fell_back_to_new'] ?? false)
                             <p class="mt-2 text-xs font-bold text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-2">
                                 元の見積番号が空のため、<strong>{{ $modes[$mode]['label'] }}ではなく新規案件（N）として採番</strong>しています。
@@ -196,21 +206,30 @@
             @if ($customerCode !== '')
                 <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
                     <div class="px-4 py-2.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between gap-2 flex-wrap">
-                        <span class="text-sm font-bold text-slate-800">過去注番リスト（{{ $customerCode }}）{{ $history->count() }} 件</span>
+                        <span class="text-sm font-bold text-slate-800">
+                            過去注番リスト（{{ $customerCode }}）{{ $history->count() }} 件
+                            @if ($searchTerm !== $customerCode)
+                                <span class="ml-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">「{{ $searchTerm }}」で絞り込み中</span>
+                                <a href="{{ route('quote-numbers.index', ['customer_code' => $customerCode, 'mode' => $mode]) }}"
+                                   class="ml-1 text-[11px] font-bold text-slate-500 hover:text-slate-800 underline">絞り込みを解除</a>
+                            @endif
+                        </span>
                         <span class="text-[11px] text-slate-500">通番の降順。補足区分（T/K/S/B/H）付きも含めて全件表示し、規約どおりでない過去の表記もそのまま出しています。</span>
                     </div>
                     <div class="overflow-x-auto max-h-[32rem] overflow-y-auto">
                         <table class="w-full text-left border-collapse text-xs">
                             <thead class="sticky top-0">
                                 <tr class="bg-slate-50 border-b border-slate-200 font-semibold text-slate-600">
-                                    <th class="p-2 whitespace-nowrap">注番</th>
-                                    <th class="p-2 whitespace-nowrap">通番</th>
-                                    <th class="p-2 whitespace-nowrap text-center">区分</th>
+                                    {{-- 内容ぶんの幅で足りる列は w-px にして、余った幅は件名・納入先に回す。
+                                         これをしないと完了日と操作の間が間延びし、操作列がはみ出して横スクロールになる。 --}}
+                                    <th class="p-2 w-px whitespace-nowrap">注番</th>
+                                    <th class="p-2 w-px whitespace-nowrap">通番</th>
+                                    <th class="p-2 w-px whitespace-nowrap text-center">区分</th>
                                     <th class="p-2">件名（工事名）</th>
                                     <th class="p-2">納入先</th>
-                                    <th class="p-2 whitespace-nowrap">担当</th>
-                                    <th class="p-2 whitespace-nowrap">完了日</th>
-                                    <th class="p-2 whitespace-nowrap text-center">操作</th>
+                                    <th class="p-2 w-px whitespace-nowrap">担当</th>
+                                    <th class="p-2 w-px whitespace-nowrap">完了日</th>
+                                    <th class="p-2 w-px whitespace-nowrap text-center">操作</th>
                                 </tr>
                             </thead>
                             {{-- 「修正」を押すと直下に編集行を開く。1件=1tbodyにして表示行と編集行を
@@ -219,12 +238,12 @@
                                 <tbody class="divide-y divide-slate-100 border-b border-slate-100" x-data="{ editing: false }">
                                     <tr class="hover:bg-blue-50">
                                         {{-- 通番は原則3桁で表示する。台帳の原文と違う場合はツールチップで出す。 --}}
-                                        <td class="p-2 font-mono whitespace-nowrap"
+                                        <td class="p-2 w-px font-mono whitespace-nowrap"
                                             @if ($quote->canonicalNo() !== $quote->full_no) title="台帳の表記: {{ $quote->full_no }}" @endif>
                                             {{ $quote->canonicalNo() }}
                                         </td>
-                                        <td class="p-2 font-mono whitespace-nowrap">{{ $quote->paddedUnitNo() }}</td>
-                                        <td class="p-2 whitespace-nowrap text-center">
+                                        <td class="p-2 w-px font-mono whitespace-nowrap">{{ $quote->paddedUnitNo() }}</td>
+                                        <td class="p-2 w-px whitespace-nowrap text-center">
                                             @if ($quote->extra_code)
                                                 <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 border border-blue-200"
                                                       title="{{ \App\Models\QuoteNumber::EXTRA_CODES[$quote->extra_code] ?? \App\Models\QuoteNumber::RETIRED_EXTRA_CODES[$quote->extra_code] ?? '' }}">{{ $quote->extra_code }}</span>
@@ -236,18 +255,18 @@
                                         </td>
                                         <td class="p-2">{{ $quote->project_name }}</td>
                                         <td class="p-2">{{ $quote->delivery_dest }}</td>
-                                        <td class="p-2 whitespace-nowrap">{{ $quote->staff?->name }}</td>
-                                        <td class="p-2 whitespace-nowrap text-slate-500">{{ $quote->completed_on }}</td>
-                                        <td class="p-2 whitespace-nowrap text-center">
-                                            <div class="flex items-center gap-1 justify-center">
+                                        <td class="p-2 w-px whitespace-nowrap">{{ $quote->staff?->name }}</td>
+                                        <td class="p-2 w-px whitespace-nowrap text-slate-500">{{ $quote->completed_on }}</td>
+                                        <td class="p-2 w-px whitespace-nowrap text-center">
+                                            <div class="flex items-center gap-0.5 justify-center">
                                                 <button type="button" @click="editing = ! editing"
-                                                        class="px-2 py-1 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-50 font-bold">修正</button>
+                                                        class="px-1.5 py-0.5 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-50 font-bold">修正</button>
                                                 <form method="POST" action="{{ route('quote-numbers.destroy', $quote) }}"
                                                       onsubmit="return confirm('{{ $quote->canonicalNo() }} を削除します。取得ログには残りますが、この番号は次の採番で再び使われる可能性があります。よろしいですか？');">
                                                     @csrf
                                                     @method('DELETE')
                                                     <button type="submit"
-                                                            class="px-2 py-1 rounded-lg border border-red-300 text-red-600 hover:bg-red-50 font-bold">削除</button>
+                                                            class="px-1.5 py-0.5 rounded-lg border border-red-300 text-red-600 hover:bg-red-50 font-bold">削除</button>
                                                 </form>
                                                 @if ($mode !== '')
                                                     {{-- 元注番として引用する。構成や工事範囲の変更は通番を+1して採る。 --}}
@@ -257,7 +276,7 @@
                                                             'unit_no' => $quote->unit_no,
                                                             'base_no' => $quote->suffix,
                                                         ]) }}"
-                                                       class="px-2 py-1 rounded-lg border border-blue-300 text-blue-700 hover:bg-blue-50 font-bold">引用</a>
+                                                       class="px-1.5 py-0.5 rounded-lg border border-blue-300 text-blue-700 hover:bg-blue-50 font-bold">引用</a>
                                                 @endif
                                             </div>
                                         </td>

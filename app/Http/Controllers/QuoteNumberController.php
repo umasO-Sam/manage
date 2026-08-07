@@ -11,6 +11,7 @@ use App\Services\QuoteNumberAllocator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
@@ -25,7 +26,12 @@ class QuoteNumberController extends Controller
 {
     public function index(Request $request, QuoteNumberAllocator $allocator): View
     {
-        $customerCode = strtoupper(trim((string) $request->query('customer_code', '')));
+        // 「Q」なら客先の全件、「Q511」のように通番まで入れたら過去注番リストを絞る。
+        // 客先の注番は900件を超えることがあり、目的の1件に辿り着けないため。
+        $searchTerm = strtoupper(trim((string) $request->query('customer_code', '')));
+        preg_match('/^([A-Z]*)/', $searchTerm, $m);
+        $customerCode = $m[1];
+
         $mode = (string) $request->query('mode', '');
         $mode = array_key_exists($mode, QuoteNumberAllocator::MODES) ? $mode : '';
 
@@ -35,15 +41,38 @@ class QuoteNumberController extends Controller
 
         return view('quote-numbers.index', [
             'customerCode' => $customerCode,
+            'searchTerm' => $searchTerm,
             'mode' => $mode,
             'unitNo' => (string) $request->query('unit_no', ''),
             'baseNo' => (string) $request->query('base_no', ''),
             'allocation' => $allocation,
-            'history' => $customerCode !== '' ? $allocator->history($customerCode, $mode ?: null) : collect(),
+            'history' => $customerCode !== ''
+                ? $this->filterHistory($allocator->history($customerCode, $mode ?: null), $searchTerm, $customerCode)
+                : collect(),
             'companyName' => $this->resolveCompanyName($customerCode),
             'staffList' => Staff::forRoster()->get(),
             'modes' => QuoteNumberAllocator::MODES,
         ]);
+    }
+
+    /**
+     * 検索語に客先番号より後ろ(通番など)が入っていれば、その前方一致で過去注番を絞る。
+     * 台帳の原文(full_no)と3桁ゼロ埋めの表示(canonicalNo)の両方を見るので、
+     * 「Q51」でも原文が Q051 の行を拾える。
+     *
+     * @param  Collection<int, QuoteNumber>  $history
+     * @return Collection<int, QuoteNumber>
+     */
+    private function filterHistory(Collection $history, string $searchTerm, string $customerCode): Collection
+    {
+        if ($searchTerm === $customerCode) {
+            return $history;
+        }
+
+        return $history
+            ->filter(fn (QuoteNumber $q) => str_starts_with(strtoupper((string) $q->full_no), $searchTerm)
+                || str_starts_with(strtoupper($q->canonicalNo()), $searchTerm))
+            ->values();
     }
 
     public function store(Request $request, QuoteNumberAllocator $allocator): RedirectResponse

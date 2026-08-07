@@ -139,6 +139,61 @@ class QuoteNumberAllocationTest extends TestCase
     }
 
     /**
+     * 見積台帳の大半は「Q511」のようにハイフン以降を持たない旧形式で、引用しても
+     * 元番号が空のまま渡る。そのままでは新規案件に倒れてしまうため、N01があった
+     * ものとみなして補足区分を採る。補ったことは画面側で注意喚起する。
+     */
+    public function test_quoting_an_old_format_number_assumes_n01(): void
+    {
+        QuoteNumber::create([
+            'full_no' => 'DH031', 'customer_code' => 'DH', 'unit_no' => '031',
+            'suffix' => null, 'quote_type' => null, 'quote_seq' => null, 'extra_code' => null, 'source' => 'legacy',
+        ]);
+
+        // 引用すると見積単位だけが入り、元番号は空で渡る。
+        $result = $this->allocator->build('DH', 'parts', '031', null);
+
+        $this->assertSame('DH031-N01B01', $result['candidate']);
+        $this->assertTrue($result['quoted_old_format']);
+        $this->assertFalse($result['fell_back_to_new']);
+        $this->assertSame('N01', $result['base_suffix']);
+        $this->assertSame('B', $result['extra_code']);
+    }
+
+    /**
+     * 旧形式は見積単位に区分が混ざる(「031B」)。先頭の数字を見積単位として扱う。
+     */
+    public function test_quoting_an_old_format_unit_with_a_trailing_code(): void
+    {
+        $result = $this->allocator->build('DH', 'remodel', '031B', null);
+
+        $this->assertSame('DH031-N01K01', $result['candidate']);
+        $this->assertTrue($result['quoted_old_format']);
+    }
+
+    /**
+     * 元注番を引用していない(見積単位も空)場合は、これまでどおり新規案件に倒す。
+     * 旧形式の救済と取り違えないこと。
+     */
+    public function test_without_quoting_the_fall_back_to_new_still_applies(): void
+    {
+        $result = $this->allocator->build('DH', 'parts', null, null);
+
+        $this->assertSame('DH021-N01', $result['candidate']);
+        $this->assertTrue($result['fell_back_to_new']);
+        $this->assertFalse($result['quoted_old_format']);
+    }
+
+    /**
+     * 追加請求(T)と変更(H)も、引用さえしていればN01を補って採番できる。
+     */
+    public function test_additional_and_change_also_assume_n01_when_quoted(): void
+    {
+        $this->assertSame('DH031-N01T01', $this->allocator->build('DH', 'additional', '031', null)['candidate']);
+        $this->assertSame('DH031-N01H01', $this->allocator->build('DH', 'change', '031', null)['candidate']);
+    }
+
+    /**
      * 追加請求(T)と変更(H)は必ず元注番にぶら下がるため、空のままでは採番しない。
      */
     public function test_additional_and_change_still_require_a_base_number(): void
@@ -482,5 +537,41 @@ class QuoteNumberAllocationTest extends TestCase
     public function test_general_staff_cannot_allocate(): void
     {
         $this->actingAs(Staff::factory()->create())->get(route('quote-numbers.index'))->assertForbidden();
+    }
+
+    /**
+     * 客先の注番は900件を超えることがあるため、「DH013」のように通番まで入れて
+     * 検索すると過去注番リストを絞り込む。客先番号だけならこれまでどおり全件。
+     */
+    public function test_searching_with_a_unit_number_filters_the_history(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+
+        $this->actingAs($manager)->get(route('quote-numbers.index', ['customer_code' => 'DH013']))
+            ->assertOk()
+            ->assertViewHas('customerCode', 'DH')
+            ->assertViewHas('searchTerm', 'DH013')
+            ->assertViewHas('history', fn ($history) => $history->pluck('full_no')->sort()->values()->all()
+                === ['DH013-N01', 'DH013-N01K01', 'DH013-N02'])
+            ->assertSee('で絞り込み中');
+
+        // 客先番号だけなら絞り込まない(setUpで作った4件が全部出る)。
+        $this->actingAs($manager)->get(route('quote-numbers.index', ['customer_code' => 'DH']))
+            ->assertOk()
+            ->assertViewHas('history', fn ($history) => $history->count() === 4)
+            ->assertDontSee('で絞り込み中');
+    }
+
+    /**
+     * 絞り込んでいても採番は客先番号で行う。検索欄に「DH013」と入れたまま
+     * 新規案件を選んでも、客先DHの老番+1で採番できること。
+     */
+    public function test_filtering_does_not_break_the_allocation(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+
+        $this->actingAs($manager)->get(route('quote-numbers.index', ['customer_code' => 'DH013', 'mode' => 'new']))
+            ->assertOk()
+            ->assertViewHas('allocation', fn (array $a) => $a['candidate'] === 'DH021-N01');
     }
 }
