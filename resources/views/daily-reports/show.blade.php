@@ -21,6 +21,7 @@
                 'leave_type' => $e->leave_type,
             ])) }},
             categories: {{ \Illuminate\Support\Js::from($categories) }},
+            orderNoOptionalCodes: {{ \Illuminate\Support\Js::from($orderNoOptionalCodes) }},
             orderNumbers: {{ \Illuminate\Support\Js::from($orderNumbers) }},
             hiddenOrderNumbers: {{ \Illuminate\Support\Js::from($hiddenOrderNumbers) }},
             weekOtherMinutes: {{ \Illuminate\Support\Js::from($weekOtherMinutes) }},
@@ -384,6 +385,7 @@
             Alpine.data('dailyReportForm', (config) => ({
                 workDate: config.workDate,
                 categories: config.categories,
+                orderNoOptionalCodes: config.orderNoOptionalCodes,
                 orderNumbers: config.orderNumbers,
                 // プルダウンから外した注番。「非表示の注番も表示する」を押したときだけ選択肢に足す。
                 hiddenOrderNumbers: config.hiddenOrderNumbers,
@@ -621,9 +623,11 @@
                 // 研修など(69)・管理(70)・空き(71)は特定の注番に紐づく作業ではないため、
                 // 注番未選択でも反映できる。それ以外の分類は注番の入力ミス・付け忘れを
                 // 防ぐため、注番を選択するまで反映できないようにする。
+                // 注番を求めるかどうかは CategoryCode::ORDER_NO_OPTIONAL_CODES が唯一の定義。
+                // 保存時のサーバー側の判定と必ず同じになるよう、値はビューから受け取る。
                 categoryRequiresOrderNo(id) {
                     const cat = this.categories.find((c) => c.id === id);
-                    return cat ? ! [69, 70, 71].includes(cat.code) : true;
+                    return cat ? ! this.orderNoOptionalCodes.includes(cat.code) : true;
                 },
 
                 isSelectionValid() {

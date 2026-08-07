@@ -272,6 +272,45 @@ class DailyReportTest extends TestCase
         $this->assertSame($exempt->id, $report->entries()->first()->category_id);
     }
 
+    /** 打合見積(62)は受注前で注番が決まっていないことがあるため、注番なしで登録できる。 */
+    public function test_the_meeting_and_estimate_category_can_be_saved_without_an_order_no(): void
+    {
+        $staff = Staff::factory()->create();
+        $category = CategoryCode::create([
+            'code' => 62, 'major_category' => '社内人工', 'sub_category' => '打合見積',
+            'item_name' => '打合せ・見積もり・構想設計・電気見積・調査',
+        ]);
+
+        $this->actingAs($staff)->post(route('daily-reports.store'), [
+            'work_date' => '2026-08-03',
+            'entries' => [
+                ['start_minute' => 480, 'end_minute' => 540, 'category_id' => $category->id],
+            ],
+        ])->assertRedirect();
+
+        $report = DailyReport::where('staff_id', $staff->id)->whereDate('work_date', '2026-08-03')->first();
+        $this->assertSame(1, $report->entries()->count());
+        $this->assertSame($category->id, $report->entries()->first()->category_id);
+    }
+
+    /**
+     * 画面の「反映」ボタンの判定とサーバー側の保存判定は同じ定義を使う。
+     * 片方だけ変えると、反映できたのに保存されない(または逆)というずれが起きる。
+     */
+    public function test_the_screen_receives_the_same_order_no_exempt_codes_as_the_server(): void
+    {
+        $staff = Staff::factory()->create();
+        CategoryCode::create(['code' => 62, 'major_category' => '社内人工', 'sub_category' => '打合見積', 'item_name' => '打合せ']);
+
+        $html = $this->actingAs($staff)->get(route('daily-reports.show', ['date' => '2026-08-03']))
+            ->assertOk()->getContent();
+
+        $expected = (string) \Illuminate\Support\Js::from(CategoryCode::ORDER_NO_OPTIONAL_CODES);
+
+        $this->assertStringContainsString('orderNoOptionalCodes: '.$expected, $html);
+        $this->assertContains(62, CategoryCode::ORDER_NO_OPTIONAL_CODES);
+    }
+
     public function test_purchasing_labor_screen_hides_provisional_rows_by_default_and_shows_them_when_included(): void
     {
         $manager = Staff::factory()->procurementManager()->create();

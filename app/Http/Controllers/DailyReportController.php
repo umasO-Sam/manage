@@ -74,6 +74,8 @@ class DailyReportController extends Controller
             'prevDate' => Carbon::parse($workDate)->subDay()->format('Y-m-d'),
             'nextDate' => Carbon::parse($workDate)->addDay()->format('Y-m-d'),
             'categories' => $categories,
+            // 注番を選ばなくても反映できる分類。保存時の判定(store)と同じ定義を使う。
+            'orderNoOptionalCodes' => CategoryCode::ORDER_NO_OPTIONAL_CODES,
             'orderNumbers' => $orderNumbers,
             'hiddenOrderNumbers' => $hiddenOrderNumbers,
             'weekOtherMinutes' => array_sum($weekWorkedByDate),
@@ -111,10 +113,10 @@ class DailyReportController extends Controller
 
         $wasSubmittedBefore = $report->isSubmitted();
 
-        // 研修など(69)・管理(70)・空き(71)以外の分類は、注番の付け忘れを防ぐため
-        // 注番が無ければ保存しない(画面側でも同じ条件で反映ボタンを無効化しているが、
-        // サーバー側でも二重にチェックする)。
-        $categoriesRequiringOrderNo = CategoryCode::whereNotIn('code', [69, 70, 71])->pluck('id')->all();
+        // 一部の分類以外は、注番の付け忘れを防ぐため注番が無ければ保存しない
+        // (画面側でも同じ条件で反映ボタンを無効化しているが、サーバー側でも二重にチェックする)。
+        $categoriesRequiringOrderNo = CategoryCode::whereNotIn('code', CategoryCode::ORDER_NO_OPTIONAL_CODES)
+            ->pluck('id')->all();
 
         DB::transaction(function () use ($report, $validated, $categoriesRequiringOrderNo) {
             $report->remarks = $validated['remarks'] ?? null;
