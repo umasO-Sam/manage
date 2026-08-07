@@ -169,6 +169,7 @@
                                         <th class="p-2.5">権限</th>
                                         <th class="p-2.5">上長</th>
                                         <th class="p-2.5" title="作業日報の確認を担当する。未確認バッジもこの人にだけ出す">日報管理</th>
+                                        <th class="p-2.5" title="承認済み申請の取消を、上長の承認後に反映してよいか最終判断する">勤怠管理</th>
                                         <th class="p-2.5" title="作業日報一覧・勤務状況一覧・社内担当者リストから除外する">名簿非表示</th>
                                         <th class="p-2.5">有休 当年度</th>
                                         <th class="p-2.5">有休 前年度繰越</th>
@@ -239,6 +240,18 @@
                                                 <input x-show="editMode" x-cloak @disabled(! $canEditRow) type="checkbox" name="updates[{{ $staff->id }}][is_daily_report_reviewer]" value="1"
                                                        @checked($staff->is_daily_report_reviewer) class="rounded border-slate-300">
                                             </td>
+                                            {{-- 勤怠管理フラグは行を編集できるだけでなく、付与を許された人(役員・
+                                                 勤怠管理者・administrator)だけが操作できる。付与できない場合は
+                                                 hiddenも出さず、現在値を据え置く。 --}}
+                                            @php($canEditAttendance = $canEditRow && Auth::user()->canGrantAttendanceManager())
+                                            <td class="p-2.5 text-center">
+                                                <span x-show="!editMode">{{ $staff->is_attendance_manager ? '○' : '' }}</span>
+                                                @if ($canEditAttendance)
+                                                    <input type="hidden" name="updates[{{ $staff->id }}][is_attendance_manager]" value="0">
+                                                @endif
+                                                <input x-show="editMode" x-cloak @disabled(! $canEditAttendance) type="checkbox" name="updates[{{ $staff->id }}][is_attendance_manager]" value="1"
+                                                       @checked($staff->is_attendance_manager) class="rounded border-slate-300">
+                                            </td>
                                             <td class="p-2.5 text-center">
                                                 <span x-show="!editMode">{{ $staff->excluded_from_rosters ? '○' : '' }}</span>
                                                 @if ($canEditRow)
@@ -249,12 +262,12 @@
                                             </td>
                                             <td class="p-2.5">
                                                 <span x-show="!editMode" class="font-mono">{{ $staff->paid_leave_granted_current_year }}</span>
-                                                <input x-show="editMode" x-cloak @disabled(! $canEditRow) type="number" step="0.5" min="0" max="99.9" name="updates[{{ $staff->id }}][paid_leave_granted_current_year]"
+                                                <input x-show="editMode" x-cloak @disabled(! $canEditRow) type="number" step="0.25" min="0" max="99.9" name="updates[{{ $staff->id }}][paid_leave_granted_current_year]"
                                                        value="{{ $staff->paid_leave_granted_current_year }}" class="w-20 text-xs border rounded px-1.5 py-1 border-slate-300">
                                             </td>
                                             <td class="p-2.5">
                                                 <span x-show="!editMode" class="font-mono">{{ $staff->paid_leave_granted_last_year }}</span>
-                                                <input x-show="editMode" x-cloak @disabled(! $canEditRow) type="number" step="0.5" min="0" max="99.9" name="updates[{{ $staff->id }}][paid_leave_granted_last_year]"
+                                                <input x-show="editMode" x-cloak @disabled(! $canEditRow) type="number" step="0.25" min="0" max="99.9" name="updates[{{ $staff->id }}][paid_leave_granted_last_year]"
                                                        value="{{ $staff->paid_leave_granted_last_year }}" class="w-20 text-xs border rounded px-1.5 py-1 border-slate-300">
                                             </td>
                                             <td class="p-2.5 font-mono text-slate-500">{{ $paidLeaveBalances[$staff->id]['remainingTotal'] }}</td>

@@ -98,6 +98,17 @@ class Staff extends Authenticatable
     }
 
     /**
+     * 勤怠管理フラグを付け外しできるか。勤怠は部署をまたいで見る必要があるため、
+     * 役員・勤怠管理者自身・administratorに限る(はしごとは別の判定)。
+     */
+    public function canGrantAttendanceManager(): bool
+    {
+        return (bool) $this->is_administrator
+            || (bool) $this->is_attendance_manager
+            || (bool) $this->is_executive;
+    }
+
+    /**
      * 権限のはしごの高さ。数字が大きいほど強い。
      * 経理資材担当・営業担当・一般社員・上長はいずれも1（互いに編集できる）。
      */

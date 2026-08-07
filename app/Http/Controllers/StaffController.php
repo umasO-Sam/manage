@@ -61,7 +61,8 @@ class StaffController extends Controller
             'is_supervisor' => $resolve('is_supervisor', true),
             // 日報管理者も上長フラグと同じ扱い(担当者管理を開ける人なら設定できる)。
             'is_daily_report_reviewer' => $resolve('is_daily_report_reviewer', true),
-            'is_attendance_manager' => $resolve('is_attendance_manager', true),
+            // 勤怠管理者は役員・勤怠管理者・administratorだけが付け外しできる。
+            'is_attendance_manager' => $resolve('is_attendance_manager', $actor->canGrantAttendanceManager()),
             // 名簿からの除外は上長フラグと同じ扱い(担当者管理を開ける人なら設定できる)。
             'excluded_from_rosters' => $resolve('excluded_from_rosters', true),
             'is_executive' => $resolve('is_executive', $actor->canGrantExecutive()),
@@ -272,7 +273,6 @@ class StaffController extends Controller
                 'is_supervisor' => ['nullable', 'boolean'],
                 'is_daily_report_reviewer' => ['nullable', 'boolean'],
                 'is_attendance_manager' => ['nullable', 'boolean'],
-            'is_attendance_manager' => ['nullable', 'boolean'],
                 'excluded_from_rosters' => ['nullable', 'boolean'],
                 'is_executive' => ['nullable', 'boolean'],
                 'is_fund_manager' => ['nullable', 'boolean'],

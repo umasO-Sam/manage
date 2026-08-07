@@ -317,4 +317,92 @@ class PermissionLadderTest extends TestCase
         // administratorはすべての機能を使うため、資材管理担当者限定の画面にも入れる。
         $this->actingAs($this->administrator())->get(route('purchasing.input'))->assertOk();
     }
+
+    /**
+     * 勤怠管理フラグははしごとは別の判定で、役員・勤怠管理者・administratorだけが
+     * 付け外しできる。上長や経理資材担当は担当者管理を開けても操作できない。
+     */
+    public function test_only_executives_attendance_managers_and_administrators_can_grant_the_attendance_flag(): void
+    {
+        // 勤怠管理フラグだけでは担当者管理を開けないため、画面に入れる立場と併せ持つ場合を見る。
+        $attendanceManager = Staff::factory()->procurementManager()->create(['is_attendance_manager' => true]);
+
+        foreach ([$this->administrator(), $this->executive(), $attendanceManager] as $actor) {
+            $target = Staff::factory()->create();
+
+            $this->actingAs($actor)
+                ->put(route('staff.update', $target), $this->payload($target, ['is_attendance_manager' => '1']))
+                ->assertRedirect();
+
+            $this->assertTrue($target->fresh()->is_attendance_manager);
+        }
+    }
+
+    public function test_procurement_managers_and_supervisors_cannot_grant_the_attendance_flag(): void
+    {
+        $supervisor = Staff::factory()->create(['is_supervisor' => true, 'role' => Staff::ROLE_PROCUREMENT_MANAGER]);
+
+        foreach ([$this->manager(), $supervisor] as $actor) {
+            $target = Staff::factory()->create();
+
+            $this->actingAs($actor)
+                ->put(route('staff.update', $target), $this->payload($target, ['is_attendance_manager' => '1']))
+                ->assertRedirect();
+
+            $this->assertFalse($target->fresh()->is_attendance_manager, '付与を許されていない実行者の指示は無視する');
+        }
+    }
+
+    public function test_an_existing_attendance_flag_is_kept_when_the_actor_cannot_grant_it(): void
+    {
+        $target = Staff::factory()->create(['is_attendance_manager' => true]);
+
+        // 経理資材担当が他項目を編集しても、勤怠管理フラグは据え置かれる。
+        $this->actingAs($this->manager())
+            ->put(route('staff.update', $target), $this->payload($target, ['name' => '氏名変更']))
+            ->assertRedirect();
+
+        $target->refresh();
+        $this->assertSame('氏名変更', $target->name);
+        $this->assertTrue($target->is_attendance_manager, '勝手に外れないこと');
+    }
+
+    public function test_the_attendance_flag_is_protected_on_the_bulk_edit_screen_too(): void
+    {
+        $target = Staff::factory()->create();
+
+        $this->actingAs($this->manager())
+            ->post(route('staff.bulk-update'), ['updates' => [
+                $target->id => [
+                    'name' => $target->name,
+                    'department' => $target->department,
+                    'login_id' => $target->login_id,
+                    'email' => $target->email,
+                    'role' => $target->role,
+                    'is_attendance_manager' => '1',
+                ],
+            ]])->assertRedirect();
+
+        $this->assertFalse($target->fresh()->is_attendance_manager);
+    }
+
+    /**
+     * 勤怠管理フラグ単独では担当者管理を開けない。パスワードを再設定できる画面なので、
+     * 開ける範囲は従来どおり経理資材担当・役員・資金管理者のまま据え置いている。
+     */
+    public function test_the_attendance_flag_alone_does_not_open_the_staff_screen(): void
+    {
+        $this->actingAs(Staff::factory()->create(['is_attendance_manager' => true]))
+            ->get(route('staff.index'))->assertForbidden();
+    }
+
+    public function test_the_staff_list_shows_the_attendance_column(): void
+    {
+        Staff::factory()->create(['is_attendance_manager' => true, 'name' => '勤怠担当さん']);
+
+        $this->actingAs($this->administrator())->get(route('staff.index'))
+            ->assertOk()
+            ->assertSee('勤怠管理')
+            ->assertSee('勤怠担当さん');
+    }
 }

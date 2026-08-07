@@ -100,9 +100,12 @@
         日報管理者（作業日報の確認を担当する。未確認バッジもこの人にだけ出す。経理資材担当に付ける）
     </label>
 
-    <label class="flex items-center gap-2 text-sm">
-        <input type="hidden" name="is_attendance_manager" value="0">
-        <input type="checkbox" name="is_attendance_manager" value="1" @checked(old('is_attendance_manager', $staff?->is_attendance_manager))>
+    <label class="flex items-center gap-2 text-sm {{ $actor->canGrantAttendanceManager() ? '' : 'text-slate-400' }}">
+        @if ($actor->canGrantAttendanceManager())
+            <input type="hidden" name="is_attendance_manager" value="0">
+        @endif
+        <input type="checkbox" name="is_attendance_manager" value="1"
+               @checked(old('is_attendance_manager', $staff?->is_attendance_manager)) @disabled(! $actor->canGrantAttendanceManager())>
         勤怠管理者（承認済み申請の取消を、上長の承認後に反映してよいか最終判断する）
     </label>
 
@@ -147,13 +150,13 @@
 <div class="grid grid-cols-2 gap-4">
     <div>
         <x-input-label for="paid_leave_granted_current_year" value="有給休暇 当年度付与日数" />
-        <x-text-input id="paid_leave_granted_current_year" name="paid_leave_granted_current_year" type="number" step="0.5" min="0" max="99.9"
+        <x-text-input id="paid_leave_granted_current_year" name="paid_leave_granted_current_year" type="number" step="0.25" min="0" max="99.9"
                        class="mt-1 block w-full" :value="old('paid_leave_granted_current_year', $staff?->paid_leave_granted_current_year)" />
         <x-input-error class="mt-2" :messages="$errors->get('paid_leave_granted_current_year')" />
     </div>
     <div>
         <x-input-label for="paid_leave_granted_last_year" value="有給休暇 前年度繰越日数" />
-        <x-text-input id="paid_leave_granted_last_year" name="paid_leave_granted_last_year" type="number" step="0.5" min="0" max="99.9"
+        <x-text-input id="paid_leave_granted_last_year" name="paid_leave_granted_last_year" type="number" step="0.25" min="0" max="99.9"
                        class="mt-1 block w-full" :value="old('paid_leave_granted_last_year', $staff?->paid_leave_granted_last_year)" />
         <x-input-error class="mt-2" :messages="$errors->get('paid_leave_granted_last_year')" />
     </div>
