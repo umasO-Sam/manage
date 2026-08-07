@@ -104,14 +104,14 @@
                             <x-input-error class="mt-2" :messages="$errors->get('due_date_type')" />
 
                             <div class="mt-2" x-show="dueDateType === 'specific'" x-cloak>
-                                <x-text-input id="due_date" name="due_date" type="date" class="block w-full" :value="old('due_date')" min="{{ now()->toDateString() }}" />
+                                <x-date-text-input name="due_date" class="block w-full" :value="old('due_date')" :min="now()->toDateString()" />
                                 <x-input-error class="mt-2" :messages="$errors->get('due_date')" />
                             </div>
                         </div>
                     @else
                         <div>
                             <x-input-label for="due_date" :value="$workflowType->due_date_label" />
-                            <x-text-input id="due_date" name="due_date" type="date" class="mt-1 block w-full" :value="old('due_date')" min="{{ now()->toDateString() }}" required />
+                            <x-date-text-input name="due_date" class="mt-1 block w-full" :value="old('due_date')" :min="now()->toDateString()" />
                             <x-input-error class="mt-2" :messages="$errors->get('due_date')" />
                         </div>
                     @endif

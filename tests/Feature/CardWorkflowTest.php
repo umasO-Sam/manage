@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Card;
 use App\Models\OrderNumber;
 use App\Models\Staff;
 use App\Models\WorkflowType;
@@ -78,6 +79,50 @@ class CardWorkflowTest extends TestCase
             'created_by' => $staff->id,
             'current_stage' => 0,
         ]);
+    }
+
+    /**
+     * 希望納期の入力欄を x-date-text-input に統一したため、送信値が
+     * 「2026/08/20」のスラッシュ区切りになる。従来のハイフン区切りと
+     * 同じように保存できることを担保する。
+     */
+    public function test_due_date_is_accepted_in_slash_format(): void
+    {
+        $workflowType = $this->purchaseWorkflow();
+        $orderNumber = $this->orderNumber();
+        $staff = Staff::factory()->create();
+        $due = now()->addWeek();
+
+        $this->actingAs($staff)->post(route('cards.store', $workflowType), [
+            'order_number_id' => $orderNumber->id,
+            'item_name' => 'テスト部品',
+            'model_number' => 'ABC-123',
+            'quantity' => 2,
+            'unit' => '個',
+            'due_date_type' => 'specific',
+            'due_date' => $due->format('Y/m/d'),
+        ])->assertRedirect();
+
+        $this->assertSame($due->format('Y-m-d'), Card::first()->due_date->format('Y-m-d'));
+    }
+
+    public function test_past_due_date_in_slash_format_is_still_rejected(): void
+    {
+        $workflowType = $this->purchaseWorkflow();
+        $orderNumber = $this->orderNumber();
+        $staff = Staff::factory()->create();
+
+        $this->actingAs($staff)->post(route('cards.store', $workflowType), [
+            'order_number_id' => $orderNumber->id,
+            'item_name' => 'テスト部品',
+            'model_number' => 'ABC-123',
+            'quantity' => 2,
+            'unit' => '個',
+            'due_date_type' => 'specific',
+            'due_date' => now()->subDay()->format('Y/m/d'),
+        ])->assertSessionHasErrors('due_date');
+
+        $this->assertSame(0, Card::count());
     }
 
     public function test_card_can_be_created_without_manufacturer(): void
