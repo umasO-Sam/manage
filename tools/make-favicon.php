@@ -8,13 +8,20 @@
  * 上げないと、ブラウザもサーバーも古い画像を返し続ける。
  *
  * この環境にはImageMagickが無いためGDで処理する。GDのimagecopyresampledは
- * バイリニアのため、598px→16pxのような大幅な縮小で線が飛ぶ。ロゴは細い線と
+ * バイリニアのため、720px→16pxのような大幅な縮小で線が飛ぶ。ロゴは細い線と
  * 抜き文字でできているので、面積平均(box filter)で縮小している。アルファは
  * 乗算済みで平均し、最後に戻す(半透明の縁が黒ずむのを防ぐ)。
+ *
+ * 元画像の白い縁取りは26pxしかなく、16pxまで縮めると0.6px相当にしかならない。
+ * 暗い背景での視認性はこの縁取りが担っているので、縮小する前に外側へ
+ * 太らせる(DILATE)。
  */
 
 // 元画像を1画素ずつPHPの配列に持つため、既定の128Mでは足りない。
-ini_set('memory_limit', '512M');
+ini_set('memory_limit', '1024M');
+
+// 白い縁取りを外側へ太らせる量(元画像の画素)。0で元のまま。
+const DILATE = 45;
 
 $srcPath = $argv[1] ?? 'sample/saitokokenlogo2.png';
 $outDir = $argv[2] ?? 'public';
@@ -30,6 +37,37 @@ imagesavealpha($im, true);
 $sw = imagesx($im);
 $sh = imagesy($im);
 
+// 元画像を [r,g,b,不透明度] の配列にする。
+$src = [];
+$opaque = [];
+for ($y = 0; $y < $sh; $y++) {
+    $rowS = []; $rowO = [];
+    for ($x = 0; $x < $sw; $x++) {
+        $c = imagecolorat($im, $x, $y);
+        $a = 1.0 - ((($c >> 24) & 0x7F) / 127.0);   // 0=透明, 1=不透明
+        $rowS[] = [($c >> 16) & 0xFF, ($c >> 8) & 0xFF, $c & 0xFF, $a];
+        $rowO[] = $a >= 0.5;
+    }
+    $src[] = $rowS;
+    $opaque[] = $rowO;
+}
+
+// --- 白い縁取りを外側へ太らせる ---
+if (DILATE > 0) {
+    $dist = distanceFromOpaque($opaque, $sw, $sh);
+    $limit = DILATE * 3;                            // 距離は3倍スケール
+    for ($y = 0; $y < $sh; $y++) {
+        for ($x = 0; $x < $sw; $x++) {
+            if ($opaque[$y][$x]) continue;
+            $dv = $dist[$y][$x];
+            if ($dv > $limit + 3) continue;
+            // 外周1pxぶんをフェードさせ、輪郭のギザギザを防ぐ。
+            $a = $dv <= $limit ? 1.0 : max(0.0, 1.0 - ($dv - $limit) / 3.0);
+            $src[$y][$x] = [255, 255, 255, max($src[$y][$x][3], $a)];
+        }
+    }
+}
+
 // --- ロゴの外接矩形を求める ---
 // 黒い画素ではなく「透明でない画素」で測る。このロゴは黒い図形の外周を
 // 白いアウトラインが縁取っており、その白は透明ではなく不透明な白。
@@ -38,8 +76,7 @@ $sh = imagesy($im);
 $x0 = $sw; $y0 = $sh; $x1 = -1; $y1 = -1;
 for ($y = 0; $y < $sh; $y++) {
     for ($x = 0; $x < $sw; $x++) {
-        $a = (imagecolorat($im, $x, $y) >> 24) & 0x7F;
-        if ($a < 64) {
+        if ($src[$y][$x][3] > 0.25) {
             if ($x < $x0) $x0 = $x;
             if ($x > $x1) $x1 = $x;
             if ($y < $y0) $y0 = $y;
@@ -49,24 +86,24 @@ for ($y = 0; $y < $sh; $y++) {
 }
 $bw = $x1 - $x0 + 1;
 $bh = $y1 - $y0 + 1;
-echo "外接矩形: {$bw}x{$bh} at ({$x0},{$y0})\n";
+echo '外接矩形: ' . $bw . 'x' . $bh . ' at (' . $x0 . ',' . $y0 . ')' . (DILATE > 0 ? '  ※縁取りを' . DILATE . "px太らせた後\n" : "\n");
 
-// --- 外接矩形を正方形の作業キャンバスに載せる(長辺基準・中央) ---
+// --- 外接矩形を正方形の作業キャンバスに載せる(長辺基準・中央)。値は乗算済み ---
 $side = max($bw, $bh);
-$work = imagecreatetruecolor($side, $side);
-imagealphablending($work, false);
-imagesavealpha($work, true);
-imagefilledrectangle($work, 0, 0, $side - 1, $side - 1, imagecolorallocatealpha($work, 255, 255, 255, 127));
-imagecopy($work, $im, intdiv($side - $bw, 2), intdiv($side - $bh, 2), $x0, $y0, $bw, $bh);
-
-// 作業キャンバスを乗算済みRGBAの配列にする。
+$ox = intdiv($side - $bw, 2);
+$oy = intdiv($side - $bh, 2);
 $px = [];
 for ($y = 0; $y < $side; $y++) {
     $row = [];
     for ($x = 0; $x < $side; $x++) {
-        $c = imagecolorat($work, $x, $y);
-        $a = 1.0 - ((($c >> 24) & 0x7F) / 127.0);   // 0=透明, 1=不透明
-        $row[] = [(($c >> 16) & 0xFF) * $a, (($c >> 8) & 0xFF) * $a, ($c & 0xFF) * $a, $a];
+        $sx = $x - $ox + $x0;
+        $sy = $y - $oy + $y0;
+        if ($sx < $x0 || $sx > $x1 || $sy < $y0 || $sy > $y1) {
+            $row[] = [0.0, 0.0, 0.0, 0.0];
+        } else {
+            [$r, $g, $b, $a] = $src[$sy][$sx];
+            $row[] = [$r * $a, $g * $a, $b * $a, $a];
+        }
     }
     $px[] = $row;
 }
@@ -75,6 +112,49 @@ for ($y = 0; $y < $side; $y++) {
  * 作業キャンバスを、余白 $pad(割合) を付けて $size 四方に面積平均で縮小する。
  * $bg が null なら透明背景、配列なら不透明な背景色の上に合成する。
  */
+/**
+ * 各画素から最寄りの不透明画素までの距離を、チャンファー距離変換(3-4近似)で求める。
+ * 総当たりだと画素数×半径の二乗で効かないので、前方・後方の2パスで近似する。
+ * 戻り値の単位は3倍スケール(1px = 3)。
+ */
+function distanceFromOpaque(array $opaque, int $w, int $h): array
+{
+    $INF = 1 << 20;
+    $d = [];
+    for ($y = 0; $y < $h; $y++) {
+        $row = [];
+        for ($x = 0; $x < $w; $x++) {
+            $row[] = $opaque[$y][$x] ? 0 : $INF;
+        }
+        $d[] = $row;
+    }
+
+    for ($y = 0; $y < $h; $y++) {            // 左上 → 右下
+        for ($x = 0; $x < $w; $x++) {
+            if ($d[$y][$x] === 0) continue;
+            $m = $d[$y][$x];
+            if ($x > 0) $m = min($m, $d[$y][$x - 1] + 3);
+            if ($y > 0) $m = min($m, $d[$y - 1][$x] + 3);
+            if ($x > 0 && $y > 0) $m = min($m, $d[$y - 1][$x - 1] + 4);
+            if ($x < $w - 1 && $y > 0) $m = min($m, $d[$y - 1][$x + 1] + 4);
+            $d[$y][$x] = $m;
+        }
+    }
+    for ($y = $h - 1; $y >= 0; $y--) {       // 右下 → 左上
+        for ($x = $w - 1; $x >= 0; $x--) {
+            if ($d[$y][$x] === 0) continue;
+            $m = $d[$y][$x];
+            if ($x < $w - 1) $m = min($m, $d[$y][$x + 1] + 3);
+            if ($y < $h - 1) $m = min($m, $d[$y + 1][$x] + 3);
+            if ($x < $w - 1 && $y < $h - 1) $m = min($m, $d[$y + 1][$x + 1] + 4);
+            if ($x > 0 && $y < $h - 1) $m = min($m, $d[$y + 1][$x - 1] + 4);
+            $d[$y][$x] = $m;
+        }
+    }
+
+    return $d;
+}
+
 function render(array $px, int $side, int $size, float $pad, ?array $bg, float $contrast = 1.0): \GdImage
 {
     $out = imagecreatetruecolor($size, $size);
