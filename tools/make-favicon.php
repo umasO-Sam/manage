@@ -13,6 +13,9 @@
  * 乗算済みで平均し、最後に戻す(半透明の縁が黒ずむのを防ぐ)。
  */
 
+// 元画像を1画素ずつPHPの配列に持つため、既定の128Mでは足りない。
+ini_set('memory_limit', '512M');
+
 $srcPath = $argv[1] ?? 'sample/saitokokenlogo2.png';
 $outDir = $argv[2] ?? 'public';
 
@@ -27,15 +30,16 @@ imagesavealpha($im, true);
 $sw = imagesx($im);
 $sh = imagesy($im);
 
-// --- ロゴの外接矩形を求める(周囲の透明・白を落とす) ---
+// --- ロゴの外接矩形を求める ---
+// 黒い画素ではなく「透明でない画素」で測る。このロゴは黒い図形の外周を
+// 白いアウトラインが縁取っており、その白は透明ではなく不透明な白。
+// 黒だけで測ると白い縁取りを丸ごと切り落としてしまい、暗い背景に置いたときに
+// ロゴが背景へ溶けて見えなくなる(縁取りは暗い背景での視認性そのもの)。
 $x0 = $sw; $y0 = $sh; $x1 = -1; $y1 = -1;
 for ($y = 0; $y < $sh; $y++) {
     for ($x = 0; $x < $sw; $x++) {
-        $c = imagecolorat($im, $x, $y);
-        $a = ($c >> 24) & 0x7F;
-        $r = ($c >> 16) & 0xFF; $g = ($c >> 8) & 0xFF; $b = $c & 0xFF;
-        $lum = 0.299 * $r + 0.587 * $g + 0.114 * $b;
-        if ($a < 64 && $lum < 128) {
+        $a = (imagecolorat($im, $x, $y) >> 24) & 0x7F;
+        if ($a < 64) {
             if ($x < $x0) $x0 = $x;
             if ($x > $x1) $x1 = $x;
             if ($y < $y0) $y0 = $y;
@@ -150,29 +154,28 @@ function pngBytes(\GdImage $img): string
     return ob_get_clean();
 }
 
-// --- 透明背景のファビコン。小さいほど余白を詰めて字面を稼ぐ ---
+// --- 透明背景のファビコン。余白は取らず、白い縁取りまで最大限に写す ---
 $targets = [
-    'favicon-32.png' => [32, 0.02],
-    'favicon-192.png' => [192, 0.04],
-    'favicon-512.png' => [512, 0.04],
+    'favicon-32.png' => 32,
+    'favicon-192.png' => 192,
+    'favicon-512.png' => 512,
 ];
-foreach ($targets as $name => [$size, $pad]) {
-    $img = render($px, $side, $size, $pad, null);
+foreach ($targets as $name => $size) {
+    $img = render($px, $side, $size, 0.0, null);
     file_put_contents("$outDir/$name", pngBytes($img));
-    echo "$name ({$size}x{$size}, 余白" . round($pad * 100) . "%)\n";
+    echo "$name ({$size}x{$size})\n";
 }
 
-// --- apple-touch-icon は白背景。iOSが角を丸めるぶん余白を多めに取る ---
-$img = render($px, $side, 180, 0.10, [255, 255, 255]);
+// --- apple-touch-icon は白背景(iOSは透明を黒で埋める)。角を丸められるので少しだけ余白を残す ---
+$img = render($px, $side, 180, 0.04, [255, 255, 255]);
 file_put_contents("$outDir/apple-touch-icon.png", pngBytes($img));
-echo "apple-touch-icon.png (180x180, 白背景, 余白10%)\n";
+echo "apple-touch-icon.png (180x180, 白背景)\n";
 
 // --- favicon.ico は 16/32/48 のPNGを収めた形式(既存と同じ) ---
-// 16pxだけは、そのまま平均すると全体が中間グレーに沈んで外形が読めないので締める。
-$icoSizes = [16 => 1.8, 32 => 1.0, 48 => 1.0];
+$icoSizes = [16, 32, 48];
 $entries = [];
-foreach ($icoSizes as $size => $contrast) {
-    $entries[$size] = pngBytes(render($px, $side, $size, 0.02, null, $contrast));
+foreach ($icoSizes as $size) {
+    $entries[$size] = pngBytes(render($px, $side, $size, 0.0, null));
 }
 
 $count = count($entries);
@@ -186,4 +189,4 @@ foreach ($entries as $data) {
     $ico .= $data;
 }
 file_put_contents("$outDir/favicon.ico", $ico);
-echo 'favicon.ico (' . implode('/', array_keys($icoSizes)) . ", PNG埋め込み)\n";
+echo 'favicon.ico (' . implode('/', $icoSizes) . ", PNG埋め込み)\n";
