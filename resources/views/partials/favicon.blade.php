@@ -9,11 +9,11 @@
     差し替えてもブラウザが古い画像を握り続けるため ?v= を付ける。
 --}}
 @production
-    <link rel="icon" href="{{ asset('favicon.ico') }}?v=4" sizes="any">
-    <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('favicon-32.png') }}?v=4">
-    <link rel="icon" type="image/png" sizes="192x192" href="{{ asset('favicon-192.png') }}?v=4">
-    <link rel="icon" type="image/png" sizes="512x512" href="{{ asset('favicon-512.png') }}?v=4">
-    <link rel="apple-touch-icon" href="{{ asset('apple-touch-icon.png') }}?v=4">
+    <link rel="icon" href="{{ asset('favicon.ico') }}?v=5" sizes="any">
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('favicon-32.png') }}?v=5">
+    <link rel="icon" type="image/png" sizes="192x192" href="{{ asset('favicon-192.png') }}?v=5">
+    <link rel="icon" type="image/png" sizes="512x512" href="{{ asset('favicon-512.png') }}?v=5">
+    <link rel="apple-touch-icon" href="{{ asset('apple-touch-icon.png') }}?v=5">
 @else
     <link rel="icon" href="data:,">
 @endproduction
