@@ -36,7 +36,28 @@
                 基準日（{{ \Illuminate\Support\Carbon::parse($anchor)->format('Y/m/d') }}）までの3週間（21日分・{{ $rangeLabel }}）の作業日報の提出・確認状況を表示しています。
                 右側は特別条項付き36協定の絶対上限（単月100時間・複数月平均80時間・月45時間超は年6回まで）に対する人別の状況です
                 （残業時間は{{ $monthLabel }}・20日締め、休日労働を含む）。有休は{{ $paidLeaveYearLabel }}の年度分です。
+                終日休み（グレー）は<strong>承認済み</strong>の休暇・振替休日・代休から判定しています。半休・2時間有休は勤務があるため日報が必要で、グレーにはなりません。
+                @unless ($timecardEnabled)
+                    <span class="text-amber-700">タイムカード連携が無効のため、「出勤記録あり・日報なし」の強調は表示されません。</span>
+                @endunless
             </p>
+
+            @php
+                // 網掛けはビルド済みCSSに無いパターンのため、Tailwindクラスではなくインラインstyleで
+                // 指定する（この環境では npm run build を実行できない。RUNBOOK 7章）。
+                // セルの背景そのもので状態を示し、提出漏れ・未確認を離れて見ても拾えるようにする。
+                // 手当てが要る3つ（日報なし・差戻し・未提出）は斜線にして、済んでいる日・
+                // 休みの日のベタ塗りから一目で切り分けられるようにする。
+                // 日報なしと差戻しはどちらも赤系のため、日報なしにだけ赤枠を足して区別する。
+                $hatch = fn (string $rgba) => "background-image:repeating-linear-gradient(45deg,{$rgba} 0 3px,transparent 3px 6px);";
+                $missingHatch = $hatch('rgba(220,38,38,.7)').'box-shadow:inset 0 0 0 2px rgba(220,38,38,.85);';
+                $rejectedHatch = $hatch('rgba(239,68,68,.55)');
+                $draftHatch = $hatch('rgba(71,85,105,.55)');
+                $pendingColor = 'rgba(245,158,11,.38)';
+                $confirmedColor = 'rgba(16,185,129,.18)';
+                $dayOffColor = 'rgba(148,163,184,.28)';
+                $purchaseColor = 'rgba(59,130,246,.28)';
+            @endphp
 
             <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-x-auto">
                 <table class="border-collapse text-xs">
@@ -100,23 +121,30 @@
                                             $isToday = $dateString === $today;
                                             $status = $statusByStaffAndDate[$staff->id][$dateString] ?? null;
                                             $hasPurchaseInput = $purchaseInputByStaffAndDate[$staff->id][$dateString] ?? false;
-                                            $statusLabels = [
+                                            $isFullDayOff = $fullDayOffByStaffAndDate[$staff->id][$dateString] ?? false;
+                                            $isMissingReport = $missingReportByStaffAndDate[$staff->id][$dateString] ?? false;
+                                            // 1セル1色。仕入管理データ入力は補助情報なので、日報の状態がある日は
+                                            // そちらを優先し、入力済みであることはツールチップで補う。
+                                            [$cellStyle, $cellTitle] = match (true) {
+                                                $isMissingReport => [$missingHatch, '出勤記録あり・日報なし'],
+                                                $status === 'rejected' => [$rejectedHatch, '差戻し'],
+                                                $status === 'pending_confirmation' => ["background-color:{$pendingColor};", '確認待ち'],
                                                 // 下書き保存の廃止前に保存された未提出の日報だけがこの状態になる。
-                                                'draft' => ['未提出', 'bg-slate-300'],
-                                                'pending_confirmation' => ['確認待ち', 'bg-amber-500'],
-                                                'rejected' => ['差戻し', 'bg-red-500'],
-                                                'confirmed' => ['確認済み', 'bg-emerald-500'],
-                                            ];
+                                                $status === 'draft' => [$draftHatch, '未提出'],
+                                                $status === 'confirmed' => ["background-color:{$confirmedColor};", '確認済み'],
+                                                $isFullDayOff => ["background-color:{$dayOffColor};", '終日休み（作業日報は不要）'],
+                                                $hasPurchaseInput => ["background-color:{$purchaseColor};", '入力済み（仕入管理データ入力）'],
+                                                default => ['', null],
+                                            };
+                                            $cellTitles = array_filter([
+                                                $cellTitle,
+                                                $hasPurchaseInput && $cellTitle !== '入力済み（仕入管理データ入力）' ? '入力済み（仕入管理データ入力）' : null,
+                                            ]);
                                         @endphp
-                                        <td class="px-0.5 py-px text-center align-middle {{ $index % 7 === 0 ? 'border-l border-slate-100' : '' }} {{ $isDayOff ? 'bg-pink-50/60' : '' }} {{ $isToday ? 'bg-slate-100' : '' }} {{ $groupBorder }}">
-                                            <div class="flex items-center justify-center gap-0.5 min-h-[10px]">
-                                                @if ($status)
-                                                    <span class="w-2 h-2 rounded-sm inline-block {{ $statusLabels[$status][1] }}" title="{{ $statusLabels[$status][0] }}"></span>
-                                                @endif
-                                                @if ($hasPurchaseInput)
-                                                    <span class="w-2 h-2 rounded-sm inline-block bg-blue-500" title="入力済み（仕入管理データ入力）"></span>
-                                                @endif
-                                            </div>
+                                        <td class="px-0.5 py-px text-center align-middle {{ $index % 7 === 0 ? 'border-l border-slate-100' : '' }} {{ $isDayOff ? 'bg-pink-50/60' : '' }} {{ $isToday ? 'bg-slate-100' : '' }} {{ $groupBorder }}"
+                                            style="{{ $cellStyle }}"
+                                            title="{{ $cellTitles ? $staff->name.' '.$current->format('n/j').'：'.implode(' ／ ', $cellTitles) : '' }}">
+                                            <div style="min-height:14px"></div>
                                         </td>
                                     @endforeach
 
@@ -158,11 +186,13 @@
             </div>
 
             <div class="flex flex-wrap gap-4 text-xs text-slate-600">
-                <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-sm bg-slate-300 inline-block"></span>未提出</span>
-                <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-sm bg-amber-500 inline-block"></span>確認待ち</span>
-                <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-sm bg-red-500 inline-block"></span>差戻し</span>
-                <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-sm bg-emerald-500 inline-block"></span>確認済み</span>
-                <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-sm bg-blue-500 inline-block"></span>入力済み（仕入管理データ入力）</span>
+                <span class="flex items-center gap-1.5"><span class="w-6 h-3 rounded-sm border border-slate-300 inline-block" style="{{ $missingHatch }}"></span><strong class="text-red-700">出勤記録あり・日報なし</strong></span>
+                <span class="flex items-center gap-1.5"><span class="w-6 h-3 rounded-sm border border-slate-300 inline-block" style="{{ $rejectedHatch }}"></span>差戻し</span>
+                <span class="flex items-center gap-1.5"><span class="w-6 h-3 rounded-sm border border-slate-300 inline-block" style="background-color:{{ $pendingColor }};"></span>確認待ち</span>
+                <span class="flex items-center gap-1.5"><span class="w-6 h-3 rounded-sm border border-slate-300 inline-block" style="{{ $draftHatch }}"></span>未提出</span>
+                <span class="flex items-center gap-1.5"><span class="w-6 h-3 rounded-sm border border-slate-300 inline-block" style="background-color:{{ $confirmedColor }};"></span>確認済み</span>
+                <span class="flex items-center gap-1.5"><span class="w-6 h-3 rounded-sm border border-slate-300 inline-block" style="background-color:{{ $dayOffColor }};"></span>終日休み（作業日報は不要）</span>
+                <span class="flex items-center gap-1.5"><span class="w-6 h-3 rounded-sm border border-slate-300 inline-block" style="background-color:{{ $purchaseColor }};"></span>入力済み（仕入管理データ入力）</span>
                 <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded bg-pink-50 border border-pink-100 inline-block"></span>土日・祝日・会社休日</span>
             </div>
 

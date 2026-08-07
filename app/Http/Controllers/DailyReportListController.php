@@ -6,6 +6,8 @@ use App\Models\DailyReport;
 use App\Models\Holiday;
 use App\Models\LaborCost;
 use App\Models\Staff;
+use App\Services\LeaveScheduleService;
+use App\Services\TimecardService;
 use App\Services\WorkTimeComplianceService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -28,8 +30,12 @@ class DailyReportListController extends Controller
     /** 前後に動かす単位(2週間)。 */
     private const SHIFT_DAYS = 14;
 
-    public function index(Request $request, WorkTimeComplianceService $compliance): View
-    {
+    public function index(
+        Request $request,
+        WorkTimeComplianceService $compliance,
+        LeaveScheduleService $leaveSchedule,
+        TimecardService $timecard,
+    ): View {
         $today = Carbon::today();
         $anchor = $this->parseDate($request->query('date')) ?? $today->copy();
 
@@ -47,6 +53,12 @@ class DailyReportListController extends Controller
 
         $staffList = Staff::forRoster()->get();
 
+        $statusByStaffAndDate = $this->buildDailyReportStatusByStaffAndDate($rangeStart, $rangeEnd, $staffList);
+        // 承認済みの休暇から終日休みの日を出し、日報が要らない日を提出漏れと区別する。
+        $fullDayOffByStaffAndDate = $leaveSchedule->fullDayOffDatesByStaff($rangeStart, $rangeEnd, $staffList->pluck('id')->all());
+        // 出勤しているのに日報が無い日を洗い出すための打刻。連携が無効なら空配列。
+        $punchesByStaffAndDate = $timecard->punchesFor($staffList, $rangeStart, $rangeEnd);
+
         return view('daily-reports.list.index', [
             'dates' => $dates,
             'today' => $today->format('Y-m-d'),
@@ -56,8 +68,11 @@ class DailyReportListController extends Controller
             'rangeLabel' => $rangeStart->format('Y/m/d').'〜'.$rangeEnd->format('Y/m/d'),
             'holidaysByDate' => $holidaysByDate,
             'staffGroups' => $staffList->groupBy('department'),
-            'statusByStaffAndDate' => $this->buildDailyReportStatusByStaffAndDate($rangeStart, $rangeEnd, $staffList),
+            'statusByStaffAndDate' => $statusByStaffAndDate,
             'purchaseInputByStaffAndDate' => $this->buildPurchaseInputByStaffAndDate($rangeStart, $rangeEnd, $staffList),
+            'fullDayOffByStaffAndDate' => $fullDayOffByStaffAndDate,
+            'missingReportByStaffAndDate' => $this->buildMissingReportByStaffAndDate($punchesByStaffAndDate, $statusByStaffAndDate, $fullDayOffByStaffAndDate),
+            'timecardEnabled' => $timecard->isEnabled(),
             // 36協定の集計は「基準日を含む月」で行う(表示範囲を過去にずらすと当時の状況が見られる)。
             'complianceByStaff' => $this->buildComplianceByStaff($staffList, $anchor, $compliance),
             'monthLabel' => $compliance->monthPeriod($anchor)[0]->format('m/d').'〜'.$compliance->monthPeriod($anchor)[1]->format('m/d'),
@@ -142,6 +157,39 @@ class DailyReportListController extends Controller
         $result = [];
         foreach ($rows as $row) {
             $result[$row->staff_id][$row->work_date->format('Y-m-d')] = true;
+        }
+
+        return $result;
+    }
+
+    /**
+     * 出勤打刻があるのに作業日報が1件も無い日。提出漏れとして一覧上で強調する。
+     *
+     * 終日休みの日は日報自体が不要なので除く(休みの日に打刻だけがある場合も、
+     * 日報の提出漏れではなく打刻側の問題なのでここでは扱わない)。
+     * タイムカード連携が無効なら $punches が空配列のまま渡るため、結果も空になる。
+     *
+     * @param  array<int, array<string, array{come: int|null, bye: int|null}>>  $punches
+     * @param  array<int, array<string, string>>  $statuses
+     * @param  array<int, array<string, bool>>  $fullDayOff
+     * @return array<int, array<string, bool>> staff_id => [work_date => true]
+     */
+    private function buildMissingReportByStaffAndDate(array $punches, array $statuses, array $fullDayOff): array
+    {
+        $result = [];
+
+        foreach ($punches as $staffId => $punchesByDate) {
+            foreach ($punchesByDate as $date => $punch) {
+                if (($punch['come'] ?? null) === null) {
+                    continue;
+                }
+
+                if (isset($statuses[$staffId][$date]) || ($fullDayOff[$staffId][$date] ?? false)) {
+                    continue;
+                }
+
+                $result[$staffId][$date] = true;
+            }
         }
 
         return $result;
