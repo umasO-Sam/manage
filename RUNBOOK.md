@@ -34,8 +34,8 @@ php artisan serve --port=8123      # http://127.0.0.1:8123
 ```
 
 - DBは `database/database.sqlite`（本番はMySQL）
-- **権限切替（開発用）**: 右上のユーザーメニューから、自分のロールと各フラグ（上長・日報管理者・役員・資金管理者・administrator）をその場で変更できる。本番ではルートごと存在しない
-- テスト: `php artisan test`（現在 **484件パス**）。修正したら必ず通してからコミットする
+- **権限切替（開発用）**: 右上のユーザーメニューから、自分のロールと各フラグ（上長・日報管理者・勤怠管理者・役員・資金管理者・administrator）をその場で変更できる。本番ではルートごと存在しない
+- テスト: `php artisan test`（現在 **535件パス**）。修正したら必ず通してからコミットする
 
 ---
 
@@ -43,25 +43,51 @@ php artisan serve --port=8123      # http://127.0.0.1:8123
 
 **前提**: ローカルでテストが全件通っていること。`main` にコミット済みであること。
 
+**CSS/JSに変更が無ければフロントの転送は不要**（PHP・Blade だけの修正はこれに当たる）。
+ビルド済みCSSに含まれないTailwindクラスを新しく使った場合だけ、下の「フロントも送る場合」を足す。
+
 ```bash
 cd C:/Users/OSAMU/claude/manage
-npm run build && git push origin main
-
-# フロントは公開ディレクトリがgitignoreのため別途送る
-tar czf build.tar.gz -C public build
-scp -i ~/.ssh/xserver_manage -P 10022 build.tar.gz saitokoken@saitokoken.xsrv.jp:~/manage/
-rm -f build.tar.gz
+php artisan test          # 全件通ってからpushする
+git push origin main
 
 # 本番の作業ツリーは常に origin/main と同一にする（本番側で編集はしない前提）。
 # git pull は作業ツリーに差分があると止まるため、reset --hard で確実に合わせる。
 ssh -i ~/.ssh/xserver_manage -p 10022 saitokoken@saitokoken.xsrv.jp 'cd ~/manage \
   && /usr/bin/php8.3 artisan down --render="errors::503" \
   && git fetch origin && git reset --hard origin/main \
-  && tar xzf build.tar.gz -C public && rm build.tar.gz \
   && /usr/bin/php8.3 artisan migrate --force \
   && /usr/bin/php8.3 artisan config:cache && /usr/bin/php8.3 artisan route:cache && /usr/bin/php8.3 artisan view:cache \
   && /usr/bin/php8.3 artisan up && git log --oneline -1'
 ```
+
+**マイグレーションを伴う場合は、先に本番DBのバックアップを取る**:
+
+```bash
+ssh -i ~/.ssh/xserver_manage -p 10022 saitokoken@saitokoken.xsrv.jp 'cd ~/manage && mkdir -p ~/backups \
+  && eval "$(/usr/bin/php8.3 artisan tinker --execute='"'"'
+       $c = config("database.connections.mysql");
+       echo "export DBH=".escapeshellarg($c["host"]).";";
+       echo "export DBU=".escapeshellarg($c["username"]).";";
+       echo "export MYSQL_PWD=".escapeshellarg($c["password"]).";";
+       echo "export DBN=".escapeshellarg($c["database"]).";";
+     '"'"' 2>/dev/null | tail -1)" \
+  && mysqldump -h "$DBH" -u "$DBU" "$DBN" > ~/backups/manage_$(date +%Y%m%d_%H%M%S).sql \
+  && ls -lh ~/backups/ | tail -2'
+```
+
+<details><summary>フロントも送る場合（CSS/JSを変更したとき）</summary>
+
+```bash
+npm run build     # ※この環境では node/npm がPATHに無く実行できない（7章）
+tar czf build.tar.gz -C public build
+scp -i ~/.ssh/xserver_manage -P 10022 build.tar.gz saitokoken@saitokoken.xsrv.jp:~/manage/
+rm -f build.tar.gz
+# 本番側の展開を reset --hard の直後に挟む:
+#   && tar xzf build.tar.gz -C public && rm build.tar.gz \
+```
+
+</details>
 
 反映後は必ず**1章の健康チェック**を実行する。
 
@@ -103,6 +129,7 @@ ssh -i ~/.ssh/xserver_manage -p 10022 saitokoken@saitokoken.xsrv.jp 'cd ~/manage
 |---|---|
 | 上長 | 他人の勤怠・原価の閲覧、申請承認、作業日報一覧・確認の閲覧 |
 | 日報管理者 | 作業日報の**確認・差し戻し**と未確認バッジ（経理資材担当に付ける） |
+| 勤怠管理者 | 承認済み申請の取消を**反映してよいか最終判断**する。「取消の反映確認」画面とバッジ |
 | 名簿に表示しない | 各画面の担当者リストから除外（ＩＤ管理には残る） |
 | 役員 | 物件管理ボード、原価、役員フラグの付与 |
 | 資金管理者 | 取引先一覧、入金済の非表示。経理資材担当と同等の扱い |
@@ -111,9 +138,15 @@ ssh -i ~/.ssh/xserver_manage -p 10022 saitokoken@saitokoken.xsrv.jp 'cd ~/manage
 付与のはしご: 経理資材担当 ＜ 役員 ＜ 資金管理者 ＜ administrator。
 **自分より上の権限のアカウントは編集・削除できない**（IDとパスワードが見えるため）。
 
+**勤怠管理者フラグだけは、このはしごとは別の判定**。付け外しできるのは
+役員・勤怠管理者・administrator のみで、経理資材担当・資金管理者は操作できない。
+ただし**このフラグだけではＩＤ管理画面に入れない**（パスワードを再設定できる画面のため、
+開ける範囲は経理資材担当・役員・資金管理者のまま）。フラグを持つ人が自分で付け外しするには、
+そのいずれかを兼ねている必要がある。
+
 ---
 
-## 5. 本番データの現況（2026-08-06 時点）
+## 5. 本番データの現況（2026-08-07 時点）
 
 | 対象 | 件数 |
 |---|---|
@@ -127,6 +160,11 @@ ssh -i ~/.ssh/xserver_manage -p 10022 saitokoken@saitokoken.xsrv.jp 'cd ~/manage
 | 見積台帳（過去注番） | 9,196 |
 
 日報管理者: 管理アカウント／瀧上祥子／水上留美子／柴田拓弥／斉藤央奈（+ administrator の斉藤修）
+勤怠管理者: 柴田拓弥／斉藤富美／斉藤央奈（+ administrator の斉藤修・管理アカウント）
+
+**受注ヘッダ1,743件は取引先・担当者・カードがいずれも未設定**。仕入管理から引き継いだ
+過去データで、物件管理に載せるのは一部だけの想定。取引先マスタも0件のため、移行時は
+受注先と社内担当者を都度入力することになる（受注先名は仕入明細の値が初期値に入る）。
 
 ---
 
@@ -152,6 +190,11 @@ ssh -i ~/.ssh/xserver_manage -p 10022 saitokoken@saitokoken.xsrv.jp 'cd ~/manage
 - **新サーバー簡単移行**（Xserverの案内分）。休日出勤のない日に別途計画する。
   現環境は sv8637
 - ログの日次ローテーション未設定
+- **この環境では `npm run build` を実行できない**（node/npm がPATHに無い）。Tailwind は
+  ビルド済みCSSに含まれるクラスしか効かないため、画面を直すときは既存クラスで組む。
+  新しいクラスを使いたくなったら、まずビルドできる環境を用意するところから
+- **勤怠管理画面でセルをクリックしてその日のステータスを強制変更する機能は不採用**（2026-08-07）。
+  勤務状況一覧は申請から導出するだけの読み取り専用ビューで、実装には別テーブルが要る
 
 ---
 
@@ -165,3 +208,31 @@ ssh -i ~/.ssh/xserver_manage -p 10022 saitokoken@saitokoken.xsrv.jp 'cd ~/manage
 | 注番がプルダウンに出ない | 注番管理の「プルダウン」チェック。各画面の「非表示の注番も表示する」で一時的に選べる |
 | 打刻と日報の乖離警告が出ない | `timecard` 接続とSIDの一致（SIDを正とする） |
 | 画面が真っ白 | 1章のエラーログ。`view:cache` の作り直しで直ることが多い |
+| 承認済みの申請を取り消したい | 申請詳細の「取消を申請する」。上長の承認後、勤怠管理者が反映して初めて確定する（9章） |
+| 取消したのに勤務状況一覧から消えない | 仕様。勤怠管理者が反映するまで承認済み扱いのまま残る（9章） |
+| 取消の反映確認が誰にも回らない | 勤怠管理者フラグが0人になっていないか。4章 |
+| 一括承認のチェックボックスが出ない | 承認待ちが0件のとき。取消申請の欄は一括対象外（1件ずつ判断する） |
+| 物件カードが「注番はすでに登録されています」で作れない | 受注済みの案件。作成画面の「すでに受注済みの案件を登録する」から検索して取り込む |
+| カレンダーアイコンを押しても開かない | 解決済み（2026-08-07）。古いキャッシュが残っていたら `view:cache` を作り直す |
+
+---
+
+## 9. 承認済み申請の取消（3段階）
+
+```
+承認済み ──[本人が理由を書いて取消申請]──→ 取消申請中
+                                              │
+              ┌───[上長が差し戻し]────────────┤
+              ↓                               ↓[上長が承認]
+          承認済みに戻る              取消の反映確認中 ──[勤怠管理者が反映]──→ 取消済み
+              ↑                               │
+              └───[勤怠管理者が差し戻し]───────┘
+```
+
+- **反映されるまで status は承認済みのまま**。勤務状況一覧・個人カレンダー・有給残日数は
+  いずれも承認済みかで判定しているため、途中で消すと「取り消せるか未確定なのに休みが消える」
+- 差し戻すと承認済みに戻り、本人はもう一度取消を申請できる（別の申請を出し直す判断も可）
+- 上長は「申請承認」画面の下段、勤怠管理者は「取消の反映確認」画面で判断する
+- 経過は操作ログに5種類のアクションで残る（取消申請／上長の承認・差し戻し／反映・差し戻し）
+
+承認前の取り下げは従来どおり申請詳細の「取消」ボタン（`withdrawn`）で、このフローは通らない。
