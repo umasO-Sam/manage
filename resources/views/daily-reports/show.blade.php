@@ -159,12 +159,12 @@
                                     <span class="text-xs font-bold text-slate-700">表示単位</span>
                                     <label class="flex items-center gap-1 text-xs text-slate-600 cursor-pointer">
                                         <input type="radio" name="granularity" value="60" x-model.number="granularity"
-                                               @change="clearSelection()">
+                                               @change="clearSelection(); $nextTick(() => scrollToDefaultStart())">
                                         1時間
                                     </label>
                                     <label class="flex items-center gap-1 text-xs text-slate-600 cursor-pointer">
                                         <input type="radio" name="granularity" value="10" x-model.number="granularity"
-                                               @change="clearSelection()">
+                                               @change="clearSelection(); $nextTick(() => scrollToDefaultStart())">
                                         10分
                                     </label>
                                 </div>
@@ -196,6 +196,7 @@
                             「＋追加」を押しておくと、離れた時間帯を続けて選択できます（Ctrlキーと同じ働きです）。
                         </p>
                         <div x-ref="grid" class="border border-slate-200 rounded-lg overflow-hidden select-none max-h-[60vh] overflow-y-auto"
+                             :style="`height: ${gridHeight()}px`"
                              @mouseup.window="endDrag()" @mouseleave="endDrag()">
                             <template x-for="i in slotIndexes" :key="i">
                                 <div @mousedown.prevent="startDrag(i, $event)" @mouseenter="dragOver(i)" @mouseup="endDrag()"
@@ -399,7 +400,12 @@
                 gridEnd: 24 * 60,
                 workStart: 8 * 60,
                 workEnd: 17 * 60 + 10,
-                defaultScrollMinute: 7 * 60 + 30,
+                // グリッドは0:00〜24:00まで作るが、最初に見せるのは7:00〜20:10。
+                // 24時間ぶんを一度に出すと日中の1行が細くなり、深夜帯ばかりが目に入る。
+                // 表示枠の高さをこの範囲に合わせ、その前後はスクロールで見えるようにする。
+                viewStart: 7 * 60,
+                viewEnd: 20 * 60 + 10,
+                slotHeight: 24,                 // 1行の高さ(h-6)と合わせる
                 // 休憩の開始・終了時刻・始業・終業は表示単位に関わらず必ずスロットの境目にする。
                 // これが無いと、例えば1時間単位表示のとき10分だけの休憩(10:00〜10:10)が
                 // 10:00〜11:00のスロットの一部にしか重ならず、境目の時刻(10:10等)が
@@ -462,9 +468,24 @@
                     this.$watch('entries', () => this.$nextTick(() => this.syncPreviewScroll()));
                 },
 
+                // 表示枠の先頭に置く行(7:00)。
+                get viewFirstIndex() {
+                    return this.slotIndexes.find((i) => this.slotStart(i) >= this.viewStart) ?? 0;
+                },
+
+                // 7:00〜20:10がちょうど収まる高さ。表示単位を変えると行数が変わるので都度求める。
+                // 10分単位では高くなりすぎるが、classのmax-h-[60vh]で頭打ちになる。
+                gridHeight() {
+                    const last = [...this.slotIndexes].reverse().find((i) => this.slotEnd(i) <= this.viewEnd);
+                    const rows = last === undefined
+                        ? this.slotIndexes.length
+                        : Math.max(1, last - this.viewFirstIndex + 1);
+
+                    return rows * this.slotHeight;
+                },
+
                 scrollToDefaultStart() {
-                    const idx = this.slotIndexes.find((i) => this.slotStart(i) >= this.defaultScrollMinute) ?? 0;
-                    if (this.$refs.grid) this.$refs.grid.scrollTop = idx * 24;
+                    if (this.$refs.grid) this.$refs.grid.scrollTop = this.viewFirstIndex * this.slotHeight;
                 },
 
                 boundaryNote(i) {

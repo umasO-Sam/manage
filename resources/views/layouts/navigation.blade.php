@@ -1,4 +1,5 @@
-<nav x-data="{ open: false }" class="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-sm">
+{{-- 開発環境だけ上部メニューを薄い黄色にして、本番と取り違えないようにする(ユーザー要望)。 --}}
+<nav x-data="{ open: false }" class="{{ app()->isProduction() ? 'bg-white' : 'bg-yellow-100' }} border-b border-slate-200 sticky top-0 z-40 shadow-sm">
     <!-- Primary Navigation Menu -->
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="flex justify-between h-16 items-center">
