@@ -115,10 +115,11 @@
                                             <td class="p-2.5 whitespace-nowrap">{{ $record->work_date?->format('Y/m/d') }}</td>
                                             <td class="p-2.5 font-bold whitespace-nowrap">{{ $record->staff?->name ?? '-' }}</td>
                                             <td class="p-2.5 font-mono whitespace-nowrap">{{ $record->order_no ?: '-' }}</td>
-                                            {{-- 分類名は200文字を超えることがある。幅を抑えて折り返させないと、
-                                                 表そのものが横に伸びて右側の列が見切れる。 --}}
-                                            <td class="p-2.5">
-                                                <div style="min-width: 11rem; max-width: 16rem; word-break: break-word;">{{ $record->category?->item_name ?? '未分類' }}</div>
+                                            {{-- 分類名は200文字を超えることがある。一覧ではコードの数字だけを出し、
+                                                 名称はマウスを乗せたときと修正フォームで読む。 --}}
+                                            <td class="p-2.5 font-mono whitespace-nowrap text-center"
+                                                title="{{ $record->category ? $record->category->code.'：'.$record->category->item_name : '未分類' }}">
+                                                {{ $record->category?->code ?? '—' }}
                                             </td>
                                             <td class="p-2.5 text-right whitespace-nowrap">
                                                 {{ $record->work_hours }}h {{ $record->work_minutes }}m
@@ -134,8 +135,10 @@
                                                     <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 border border-blue-200">仕入入力</span>
                                                 @endif
                                             </td>
-                                            <td class="p-2.5 text-slate-500">
-                                                <div style="min-width: 8rem; max-width: 14rem; word-break: break-word;">{{ $record->note }}</div>
+                                            {{-- 補足は改行せず1行に収め、入りきらない分は「…」で省略する。
+                                                 全文はマウスを乗せたときと修正フォームで読む。 --}}
+                                            <td class="p-2.5 text-slate-500" title="{{ $record->note }}">
+                                                <div style="max-width: 16rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ $record->note }}</div>
                                             </td>
                                             <td class="p-2.5 whitespace-nowrap text-center">
                                                 <div class="flex items-center gap-1 justify-center">

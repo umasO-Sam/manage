@@ -46,9 +46,36 @@ class LaborRecordTest extends TestCase
             ->assertOk()
             // 編集フォームの分類セレクト
             ->assertSee('style="width: 16rem;"', false)
-            // 一覧の分類・補足は折り返して複数行にする
-            ->assertSee('min-width: 11rem; max-width: 16rem; word-break: break-word;', false)
-            ->assertSee('min-width: 8rem; max-width: 14rem; word-break: break-word;', false);
+            // 一覧の補足は1行に収めて省略する
+            ->assertSee('overflow: hidden; text-overflow: ellipsis; white-space: nowrap;', false);
+    }
+
+    /**
+     * 一覧では分類はコードの数字だけを出す。分類名は200文字を超えることがあり、
+     * 全文を並べると表が読めなくなるため(名称はマウスを乗せたときと修正フォームで読む)。
+     */
+    public function test_the_list_shows_only_the_category_code(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        $category = $this->makeCategory('29', 'バルブ・配管材料・レギュレータ・フィルタ・コンバム');
+        LaborCost::create([
+            'work_date' => '2026-08-05', 'staff_id' => $manager->id, 'category_id' => $category->id,
+            'note' => '収まりきらないくらい長い補足のテキスト',
+            'work_hours' => 1, 'work_minutes' => 0, 'is_provisional' => false,
+        ]);
+
+        $response = $this->actingAs($manager)->get(route('labor-records.index'))->assertOk();
+
+        // 一覧のセルの中身はコードだけ。名称はマウスを乗せたときのtitleにだけ出る。
+        $response->assertSee('title="29：バルブ・配管材料・レギュレータ・フィルタ・コンバム"', false);
+        preg_match(
+            '/<td class="p-2\.5 font-mono whitespace-nowrap text-center"\s+title="[^"]*">\s*([^<]*?)\s*<\/td>/u',
+            $response->getContent(),
+            $cell
+        );
+        $this->assertSame('29', $cell[1] ?? null, '一覧の分類セルはコードの数字だけにする');
+        // 補足は省略表示でも全文をtitleで読める。
+        $response->assertSee('title="収まりきらないくらい長い補足のテキスト"', false);
     }
 
     public function test_supervisor_cannot_access_the_page(): void
