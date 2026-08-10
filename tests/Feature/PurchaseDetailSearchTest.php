@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\LaborCost;
 use App\Models\PurchaseDetail;
 use App\Models\Staff;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -51,6 +52,79 @@ class PurchaseDetailSearchTest extends TestCase
         ]));
 
         $response->assertSee('売上済み')->assertDontSee('未計上')->assertSee('2026/07/29');
+    }
+
+    /**
+     * ZATSU(雑人工)のように人工にしか存在しない注番がある。仕入明細だけを見ていると
+     * 0件になり「データが無い」ように見えてしまうため、注番で探したときは人工も並べる。
+     */
+    public function test_labor_costs_are_listed_for_an_order_number_that_has_no_purchase_details(): void
+    {
+        $staff = Staff::factory()->sales()->create();
+        $worker = Staff::factory()->create(['name' => '雑人工担当']);
+        LaborCost::create([
+            'work_date' => '2026-08-04', 'staff_id' => $worker->id, 'order_no' => 'ZATSU',
+            'work_hours' => 2, 'work_minutes' => 0, 'note' => '事務所整理',
+        ]);
+
+        $response = $this->actingAs($staff)->get(route('purchasing.index', ['item_code' => 'ZATSU']));
+
+        $response->assertSee('人工データ')
+            ->assertSee('雑人工担当')
+            ->assertSee('事務所整理')
+            ->assertSee('2026/08/04');
+    }
+
+    public function test_labor_costs_follow_the_same_order_number_match_mode(): void
+    {
+        $staff = Staff::factory()->sales()->create();
+        $worker = Staff::factory()->create(['name' => '雑人工担当']);
+        LaborCost::create([
+            'work_date' => '2026-08-04', 'staff_id' => $worker->id, 'order_no' => 'ZATSU',
+            'work_hours' => 1, 'work_minutes' => 0, 'note' => '完全一致で出る',
+        ]);
+        LaborCost::create([
+            'work_date' => '2026-08-04', 'staff_id' => $worker->id, 'order_no' => 'ZATSU2',
+            'work_hours' => 1, 'work_minutes' => 0, 'note' => '完全一致では出ない',
+        ]);
+
+        $this->actingAs($staff)->get(route('purchasing.index', ['item_code' => 'ZATSU']))
+            ->assertSee('完全一致で出る')->assertSee('完全一致では出ない');
+
+        $this->actingAs($staff)->get(route('purchasing.index', ['item_code' => 'ZATSU', 'item_code_match' => 'perfect']))
+            ->assertSee('完全一致で出る')->assertDontSee('完全一致では出ない');
+    }
+
+    /**
+     * 人工が持たない項目で絞り込んでいるときは、その条件を無視した一覧になってしまうため出さない。
+     */
+    public function test_labor_costs_are_hidden_when_filtering_by_a_column_the_labor_data_does_not_have(): void
+    {
+        $staff = Staff::factory()->sales()->create();
+        LaborCost::create([
+            'work_date' => '2026-08-04', 'staff_id' => Staff::factory()->create()->id, 'order_no' => 'ZATSU',
+            'work_hours' => 2, 'work_minutes' => 0, 'note' => '事務所整理',
+        ]);
+
+        $this->actingAs($staff)->get(route('purchasing.index', ['item_code' => 'ZATSU', 'supplier_name' => '丸紅']))
+            ->assertDontSee('事務所整理');
+
+        $this->actingAs($staff)->get(route('purchasing.index', [
+            'item_code' => 'ZATSU', 'order_date_mode' => 'exact', 'order_date_from' => '2026-08-04',
+        ]))->assertDontSee('事務所整理');
+    }
+
+    /** 注番を入れずに検索したときは人工を出さない(全件が並んで検索結果が読めなくなるため)。 */
+    public function test_labor_costs_are_not_listed_without_an_order_number(): void
+    {
+        $staff = Staff::factory()->sales()->create();
+        LaborCost::create([
+            'work_date' => '2026-08-04', 'staff_id' => Staff::factory()->create()->id, 'order_no' => 'ZATSU',
+            'work_hours' => 2, 'work_minutes' => 0, 'note' => '事務所整理',
+        ]);
+
+        $this->actingAs($staff)->get(route('purchasing.index', ['item_name' => 'センサ']))
+            ->assertDontSee('事務所整理');
     }
 
     public function test_search_by_item_code_perfect_match(): void

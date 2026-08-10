@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\BusinessOrder;
 use App\Models\CategoryCode;
+use App\Models\LaborCost;
 use App\Models\PurchaseDetail;
 use Illuminate\Contracts\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
@@ -59,6 +60,9 @@ class PurchaseDetailController extends Controller
         'manufacturer' => 'manufacturer',
         'supplier_name' => 'supplier_name',
     ];
+
+    /** 人工データは件数が多い(ZATSU=雑人工だけで2万件超)ため、一覧はここまでで打ち切る。 */
+    private const LABOR_DISPLAY_LIMIT = 200;
 
     /**
      * @var array<string, string> クエリ文字列のキー => purchase_details の日付カラム名
@@ -154,6 +158,10 @@ class PurchaseDetailController extends Controller
                 'searched' => false,
                 'showProjects' => false,
                 'projectOrders' => collect(),
+                'showLabor' => false,
+                'laborRows' => collect(),
+                'laborCount' => 0,
+                'laborLimit' => self::LABOR_DISPLAY_LIMIT,
             ]);
         }
 
@@ -166,6 +174,11 @@ class PurchaseDetailController extends Controller
 
         $categories = CategoryCode::orderBy('code')->get();
 
+        // 人工にしか存在しない注番(ZATSU=雑人工など)は明細が0件になるため、
+        // 注番で探しているときは人工データも別枠で並べる。
+        $showLabor = $this->shouldShowLabor($filters);
+        $laborQuery = $showLabor ? $this->laborQuery($filters) : null;
+
         return view('purchasing.index', [
             'details' => $details,
             'filters' => $filters,
@@ -175,7 +188,81 @@ class PurchaseDetailController extends Controller
             'projectOrders' => $this->shouldShowProjects($request, $filters)
                 ? $this->searchProjectOrders($filters)
                 : collect(),
+            'showLabor' => $showLabor,
+            'laborCount' => $laborQuery?->count() ?? 0,
+            'laborRows' => $laborQuery
+                ? $laborQuery->with(['staff', 'category'])
+                    ->orderByDesc('work_date')->orderByDesc('id')
+                    ->limit(self::LABOR_DISPLAY_LIMIT)->get()
+                : collect(),
+            'laborLimit' => self::LABOR_DISPLAY_LIMIT,
         ]);
+    }
+
+    /**
+     * 人工データ(labor_costs)を検索結果に並べるかどうか。
+     *
+     * 注番で探しているときだけ出す。人工にしかない注番(ZATSU=雑人工、社内の勉強会など)を
+     * 仕入管理の検索で引くと明細が0件になり、データそのものが無いように見えてしまうため。
+     * 人工が持たない項目(製品名・型式／寸法・品名・メーカー・商社名・各日付)で絞り込んで
+     * いるときは、その条件を無視した一覧になってしまうので出さない。
+     *
+     * @param  array<string, mixed>  $filters
+     */
+    private function shouldShowLabor(array $filters): bool
+    {
+        if ($filters['item_code'] === '') {
+            return false;
+        }
+
+        foreach (['product_name', 'dimensions', 'item_name', 'manufacturer', 'supplier_name'] as $key) {
+            if ($filters[$key] !== '') {
+                return false;
+            }
+        }
+
+        foreach (array_keys(self::DATE_FIELDS) as $key) {
+            if ($filters["{$key}_mode"] !== '' && ($filters["{$key}_from"] !== '' || $filters["{$key}_to"] !== '')) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * 明細と同じ絞り込み条件のうち、人工データが持つ項目(注番・機械装置No・分類・仮登録・
+     * 注番の頭文字)だけを適用して人工を探す。
+     *
+     * @param  array<string, mixed>  $filters
+     * @return Builder<LaborCost>
+     */
+    private function laborQuery(array $filters): Builder
+    {
+        $query = LaborCost::query();
+
+        foreach (['item_code' => 'order_no', 'machine_no' => 'machine_no'] as $filterKey => $column) {
+            $value = $filters[$filterKey];
+            if ($value === '') {
+                continue;
+            }
+
+            $filters["{$filterKey}_match"] === 'perfect'
+                ? $query->where($column, $value)
+                : $query->where($column, 'like', "%{$value}%");
+        }
+
+        if (! empty($filters['category_id'])) {
+            $query->whereIn('category_id', $filters['category_id']);
+        }
+
+        if ($filters['provisional'] !== '') {
+            $query->where('is_provisional', $filters['provisional'] === '1');
+        }
+
+        $this->applyAlphaFilter($query, $filters['alpha'], 'order_no');
+
+        return $query;
     }
 
     /**
@@ -378,10 +465,12 @@ class PurchaseDetailController extends Controller
     }
 
     /**
-     * @param  Builder<PurchaseDetail>  $query
+     * 注番の頭文字による絞り込み。人工データにも同じ意味で使うため、注番のカラム名を受け取る。
+     *
+     * @param  Builder<PurchaseDetail>|Builder<LaborCost>  $query
      * @param  array<int, string>  $alphas
      */
-    private function applyAlphaFilter(Builder $query, array $alphas): void
+    private function applyAlphaFilter(Builder $query, array $alphas, string $column = 'item_code'): void
     {
         if (empty($alphas) || in_array('ALL', $alphas, true)) {
             return;
@@ -389,18 +478,18 @@ class PurchaseDetailController extends Controller
 
         // MySQL(本番)・SQLite(ローカル開発)の両方で動く書き方に限定するため、
         // REGEXP・CHAR_LENGTH等のMySQL専用関数は使わずSUBSTR+BETWEENで代替する。
-        $query->where(function (Builder $q) use ($alphas) {
+        $query->where(function (Builder $q) use ($alphas, $column) {
             foreach ($alphas as $alpha) {
                 if ($alpha === 'ERR') {
                     // 異常データ: 注番が空、または先頭が半角英字(A-Z/a-z)でないもの
-                    $q->orWhereNull('item_code')
-                        ->orWhere('item_code', '')
-                        ->orWhere(function (Builder $err) {
-                            $err->whereRaw("NOT (SUBSTR(item_code, 1, 1) BETWEEN 'A' AND 'Z')")
-                                ->whereRaw("NOT (SUBSTR(item_code, 1, 1) BETWEEN 'a' AND 'z')");
+                    $q->orWhereNull($column)
+                        ->orWhere($column, '')
+                        ->orWhere(function (Builder $err) use ($column) {
+                            $err->whereRaw("NOT (SUBSTR({$column}, 1, 1) BETWEEN 'A' AND 'Z')")
+                                ->whereRaw("NOT (SUBSTR({$column}, 1, 1) BETWEEN 'a' AND 'z')");
                         });
                 } elseif (preg_match('/^[A-Z]$/', $alpha)) {
-                    $q->orWhere('item_code', 'like', "{$alpha}%");
+                    $q->orWhere($column, 'like', "{$alpha}%");
                 }
             }
         });

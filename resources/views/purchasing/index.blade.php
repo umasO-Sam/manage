@@ -194,7 +194,8 @@
                 <div class="flex justify-between items-center pt-2 border-t border-slate-100">
                     <div class="text-xs text-slate-500 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200 font-medium">
                         @if ($searched)
-                            該当件数: <span class="font-bold text-slate-800">{{ $details->total() }}</span> 件
+                            {{-- 物件・人工も別表で出るため、この件数が明細のものだと分かるようにする。 --}}
+                            仕入明細の該当件数: <span class="font-bold text-slate-800">{{ $details->total() }}</span> 件
                         @else
                             条件を入力して検索してください（未入力のまま検索すると全件が対象になります）
                         @endif
@@ -279,6 +280,64 @@
                                     </tr>
                                 @empty
                                     <tr><td colspan="9" class="p-6 text-center text-slate-400">該当する物件はありません。</td></tr>
+                                @endforelse
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            @endif
+
+            {{-- 人工データ。ZATSU(雑人工)のように人工にしか存在しない注番があり、
+                 仕入明細だけを見ていると「データが無い」ように見えてしまうため、
+                 注番で探しているときは人工も並べる。列の意味が明細と違うので別表にする。 --}}
+            @if ($showLabor)
+                <div class="bg-white rounded-xl border border-green-200 shadow-sm overflow-hidden">
+                    <div class="px-4 py-2.5 bg-green-50 border-b border-green-200 flex items-center justify-between gap-2 flex-wrap">
+                        <span class="text-sm font-bold text-green-900">
+                            人工データ{{ number_format($laborCount) }} 件
+                            @if ($laborCount > $laborLimit)
+                                <span class="ml-1 text-[11px] font-bold text-green-700">（新しい順に {{ number_format($laborLimit) }} 件まで表示）</span>
+                            @endif
+                        </span>
+                        <span class="text-[11px] text-green-700">
+                            注番・機械装置No・分類の条件で絞り込んでいます。
+                            <a href="{{ route('purchasing.labor.index', ['order_no' => $filters['item_code'], 'order_no_match' => $filters['item_code_match']]) }}"
+                               class="font-bold underline hover:text-slate-800">人工計算で集計する</a>
+                        </span>
+                    </div>
+                    <div class="overflow-x-auto max-h-[55vh]">
+                        <table class="w-full text-left border-collapse text-xs">
+                            <thead>
+                                <tr class="bg-slate-50 border-b border-slate-200 font-semibold text-slate-600">
+                                    <th class="p-2.5 whitespace-nowrap">作業日</th>
+                                    <th class="p-2.5 whitespace-nowrap">氏名</th>
+                                    <th class="p-2.5 whitespace-nowrap">注番</th>
+                                    <th class="p-2.5 whitespace-nowrap">機械装置No</th>
+                                    <th class="p-2.5">作業内容</th>
+                                    <th class="p-2.5 text-right whitespace-nowrap">時間</th>
+                                    <th class="p-2.5 text-right whitespace-nowrap">人工</th>
+                                    <th class="p-2.5">備考</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100">
+                                @forelse ($laborRows as $row)
+                                    <tr class="hover:bg-green-50">
+                                        <td class="p-2.5 font-mono whitespace-nowrap">
+                                            {{ $row->work_date?->format('Y/m/d') }}
+                                            @if ($row->is_provisional)
+                                                <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-yellow-100 text-yellow-800 border border-yellow-300">仮</span>
+                                            @endif
+                                        </td>
+                                        <td class="p-2.5 whitespace-nowrap">{{ $row->staff?->name }}</td>
+                                        <td class="p-2.5 font-mono whitespace-nowrap">{{ $row->order_no ?: '—' }}</td>
+                                        <td class="p-2.5 font-mono whitespace-nowrap">{{ $row->machine_no ?: '—' }}</td>
+                                        <td class="p-2.5">{{ $row->category?->item_name ?? '未分類' }}</td>
+                                        <td class="p-2.5 text-right whitespace-nowrap">{{ $row->work_hours }}h {{ $row->work_minutes }}m</td>
+                                        <td class="p-2.5 text-right font-bold text-green-700 whitespace-nowrap">{{ round($row->totalMinutes() / 480, 3) }}</td>
+                                        <td class="p-2.5">{{ $row->note }}</td>
+                                    </tr>
+                                @empty
+                                    <tr><td colspan="8" class="p-6 text-center text-slate-400">この注番の人工データはありません。</td></tr>
                                 @endforelse
                             </tbody>
                         </table>
