@@ -115,6 +115,24 @@ class OrderNumberTest extends TestCase
         $this->assertDatabaseHas('order_numbers', ['code' => 'Q511-N01']);
     }
 
+    /**
+     * 英字は大文字に揃えて登録する。見積番号の採番は大文字で保存するため、ここで
+     * 揃えないと同じ注番が大小2件に分かれ、物件管理と共通で使えなくなる。
+     */
+    public function test_lowercase_input_is_converted_to_uppercase(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+
+        $this->actingAs($manager)->post(route('order-numbers.store'), ['code' => 'q511-n01b01'])
+            ->assertRedirect(route('order-numbers.index'));
+
+        $this->assertDatabaseHas('order_numbers', ['code' => 'Q511-N01B01']);
+
+        // 大文字にした結果として重複するので、続けて登録しようとすると弾かれる。
+        $this->actingAs($manager)->post(route('order-numbers.store'), ['code' => 'Q511-N01B01'])
+            ->assertSessionHasErrors('code');
+    }
+
     public function test_without_bypass_japanese_text_is_still_rejected(): void
     {
         $manager = Staff::factory()->procurementManager()->create();

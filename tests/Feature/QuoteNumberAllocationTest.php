@@ -312,6 +312,21 @@ class QuoteNumberAllocationTest extends TestCase
         $this->assertNull(QuoteNumber::where('full_no', 'DH021-N01')->first());
     }
 
+    /** 取得する注番の英字は必ず大文字にする(注番管理・物件管理と突き合わせるため)。 */
+    public function test_a_hand_edited_number_is_stored_in_uppercase(): void
+    {
+        $staff = Staff::factory()->create(['role' => Staff::ROLE_SALES]);
+
+        $this->actingAs($staff)->post(route('quote-numbers.store'), [
+            'customer_code' => 'dh', 'mode' => 'new', 'full_no' => 'dh099-n05k02',
+            'project_name' => 'x', 'delivery_dest' => 'y', 'customer_contact' => 'z', 'staff_id' => $staff->id,
+        ])->assertRedirect();
+
+        $quote = QuoteNumber::where('full_no', 'DH099-N05K02')->sole();
+        $this->assertSame('DH', $quote->customer_code);
+        $this->assertSame('N05K02', $quote->suffix);
+    }
+
     public function test_a_hand_edited_number_that_already_exists_is_rejected(): void
     {
         $staff = Staff::factory()->create(['role' => Staff::ROLE_SALES]);

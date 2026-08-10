@@ -133,17 +133,16 @@
                                 <div class="mt-2 max-h-72 overflow-y-auto">
                                     <template x-for="order in orderResults" :key="order.order_no">
                                         <button type="button" @click="pickOrder(order)"
-                                                :disabled="order.card_id || order.order_number_taken"
+                                                :disabled="order.card_id"
                                                 class="w-full text-left px-3 py-2 mt-1 rounded border border-slate-200"
-                                                :class="(order.card_id || order.order_number_taken) ? 'bg-slate-100' : 'bg-white cursor-pointer'">
+                                                :class="order.card_id ? 'bg-slate-100' : 'bg-white cursor-pointer'">
                                             <span class="flex items-center justify-between gap-2">
                                                 <span class="font-mono text-xs text-slate-500" x-text="order.order_no"></span>
                                                 <span class="shrink-0 text-[11px] font-bold"
-                                                      :class="(order.card_id || order.order_number_taken) ? 'text-amber-600' : 'text-slate-400'"
+                                                      :class="order.card_id ? 'text-amber-600' : 'text-slate-400'"
                                                       x-text="order.card_id
                                                           ? (order.card_hidden ? '登録済み（非表示）' : '登録済み')
-                                                          : (order.order_number_taken ? '注番が使用済み'
-                                                          : (order.source === 'detail' ? '仕入明細から' : '受注ヘッダ'))"></span>
+                                                          : (order.source === 'detail' ? '仕入明細から' : '受注ヘッダ')"></span>
                                             </span>
                                             <span class="block text-sm text-slate-800" x-text="order.product_name || '（件名なし）'"></span>
                                             <span class="block text-[11px] text-slate-500">
@@ -187,8 +186,10 @@
                 <div>
                     <x-input-label for="order_no" value="注番（必須）" />
                     <div class="mt-1 flex gap-2">
+                        {{-- 形式チェックを解除しているときは日本語もそのまま登録するので大文字化しない。 --}}
                         <x-text-input id="order_no" name="order_no" type="text" class="block w-full font-mono"
                                       x-ref="orderNo" :value="old('order_no')" required
+                                      x-bind:class="bypassFormat ? '' : 'uppercase'"
                                       x-bind:readonly="pickedOrder !== null" />
                         <button type="button" @click="lookup()" x-show="! pickedOrder"
                                 class="shrink-0 px-4 py-2 rounded-lg border border-slate-300 text-slate-700 text-sm font-bold hover:bg-slate-50">
@@ -205,7 +206,8 @@
                     </label>
                     <p class="mt-0.5 text-[11px] text-slate-400" x-show="! pickedOrder && ! bypassFormat">
                         「英字1〜3文字＋数字」-「見積区分1文字＋2桁通番」の形式（例: Q001-N01、R101-N01B01）。
-                        装置番号だけを入力すると「-N01」を補います。ここで入力した注番が注番管理にも新規登録されます。
+                        英字は大文字に、装置番号だけの入力は「-N01」を補って扱います。
+                        注番管理にまだ無い注番はここで新規登録され、すでにある注番はそのまま使います。
                     </p>
                     <p class="mt-0.5 text-[11px] text-slate-500" x-show="pickedOrder" x-cloak>
                         取り込んだ注番です。変更する場合は上の「解除」を押してください。

@@ -60,12 +60,14 @@ class OrderNumber extends Model
      *
      * 全角で入力された英数字・ハイフンは半角に直す(過去に全角のＱで登録された注番が
      * 混ざっており、形式チェックにも検索にも掛からなくなるため)。
+     * 英字は大文字に揃える。見積番号の採番は大文字で保存するため、ここで揃えないと
+     * 同じ注番が大小2件に分かれ、注番マスタと受注ヘッダを共通で使えなくなる。
      * 「Q511」のように装置番号だけが入力された場合は、見積区分・通番の既定値を補って
      * 「Q511-N01」として扱う。
      */
     public static function normalizeCode(?string $code): string
     {
-        $code = trim(mb_convert_kana((string) $code, 'as'));
+        $code = strtoupper(trim(mb_convert_kana((string) $code, 'as')));
 
         if (preg_match('/^[A-Za-z]{1,3}\d{1,5}$/', $code)) {
             $code .= '-'.self::DEFAULT_SUFFIX;

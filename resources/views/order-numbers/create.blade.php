@@ -39,7 +39,8 @@
                             <x-text-input id="code" name="code" type="text" class="block w-full"
                                 x-ref="code"
                                 :value="old('code')" required autofocus
-                                x-bind:class="bypass ? '' : 'font-mono'"
+                                {{-- 形式チェックを解除しているときは日本語もそのまま登録するので大文字化しない。 --}}
+                                x-bind:class="bypass ? '' : 'font-mono uppercase'"
                                 x-bind:placeholder="bypass ? '例: 〇〇工事現場支給品' : '例: ZZ999-N99T99'" />
                             <button type="button" @click="lookup()"
                                     class="shrink-0 px-4 py-2 rounded-lg border border-slate-300 text-slate-700 text-sm font-bold hover:bg-slate-50">
@@ -48,7 +49,7 @@
                         </div>
                         <p class="mt-1 text-[11px] text-slate-400" x-show="! bypass">
                             「英字1〜3文字＋数字」-「見積区分1文字＋2桁通番」（例: Q001-N01、R101-N01B01、JSS11-N05B01H01）。
-                            装置番号だけを入力すると「-N01」を補います（Q511 → Q511-N01）。
+                            英字は大文字に直します。装置番号だけを入力すると「-N01」を補います（Q511 → Q511-N01）。
                         </p>
                         <p class="mt-1 text-[11px] text-amber-600" x-show="bypass" x-cloak>形式チェックを解除しています。日本語を含む自由な文字列で登録できます。</p>
                         <template x-if="lookupMessage">

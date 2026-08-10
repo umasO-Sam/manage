@@ -122,7 +122,6 @@ class ProjectBoardController extends Controller
             // 非表示にしたカードも「登録済み」として扱う(受注1件＝カード1枚のため)。
             'card_id' => $o->card?->id,
             'card_hidden' => (bool) $o->card?->trashed(),
-            'order_number_taken' => false,
             'detail_count' => 0,
             // Eloquent\Collection のまま merge するとモデル前提の処理に入るため、素のコレクションに落とす。
         ])->toBase()->values();
@@ -161,9 +160,6 @@ class ProjectBoardController extends Controller
             return collect();
         }
 
-        // 注番マスタに既にある注番は新規登録できないため、画面で選ばせない。
-        $taken = OrderNumber::whereIn('code', $codes)->pluck('code')->all();
-
         return PurchaseDetail::query()
             ->select(['item_code', 'product_name', 'recipient', 'delivery_dest', 'order_received_date', 'order_amount'])
             ->whereIn('item_code', $codes)
@@ -180,7 +176,6 @@ class ProjectBoardController extends Controller
                 'order_amount' => $this->representative($rows, 'order_amount'),
                 'card_id' => null,
                 'card_hidden' => false,
-                'order_number_taken' => in_array($code, $taken, true),
                 'detail_count' => $rows->count(),
             ])
             ->values();
@@ -232,9 +227,10 @@ class ProjectBoardController extends Controller
         $data = $request->validate([
             'order_no' => $existingOrder ? ['nullable'] : [
                 'required', 'string', 'max:255',
-                // 注番マスタと受注ヘッダの両方で重複を見る。過去の注番の大半は
-                // 注番マスタに存在しないため、マスタだけ見てもすり抜ける。
-                Rule::unique('order_numbers', 'code'),
+                // 重複を見るのは受注ヘッダだけ。注番マスタに既にある注番は弾かない。
+                // 受注より先に見積番号を採番し、その注番を注番管理に登録してから
+                // 受注が決まる流れがあるため(採番→注番管理→受注登録)。マスタの
+                // レコードは下の firstOrCreate で共通のものを使い回す。
                 Rule::unique('business_orders', 'order_no'),
                 ...($bypassFormat ? [] : ['regex:'.OrderNumber::FORMAT_REGEX]),
             ],

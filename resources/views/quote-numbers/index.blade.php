@@ -127,7 +127,10 @@
                     <div x-data="{ candidate: @js(old('full_no', $allocation['candidate'])), suggested: @js($allocation['candidate']) }">
                         <span class="block text-[11px] font-bold text-slate-600 mb-1">注番候補（必要なら直接編集できます）</span>
                         <div class="flex items-center gap-2 flex-wrap">
+                            {{-- 英字は必ず大文字で取得する(サーバー側でも大文字に直すが、
+                                 uppercase は見た目だけなので入力欄の値も揃えておく)。 --}}
                             <input type="text" name="full_no" x-model="candidate" required
+                                   @blur="candidate = candidate.toUpperCase()"
                                    class="border-2 rounded-lg px-3 py-2 border-slate-300 text-2xl font-mono font-bold text-slate-900 uppercase w-80">
                             <button type="button" @click="candidate = suggested" x-show="candidate !== suggested"
                                     class="px-3 py-1.5 rounded-lg border border-slate-300 text-slate-600 text-xs font-bold hover:bg-slate-50">

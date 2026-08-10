@@ -284,7 +284,11 @@ class ProjectBoardTest extends TestCase
         $this->assertSame('order', $rows->first()['source']);
     }
 
-    public function test_a_purchase_detail_whose_order_number_is_taken_cannot_be_picked(): void
+    /**
+     * 受注より先に見積番号を採番し、注番管理に登録してから受注が決まることがある。
+     * 注番マスタに既にあっても、明細から選んで受注登録できなければならない。
+     */
+    public function test_a_purchase_detail_whose_order_number_is_already_in_the_master_can_still_be_picked(): void
     {
         PurchaseDetail::create(['item_code' => 'TAKEN01-N01', 'product_name' => '既に採番済み']);
         OrderNumber::create(['code' => 'TAKEN01-N01']);
@@ -293,7 +297,8 @@ class ProjectBoardTest extends TestCase
             ->getJson(route('projects.orders.search', ['q' => 'TAKEN01']))->json('orders'))
             ->firstWhere('order_no', 'TAKEN01-N01');
 
-        $this->assertTrue($found['order_number_taken'], '注番マスタにある＝新規登録できないので選ばせない');
+        $this->assertNotNull($found, '注番マスタにあっても候補から外さない');
+        $this->assertSame('既に採番済み', $found['product_name']);
     }
 
     public function test_a_card_can_be_created_from_a_purchase_detail_order_number(): void
@@ -323,13 +328,31 @@ class ProjectBoardTest extends TestCase
         $this->assertSame('LEG002-N01', OrderNumber::where('code', 'LEG002-N01')->sole()->code);
     }
 
-    public function test_an_order_number_that_already_exists_is_rejected(): void
+    /**
+     * 受注前に採番して注番管理に登録しておく流れがあるため、注番マスタに既にある
+     * 注番でも受注登録できる。マスタは作り直さず同じレコードを使い回す。
+     */
+    public function test_an_order_number_that_is_already_in_the_master_is_reused(): void
+    {
+        $existing = OrderNumber::create(['code' => 'PJ001-N01', 'project_name' => '採番時の工事名']);
+
+        $card = $this->createCard($this->manager());
+
+        $this->assertSame(1, OrderNumber::where('code', 'PJ001-N01')->count(), '注番マスタを二重に作らない');
+        $this->assertSame($existing->id, $card->order_number_id);
+        // 件名は受注ヘッダを正とするため、採番時の工事名は受注の件名で上書きする。
+        $this->assertSame('搬送装置', $existing->fresh()->project_name);
+    }
+
+    /** 英字の大小で注番マスタが2件に分かれないこと。 */
+    public function test_a_lowercase_order_number_is_stored_in_uppercase(): void
     {
         OrderNumber::create(['code' => 'PJ001-N01']);
 
-        $this->actingAs($this->manager())
-            ->post(route('projects.store'), $this->payload(['is_new_partner' => '1', 'new_partner_name' => 'A社']))
-            ->assertSessionHasErrors('order_no');
+        $this->createCard($this->manager(), ['order_no' => 'pj001-n01']);
+
+        $this->assertSame(1, OrderNumber::where('code', 'PJ001-N01')->count());
+        $this->assertSame('PJ001-N01', BusinessOrder::sole()->order_no);
     }
 
     /**
