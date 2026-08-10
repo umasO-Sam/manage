@@ -164,6 +164,31 @@ class Staff extends Authenticatable
     }
 
     /**
+     * 作業日報一覧・勤務状況一覧の部署欄で使う短縮表記。
+     *
+     * この欄は幅6(1.5rem)しかないため既定では縦書きで並べているが、短縮した部署は
+     * 2文字に収まるので横書きにする(縦書きのままだと同じ2文字でも読みにくいため)。
+     * 短縮する部署はここだけで決め、2つの一覧で表記がずれないようにする。
+     *
+     * @var array<string, string>
+     */
+    public const DEPARTMENT_SHORT_LABELS = [
+        '電気制御' => '電制',
+    ];
+
+    /** 部署欄の表示名。短縮の対象でなければそのまま返す。 */
+    public static function departmentLabel(?string $department): string
+    {
+        return self::DEPARTMENT_SHORT_LABELS[$department] ?? (string) $department;
+    }
+
+    /** その部署を横書きで出すか(＝短縮表記の対象か)。 */
+    public static function departmentIsHorizontal(?string $department): bool
+    {
+        return array_key_exists((string) $department, self::DEPARTMENT_SHORT_LABELS);
+    }
+
+    /**
      * 承認済み申請の取消を、上長の承認後に反映してよいか判断できるか。
      * 日報管理者と違いロールは問わない(勤怠は部署をまたいで見る必要があるため)。
      */

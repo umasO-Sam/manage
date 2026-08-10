@@ -69,10 +69,13 @@
                                 @endphp
                                 <tr class="{{ $rowIndex % 2 === 0 ? 'bg-slate-50' : 'bg-white' }} hover:bg-blue-50">
                                     @if ($loop->first)
+                                        {{-- 部署欄は幅が狭いので既定は縦書き。2文字に縮めた部署だけ横書きにする
+                                             (表記と縦横の判定は Staff::DEPARTMENT_SHORT_LABELS の1箇所で決める)。 --}}
                                         <td rowspan="{{ $staffInGroup->count() }}"
-                                            class="sticky left-0 z-10 bg-slate-50 text-center font-semibold text-slate-600 border-r border-slate-200 align-middle w-6 {{ $groupBorder }}"
-                                            style="writing-mode: vertical-rl;">
-                                            {{ $department }}
+                                            class="sticky left-0 z-10 bg-slate-50 text-center font-semibold text-slate-600 border-r border-slate-200 align-middle w-6 whitespace-nowrap {{ $groupBorder }}"
+                                            @unless (\App\Models\Staff::departmentIsHorizontal($department)) style="writing-mode: vertical-rl;" @endunless
+                                            title="{{ $department }}">
+                                            {{ \App\Models\Staff::departmentLabel($department) }}
                                         </td>
                                     @endif
                                     <td class="sticky left-6 z-10 {{ $rowIndex % 2 === 0 ? 'bg-slate-50' : 'bg-white' }} py-0.5 px-1.5 font-semibold text-slate-800 whitespace-nowrap border-r border-slate-200 {{ $groupBorder }}">
