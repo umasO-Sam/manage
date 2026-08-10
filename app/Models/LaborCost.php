@@ -9,11 +9,18 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 #[Fillable([
     'work_date', 'staff_id', 'order_no', 'machine_no', 'category_id', 'work_hours',
-    'work_minutes', 'is_overtime', 'position_weight_cache', 'note', 'is_provisional', 'daily_report_id',
+    'work_minutes', 'is_overtime', 'position_weight_cache', 'note', 'is_provisional',
+    'daily_report_id', 'origin',
 ])]
 class LaborCost extends Model
 {
     use HasFactory;
+
+    /** 作業日報の時間帯グリッドから作られたもの。日報の再提出で作り直される。 */
+    public const ORIGIN_DAILY_REPORT = 'daily_report';
+
+    /** 仕入管理のデータ入力(社内人工・エクセル一括)から作られたもの。 */
+    public const ORIGIN_PURCHASE_INPUT = 'purchase_input';
 
     protected function casts(): array
     {

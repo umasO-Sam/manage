@@ -242,7 +242,11 @@ class DailyReportController extends Controller
             $groups[$key]['minutes'] += $entry->end_minute - $entry->start_minute;
         }
 
-        LaborCost::where('daily_report_id', $report->id)->delete();
+        // 消すのは前回この日報のグリッドから作った分だけ。仕入管理のデータ入力から
+        // 同じ日・同じ担当者としてぶら下がっている人工は、本人の再提出では消さない。
+        LaborCost::where('daily_report_id', $report->id)
+            ->where('origin', LaborCost::ORIGIN_DAILY_REPORT)
+            ->delete();
 
         $staff = $report->staff;
 
@@ -263,6 +267,7 @@ class DailyReportController extends Controller
                 'position_weight_cache' => $staff?->position_weight,
                 'note' => $group['note'],
                 'is_provisional' => true,
+                'origin' => LaborCost::ORIGIN_DAILY_REPORT,
             ]);
         }
     }

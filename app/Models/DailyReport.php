@@ -61,4 +61,31 @@ class DailyReport extends Model
     {
         return $this->proxy_staff_id !== null;
     }
+
+    /**
+     * その担当者・その日の日報を、無ければ作って返す。
+     *
+     * 仕入管理のデータ入力で登録した人工を、作業日・担当者から「その日の日報」として
+     * 確認対象に載せるために使う。確認画面は提出済み(submitted_at)のものだけを並べる
+     * ため、新規に作る場合は提出済みとして作る。すでに本人が出している日報があれば
+     * それにぶら下げる(1人1日1枚のため)。
+     *
+     * work_date は date キャストの保存値が接続の書式になるので、whereDate で日付だけを見る。
+     */
+    public static function containerFor(int $staffId, string $workDate): self
+    {
+        $report = static::where('staff_id', $staffId)->whereDate('work_date', $workDate)->first();
+
+        if ($report === null) {
+            $report = static::create([
+                'staff_id' => $staffId,
+                'work_date' => $workDate,
+                'submitted_at' => now(),
+            ]);
+        } elseif (! $report->isSubmitted()) {
+            $report->update(['submitted_at' => now()]);
+        }
+
+        return $report;
+    }
 }

@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\BusinessOrder;
 use App\Models\CategoryCode;
+use App\Models\DailyReport;
 use App\Models\LaborCost;
 use App\Models\PurchaseDetail;
 use App\Models\Staff;
@@ -565,7 +566,15 @@ class PurchasingModuleTest extends TestCase
         $this->assertSame(1, $laborCost->work_hours);
         $this->assertSame(30, $laborCost->work_minutes);
         $this->assertTrue($laborCost->is_overtime);
-        $this->assertFalse($laborCost->is_provisional);
+
+        // 作業日・担当者からその日の日報にぶら下げ、確認されるまでは未確認のまま置く。
+        $this->assertTrue($laborCost->is_provisional);
+        $this->assertSame(LaborCost::ORIGIN_PURCHASE_INPUT, $laborCost->origin);
+        $report = DailyReport::sole();
+        $this->assertSame($report->id, $laborCost->daily_report_id);
+        $this->assertSame($worker->id, $report->staff_id);
+        $this->assertSame('2026-06-17', $report->work_date->toDateString());
+        $this->assertNotNull($report->submitted_at, '確認画面に載せるため提出済みとして作る');
     }
 
     public function test_labor_bulk_paste_registers_multiple_rows_and_treats_blank_overtime_as_false(): void

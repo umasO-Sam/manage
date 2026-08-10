@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\BusinessOrder;
 use App\Models\CategoryCode;
+use App\Models\DailyReport;
 use App\Models\LaborCost;
 use App\Models\PurchaseDetail;
 use App\Models\Staff;
@@ -95,14 +96,43 @@ class PurchaseInputController extends Controller
         $data['category_id'] = $data['labor_category_id'] ?? null;
         unset($data['labor_machine_no'], $data['labor_category_id']);
         $data['is_overtime'] = $request->boolean('is_overtime');
-        $data['is_provisional'] = $isProvisional;
         $data['position_weight_cache'] = $data['staff_id'] ?? null
             ? Staff::find($data['staff_id'])?->position_weight
             : null;
 
-        LaborCost::create($data);
+        LaborCost::create($this->asDailyReportLabor($data, $isProvisional));
 
         return redirect()->route('purchasing.input')->with('status', $isProvisional ? 'input-provisional' : 'input-created');
+    }
+
+    /**
+     * 仕入管理から入れた人工を、作業日・担当者から「その日の日報」にぶら下げて
+     * 作業日報の確認対象に載せる。確認されるまでは仮登録のままなので、原価計算には
+     * まだ乗らない(作業日報のグリッドから入れた分と同じ扱い)。
+     *
+     * 作業日か担当者が欠けている仮登録は日報を特定できないため、従来どおり
+     * どの日報にも紐づけずに残す(あとで修正して揃えてもらう)。
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    private function asDailyReportLabor(array $data, bool $isProvisional): array
+    {
+        $data['origin'] = LaborCost::ORIGIN_PURCHASE_INPUT;
+
+        if ($isProvisional || empty($data['work_date']) || empty($data['staff_id'])) {
+            $data['is_provisional'] = true;
+
+            return $data;
+        }
+
+        $report = DailyReport::containerFor((int) $data['staff_id'], (string) $data['work_date']);
+
+        $data['daily_report_id'] = $report->id;
+        // 日報として確認・確定してもらうため、登録時点では未確認にする。
+        $data['is_provisional'] = true;
+
+        return $data;
     }
 
     /**
@@ -307,7 +337,6 @@ class PurchaseInputController extends Controller
                 'is_overtime' => in_array(strtoupper($overtimeText), ['TRUE', '1'], true),
                 'position_weight_cache' => $staff?->position_weight,
                 'note' => $note !== '' ? $note : null,
-                'is_provisional' => false,
             ];
         }
 
@@ -324,7 +353,10 @@ class PurchaseInputController extends Controller
 
         DB::transaction(function () use ($rows) {
             foreach ($rows as $row) {
-                LaborCost::create($row);
+                // 確認画面の表示用に足した列はDBに無いので、保存前に落とす。
+                unset($row['staff_name'], $row['sid_display'], $row['category_display']);
+
+                LaborCost::create($this->asDailyReportLabor($row, isProvisional: false));
             }
         });
 

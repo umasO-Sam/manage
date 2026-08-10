@@ -27,6 +27,24 @@ class LaborRecordTest extends TestCase
         $this->actingAs($manager)->get(route('labor-records.index'))->assertOk();
     }
 
+    /**
+     * 修正フォームは表の幅ではなく画面の幅に収める。表が横スクロールしていても
+     * 左端に貼り付いたまま全体が見えるようにするため(スクロールしないと右側の
+     * 項目が見えない状態だった)。
+     */
+    public function test_the_edit_form_fits_in_the_viewport_without_horizontal_scrolling(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        LaborCost::create([
+            'work_date' => '2026-08-05', 'staff_id' => $manager->id,
+            'work_hours' => 1, 'work_minutes' => 0, 'is_provisional' => false,
+        ]);
+
+        $this->actingAs($manager)->get(route('labor-records.index'))
+            ->assertOk()
+            ->assertSee('position: sticky; left: 0; max-width: calc(100vw - 4rem);', false);
+    }
+
     public function test_supervisor_cannot_access_the_page(): void
     {
         $supervisor = Staff::factory()->create(['is_supervisor' => true]);
@@ -163,9 +181,13 @@ class LaborRecordTest extends TestCase
         $staff = Staff::factory()->create();
         $report = DailyReport::create(['staff_id' => $staff->id, 'work_date' => '2026-08-05', 'submitted_at' => now()]);
 
+        // 仕入管理から入れた人工も日報にぶら下がるため、daily_report_idの有無ではなく
+        // originで見分ける。どちらも同じ日報に属する状況を再現する。
         LaborCost::create(['work_date' => '2026-08-05', 'staff_id' => $staff->id, 'daily_report_id' => $report->id,
+            'origin' => LaborCost::ORIGIN_DAILY_REPORT,
             'order_no' => 'FROM-REPORT', 'work_hours' => 1, 'work_minutes' => 0, 'is_overtime' => false, 'is_provisional' => false]);
-        LaborCost::create(['work_date' => '2026-08-05', 'staff_id' => $staff->id,
+        LaborCost::create(['work_date' => '2026-08-05', 'staff_id' => $staff->id, 'daily_report_id' => $report->id,
+            'origin' => LaborCost::ORIGIN_PURCHASE_INPUT,
             'order_no' => 'FROM-INPUT', 'work_hours' => 1, 'work_minutes' => 0, 'is_overtime' => false, 'is_provisional' => false]);
 
         $this->actingAs($manager)->get(route('labor-records.index', ['source' => 'purchase_input']))

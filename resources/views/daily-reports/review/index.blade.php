@@ -118,6 +118,50 @@
                             </form>
                         @endif
                     </div>
+                    {{-- 仕入管理のデータ入力から入った人工。時間帯を持たないのでグリッドには
+                         出ず、ここに明細として並べる。確認・差し戻しの対象は日報単位で同じ。 --}}
+                    @if ($report->laborCosts->isNotEmpty())
+                        <div class="px-4 pt-4">
+                            <p class="text-[11px] font-bold text-slate-600 mb-1">
+                                仕入管理のデータ入力から登録された人工（{{ $report->laborCosts->count() }} 件）
+                            </p>
+                            <div class="overflow-x-auto rounded-lg border border-blue-200">
+                                <table class="w-full text-left border-collapse text-xs">
+                                    <thead>
+                                        <tr class="bg-blue-50 border-b border-blue-200 font-semibold text-slate-600">
+                                            <th class="p-2 whitespace-nowrap">注番</th>
+                                            <th class="p-2 whitespace-nowrap">機械装置No</th>
+                                            <th class="p-2">作業内容</th>
+                                            <th class="p-2 text-right whitespace-nowrap">時間</th>
+                                            <th class="p-2 text-right whitespace-nowrap">人工</th>
+                                            <th class="p-2">補足</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-slate-100">
+                                        @foreach ($report->laborCosts as $labor)
+                                            <tr>
+                                                <td class="p-2 font-mono whitespace-nowrap">{{ $labor->order_no ?: '—' }}</td>
+                                                <td class="p-2 font-mono whitespace-nowrap">{{ $labor->machine_no ?: '—' }}</td>
+                                                <td class="p-2">{{ $labor->category?->item_name ?? '未分類' }}</td>
+                                                <td class="p-2 text-right whitespace-nowrap">
+                                                    {{ $labor->work_hours }}h {{ $labor->work_minutes }}m
+                                                    @if ($labor->is_overtime)
+                                                        <span class="text-[10px] font-bold px-1 py-0.5 rounded bg-orange-100 text-orange-700 border border-orange-200">時間外</span>
+                                                    @endif
+                                                </td>
+                                                <td class="p-2 text-right font-bold text-slate-700 whitespace-nowrap">{{ round($labor->totalMinutes() / 480, 3) }}</td>
+                                                <td class="p-2 text-slate-500">{{ $labor->note }}</td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    @endif
+
+                    {{-- 時間帯グリッドは本人が作業日報で入れた分のみ。仕入管理から入った人工
+                         だけの日報は時間帯を持たないため、空のグリッドは出さない。 --}}
+                    @if ($report->entries->isNotEmpty())
                     <div class="p-4"
                          x-data="reviewGrid({
                             entries: {{ \Illuminate\Support\Js::from($report->entries->map(fn ($e) => [
@@ -151,6 +195,7 @@
                             </div>
                         </div>
                     </div>
+                    @endif
                 </div>
             @empty
                 <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-8 text-center text-slate-400 text-sm">

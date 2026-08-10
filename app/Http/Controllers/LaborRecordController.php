@@ -15,7 +15,7 @@ class LaborRecordController extends Controller
     /**
      * 作業日報の確認で確定した人工レコードと、仕入管理のデータ入力で登録した人工レコードを
      * 同じ一覧で確認する。どちらも確定済み(is_provisional=false)が対象で、
-     * daily_report_idの有無で「日報」「仕入入力」を区別して表示する。
+     * originで「日報」「仕入入力」を区別して表示する。
      * 未確定(is_provisional=true)の日報由来レコードは作業日報確認で扱うためここには出さない。
      */
     public function index(Request $request): View
@@ -47,10 +47,10 @@ class LaborRecordController extends Controller
         if ($orderNo !== '') {
             $query->where('order_no', 'like', '%'.$orderNo.'%');
         }
-        if ($source === 'daily_report') {
-            $query->whereNotNull('daily_report_id');
-        } elseif ($source === 'purchase_input') {
-            $query->whereNull('daily_report_id');
+        // 仕入管理から入れた人工も日報にぶら下がるようになったため、daily_report_idの
+        // 有無ではなく origin で見分ける。
+        if (in_array($source, [LaborCost::ORIGIN_DAILY_REPORT, LaborCost::ORIGIN_PURCHASE_INPUT], true)) {
+            $query->where('origin', $source);
         }
 
         $records = $query->orderByDesc('work_date')->orderByDesc('id')->paginate(100)->withQueryString();

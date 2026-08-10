@@ -124,7 +124,7 @@
                                             </td>
                                             <td class="p-2.5 text-right font-bold text-slate-700 whitespace-nowrap">{{ round($record->totalMinutes() / 480, 3) }}</td>
                                             <td class="p-2.5 whitespace-nowrap">
-                                                @if ($record->daily_report_id)
+                                                @if ($record->origin === \App\Models\LaborCost::ORIGIN_DAILY_REPORT)
                                                     <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 border border-emerald-200">作業日報</span>
                                                 @else
                                                     <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 border border-blue-200">仕入入力</span>
@@ -146,9 +146,14 @@
                                             </td>
                                         </tr>
                                         <tr x-show="editing" x-cloak class="bg-slate-50">
-                                            <td colspan="9" class="p-3">
+                                            {{-- 編集フォームは表の幅（＝横スクロールが要る幅）に広がってしまい、
+                                                 スクロールしないと右側の項目が見えなかった。スクロール領域の左端に
+                                                 貼り付け、幅を画面内に収めることで、横スクロールなしで全体が見える。
+                                                 Tailwindの任意値クラスはビルドできないためインラインstyleで指定する。 --}}
+                                            <td colspan="9" class="p-0">
                                                 <form method="POST" action="{{ route('labor-records.update', $record) }}"
-                                                      class="flex flex-wrap items-end gap-3">
+                                                      class="flex flex-wrap items-end gap-3 p-3"
+                                                      style="position: sticky; left: 0; max-width: calc(100vw - 4rem); box-sizing: border-box;">
                                                     @csrf
                                                     @method('PUT')
                                                     <label class="block">
@@ -203,7 +208,7 @@
                                                         <button type="button" @click="editing = false"
                                                                 class="px-3 py-1.5 rounded-lg border border-slate-300 text-slate-600 text-xs font-bold">取消</button>
                                                     </div>
-                                                    @if ($record->daily_report_id)
+                                                    @if ($record->origin === \App\Models\LaborCost::ORIGIN_DAILY_REPORT)
                                                         <p class="w-full text-[11px] text-amber-700">
                                                             このレコードは作業日報から生成されています。本人が同じ日の日報を修正提出すると、この修正内容は日報の内容で作り直されます。
                                                         </p>

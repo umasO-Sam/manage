@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Mail\DailyReportRejectedMail;
 use App\Models\CategoryCode;
 use App\Models\DailyReport;
 use App\Models\LaborCost;
@@ -11,7 +12,10 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\View\View;
+use Throwable;
 
 /**
  * 作業日報確認画面。日付単位で、提出された作業日報を確認済・未確認の別とともに一覧する。
@@ -42,6 +46,10 @@ class DailyReportReviewController extends Controller
                 'proxyStaff',
                 'entries' => fn ($q) => $q->orderBy('start_minute'),
                 'entries.category',
+                // 仕入管理のデータ入力から同じ日・同じ担当者としてぶら下がった人工。
+                // 時間帯を持たないためグリッドには出ず、明細として並べる。
+                'laborCosts' => fn ($q) => $q->where('origin', LaborCost::ORIGIN_PURCHASE_INPUT)->orderBy('id'),
+                'laborCosts.category',
             ])
             ->get()
             ->sortBy(fn (DailyReport $r) => $r->staff->name)
@@ -171,9 +179,35 @@ class DailyReportReviewController extends Controller
             );
         });
 
+        $this->notifyRejection($dailyReport);
+
         return back()->with('status', $dailyReport->isProxySubmitted()
             ? 'daily-report-rejected-to-proxy'
             : 'daily-report-rejected');
+    }
+
+    /**
+     * 差し戻しを直す人に通知する。代理提出されたものは本人ではなく代理提出者が直すため、
+     * そちらへ送る。確認(承認)時は通知しない(ユーザーの指示。行動を求めないため)。
+     *
+     * メール送信に失敗しても、すでに成立している差し戻しまで失敗扱いにはしない
+     * (LeaveRequestController::sendNotification()と同じ方針)。
+     */
+    private function notifyRejection(DailyReport $dailyReport): void
+    {
+        $recipient = $dailyReport->isProxySubmitted()
+            ? $dailyReport->proxyStaff
+            : $dailyReport->staff;
+
+        if ($recipient?->email === null) {
+            return;
+        }
+
+        try {
+            Mail::to($recipient->email)->send(new DailyReportRejectedMail($dailyReport));
+        } catch (Throwable $e) {
+            Log::error("作業日報の差し戻し通知の送信に失敗しました（宛先: {$recipient->email}）: {$e->getMessage()}");
+        }
     }
 
     /**

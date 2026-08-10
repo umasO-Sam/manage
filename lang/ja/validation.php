@@ -246,6 +246,12 @@ return [
         // カードコメント
         'body' => 'コメント内容',
 
+        // カードの添付ファイル
+        'attachments' => '添付ファイル',
+        'attachments.*' => '添付ファイル',
+        'remove_attachments' => '削除する添付ファイル',
+        'remove_attachments.*' => '削除する添付ファイル',
+
         // 注番管理
         'project_name' => '工事名',
 
@@ -283,6 +289,76 @@ return [
         'telegram_declined' => '電報の辞退',
         'action' => '操作',
         'rejection_reason' => '却下理由',
+        'half_day_period' => '午前／午後',
+        'cancel_reason' => '取消の理由',
+        'cancel_rejection_reason' => '差し戻しの理由',
+
+        // 作業日報の1コマごとの項目。「entries.3.order_no」のような添字付きでも
+        // 拾えるよう、ワイルドカードの形でも定義しておく。
+        'entries.*.start_minute' => '開始時刻',
+        'entries.*.end_minute' => '終了時刻',
+        'entries.*.order_no' => '注番',
+        'entries.*.category_id' => '作業分類',
+        'entries.*.is_other' => 'その他',
+        'entries.*.free_text' => '自由記入',
+        'entries.*.is_break' => '休憩',
+        'entries.*.is_leave' => '休暇',
+        'entries.*.leave_type' => '休暇の種類',
+
+        // 人工計算・仕入管理のデータ入力(続き)
+        'is_overtime' => '時間外',
+        'labor_paste_data' => '貼り付け欄',
+        'ids' => '対象の選択',
+        'ids.*' => '対象の選択',
+
+        // 見積番号の採番
+        'customer_code' => '客先番号',
+        'mode' => '案件種別',
+        'unit_no' => '通番',
+        'base_no' => '元の見積番号',
+        'full_no' => '注番',
+        'company_name' => '客先会社名',
+        'customer_contact' => '客先担当者',
+        'completed_on' => '完了日',
+        'note_no' => 'ノートNo',
+
+        // 物件管理・受注登録
+        'business_partner_id' => '受注先',
+        'new_partner_name' => '新規取引先名',
+        'is_direct_delivery_only' => '直送のみ',
+        'invoice_confirmed' => '請求書の確認',
+        'file' => '添付ファイル',
+
+        // 取引先一覧
+        'transaction_type' => '取引区分',
+        'closing_day' => '締日',
+        'payment_terms' => '支払条件',
+        'bank' => '振込先',
+
+        // 注文書・明細書
+        'staff_name' => '担当者名',
+        'staff_phone' => '担当者電話番号',
+        'target_ids' => '対象の選択',
+        'target_ids.*' => '対象の選択',
+        'date_type' => '日付の種類',
+        'date_from' => '開始日',
+        'date_to' => '終了日',
+
+        // 注番管理
+        'show_in_dropdown' => 'プルダウンに表示',
+
+        // 休日マスタ
+        'date' => '日付',
+
+        // 担当者管理・権限
+        'sid' => 'SID',
+        'display_order' => '表示順',
+        'excluded_from_rosters' => '名簿に表示しない',
+        'is_daily_report_reviewer' => '日報管理者',
+        'is_attendance_manager' => '勤怠管理者',
+        'is_executive' => '役員',
+        'is_fund_manager' => '資金管理者',
+        'is_administrator' => 'administrator',
     ],
 
 ];
