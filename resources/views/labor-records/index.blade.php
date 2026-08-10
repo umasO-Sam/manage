@@ -115,7 +115,11 @@
                                             <td class="p-2.5 whitespace-nowrap">{{ $record->work_date?->format('Y/m/d') }}</td>
                                             <td class="p-2.5 font-bold whitespace-nowrap">{{ $record->staff?->name ?? '-' }}</td>
                                             <td class="p-2.5 font-mono whitespace-nowrap">{{ $record->order_no ?: '-' }}</td>
-                                            <td class="p-2.5">{{ $record->category?->item_name ?? '未分類' }}</td>
+                                            {{-- 分類名は200文字を超えることがある。幅を抑えて折り返させないと、
+                                                 表そのものが横に伸びて右側の列が見切れる。 --}}
+                                            <td class="p-2.5">
+                                                <div style="min-width: 11rem; max-width: 16rem; word-break: break-word;">{{ $record->category?->item_name ?? '未分類' }}</div>
+                                            </td>
                                             <td class="p-2.5 text-right whitespace-nowrap">
                                                 {{ $record->work_hours }}h {{ $record->work_minutes }}m
                                                 @if ($record->is_overtime)
@@ -130,7 +134,9 @@
                                                     <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 border border-blue-200">仕入入力</span>
                                                 @endif
                                             </td>
-                                            <td class="p-2.5 text-slate-500">{{ $record->note }}</td>
+                                            <td class="p-2.5 text-slate-500">
+                                                <div style="min-width: 8rem; max-width: 14rem; word-break: break-word;">{{ $record->note }}</div>
+                                            </td>
                                             <td class="p-2.5 whitespace-nowrap text-center">
                                                 <div class="flex items-center gap-1 justify-center">
                                                     <button type="button" @click="editing = ! editing"
@@ -146,14 +152,14 @@
                                             </td>
                                         </tr>
                                         <tr x-show="editing" x-cloak class="bg-slate-50">
-                                            {{-- 編集フォームは表の幅（＝横スクロールが要る幅）に広がってしまい、
-                                                 スクロールしないと右側の項目が見えなかった。スクロール領域の左端に
-                                                 貼り付け、幅を画面内に収めることで、横スクロールなしで全体が見える。
+                                            {{-- 幅の要になるのは分類のセレクト。selectの既定幅は最も長い選択肢
+                                                 （分類名は200文字を超えるものがある）で決まるため、幅を指定しないと
+                                                 表ごと数千pxに広がり、保存ボタンまで右に見切れる。ここで幅を抑えれば
+                                                 表は画面内に収まり、項目は折り返して複数行に並ぶ。
                                                  Tailwindの任意値クラスはビルドできないためインラインstyleで指定する。 --}}
-                                            <td colspan="9" class="p-0">
+                                            <td colspan="9" class="p-3">
                                                 <form method="POST" action="{{ route('labor-records.update', $record) }}"
-                                                      class="flex flex-wrap items-end gap-3 p-3"
-                                                      style="position: sticky; left: 0; max-width: calc(100vw - 4rem); box-sizing: border-box;">
+                                                      class="flex flex-wrap items-end gap-3">
                                                     @csrf
                                                     @method('PUT')
                                                     <label class="block">
@@ -163,7 +169,8 @@
                                                     </label>
                                                     <label class="block">
                                                         <span class="block text-[11px] font-bold text-slate-600 mb-0.5">担当者</span>
-                                                        <select name="staff_id" class="border rounded-lg p-1.5 border-slate-300 text-xs" required>
+                                                        <select name="staff_id" class="border rounded-lg p-1.5 border-slate-300 text-xs"
+                                                                style="width: 9rem;" required>
                                                             @foreach ($staffList as $person)
                                                                 <option value="{{ $person->id }}" @selected($record->staff_id === $person->id)>{{ $person->name }}</option>
                                                             @endforeach
@@ -176,10 +183,14 @@
                                                     </label>
                                                     <label class="block">
                                                         <span class="block text-[11px] font-bold text-slate-600 mb-0.5">分類</span>
-                                                        <select name="category_id" class="border rounded-lg p-1.5 border-slate-300 text-xs">
+                                                        {{-- 選択肢は200文字を超えることがある。閉じている間は幅を固定して
+                                                             表を広げないようにし、開いたときは一覧側で全文が読める。 --}}
+                                                        <select name="category_id" class="border rounded-lg p-1.5 border-slate-300 text-xs"
+                                                                style="width: 16rem;">
                                                             <option value="">未分類</option>
                                                             @foreach ($editableCategories as $category)
-                                                                <option value="{{ $category->id }}" @selected($record->category_id === $category->id)>{{ $category->code }}：{{ $category->item_name }}</option>
+                                                                <option value="{{ $category->id }}" @selected($record->category_id === $category->id)
+                                                                        title="{{ $category->code }}：{{ $category->item_name }}">{{ $category->code }}：{{ $category->item_name }}</option>
                                                             @endforeach
                                                         </select>
                                                     </label>

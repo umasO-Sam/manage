@@ -28,21 +28,27 @@ class LaborRecordTest extends TestCase
     }
 
     /**
-     * 修正フォームは表の幅ではなく画面の幅に収める。表が横スクロールしていても
-     * 左端に貼り付いたまま全体が見えるようにするため(スクロールしないと右側の
-     * 項目が見えない状態だった)。
+     * 修正フォームの幅を決めていたのは分類のセレクト。selectの既定幅は最も長い選択肢で
+     * 決まり、分類名は200文字を超えるものがあるため、幅を指定しないと表ごと数千pxに
+     * 広がって保存ボタンまで右に見切れる。幅を固定していることを固定する。
      */
-    public function test_the_edit_form_fits_in_the_viewport_without_horizontal_scrolling(): void
+    public function test_the_category_select_has_a_fixed_width_so_the_table_does_not_stretch(): void
     {
         $manager = Staff::factory()->procurementManager()->create();
+        $longName = str_repeat('バルブ・配管材料・レギュレータ・', 12);
+        $category = $this->makeCategory('29', $longName);
         LaborCost::create([
-            'work_date' => '2026-08-05', 'staff_id' => $manager->id,
+            'work_date' => '2026-08-05', 'staff_id' => $manager->id, 'category_id' => $category->id,
             'work_hours' => 1, 'work_minutes' => 0, 'is_provisional' => false,
         ]);
 
         $this->actingAs($manager)->get(route('labor-records.index'))
             ->assertOk()
-            ->assertSee('position: sticky; left: 0; max-width: calc(100vw - 4rem);', false);
+            // 編集フォームの分類セレクト
+            ->assertSee('style="width: 16rem;"', false)
+            // 一覧の分類・補足は折り返して複数行にする
+            ->assertSee('min-width: 11rem; max-width: 16rem; word-break: break-word;', false)
+            ->assertSee('min-width: 8rem; max-width: 14rem; word-break: break-word;', false);
     }
 
     public function test_supervisor_cannot_access_the_page(): void
