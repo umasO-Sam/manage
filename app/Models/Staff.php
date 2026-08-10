@@ -288,8 +288,8 @@ class Staff extends Authenticatable
     }
 
     /**
-     * 勤怠管理者の反映確認待ち件数。担当が1人に固定されていないため、
-     * 勤怠管理者全員に同じ件数を出す。
+     * 勤怠管理者の確認待ち件数(取消の反映確認 ＋ 上長承認済みの休日勤務)。
+     * 担当が1人に固定されていないため、勤怠管理者全員に同じ件数を出す。
      */
     public function pendingCancelReflectionCount(): int
     {
@@ -297,9 +297,26 @@ class Staff extends Authenticatable
             return 0;
         }
 
-        return LeaveRequest::where('status', LeaveRequest::STATUS_APPROVED)
-            ->where('cancel_status', LeaveRequest::CANCEL_PENDING_REFLECTION)
+        return LeaveRequest::where(fn ($q) => $q
+            ->where(fn ($w) => $w
+                ->where('status', LeaveRequest::STATUS_APPROVED)
+                ->where('cancel_status', LeaveRequest::CANCEL_PENDING_REFLECTION))
+            ->orWhere('status', LeaveRequest::STATUS_PENDING_ATTENDANCE))
             ->count();
+    }
+
+    /**
+     * 自分が代理提出した作業日報のうち、差し戻されたままのもの(バッジ・一覧表示用)。
+     * 本人ではなく代理提出した勤怠管理者が直す約束のため、本人の画面には出さない。
+     *
+     * @return \Illuminate\Database\Eloquent\Builder<DailyReport>
+     */
+    public function rejectedProxyReportsQuery()
+    {
+        return DailyReport::where('proxy_staff_id', $this->id)
+            ->whereNotNull('rejected_at')
+            ->with('staff')
+            ->orderBy('work_date');
     }
 
     /**

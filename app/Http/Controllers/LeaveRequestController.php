@@ -349,31 +349,129 @@ class LeaveRequestController extends Controller
             'rejection_reason' => ['nullable', 'string', 'max:2000', 'required_if:action,reject'],
         ]);
 
+        $approved = $data['action'] === 'approve';
+
         // 状態更新と操作ログは必ず対で残す(片方だけ成立して履歴が欠けるのを防ぐ)。
-        DB::transaction(function () use ($leaveRequest, $data) {
+        DB::transaction(function () use ($leaveRequest, $data, $approved) {
             $leaveRequest->update([
-                'status' => $data['action'] === 'approve' ? LeaveRequest::STATUS_APPROVED : LeaveRequest::STATUS_REJECTED,
-                'rejection_reason' => $data['action'] === 'reject' ? $data['rejection_reason'] : null,
+                'status' => $approved ? $this->statusAfterSupervisorApproval($leaveRequest) : LeaveRequest::STATUS_REJECTED,
+                'rejection_reason' => $approved ? null : $data['rejection_reason'],
                 'approved_at' => now(),
+                'supervisor_approved_at' => $approved ? now() : null,
             ]);
 
             OperationLog::record(
-                $data['action'] === 'approve' ? OperationLog::ACTION_LEAVE_REQUEST_APPROVE : OperationLog::ACTION_LEAVE_REQUEST_REJECT,
+                $approved ? OperationLog::ACTION_LEAVE_REQUEST_APPROVE : OperationLog::ACTION_LEAVE_REQUEST_REJECT,
                 $leaveRequest,
                 $leaveRequest->staff_id,
-                $data['action'] === 'reject' ? $data['rejection_reason'] : null
+                $approved ? null : $data['rejection_reason']
             );
         });
+
+        $this->notifyAfterSupervisorDecision($leaveRequest, $approved);
+
+        return redirect()->route('leave-requests.approvals')->with('status', 'leave-request-decided');
+    }
+
+    /**
+     * 上長が承認したあとの状態。休日勤務は勤怠管理者の確認を経て初めて承認済みになる。
+     * ここで承認済みにしてしまうと、勤務状況一覧や振替休日が未確定のまま確定扱いになる。
+     */
+    private function statusAfterSupervisorApproval(LeaveRequest $leaveRequest): string
+    {
+        return $leaveRequest->needsAttendanceApproval()
+            ? LeaveRequest::STATUS_PENDING_ATTENDANCE
+            : LeaveRequest::STATUS_APPROVED;
+    }
+
+    /**
+     * 上長の判断後の通知。勤怠管理者の確認が要る申請は、本人ではなく勤怠管理者へ回す
+     * (本人にはまだ結果が出ていないため「承認されました」とは言えない)。
+     */
+    private function notifyAfterSupervisorDecision(LeaveRequest $leaveRequest, bool $approved): void
+    {
+        if ($approved && $leaveRequest->isPendingAttendance()) {
+            foreach ($this->attendanceManagers() as $manager) {
+                $this->sendNotification(
+                    $manager->email,
+                    new LeaveRequestNotificationMail($leaveRequest, '上長承認済みの休日勤務申請の確認をお願いします')
+                );
+            }
+
+            $this->sendNotification(
+                $leaveRequest->staff->email,
+                new LeaveRequestNotificationMail($leaveRequest, '上長が承認しました（勤怠管理者の確認待ちです）')
+            );
+
+            return;
+        }
 
         $this->sendNotification(
             $leaveRequest->staff->email,
             new LeaveRequestNotificationMail(
                 $leaveRequest,
-                $data['action'] === 'approve' ? '申請が承認されました' : '申請が却下されました'
+                $approved ? '申請が承認されました' : '申請が却下されました'
             )
         );
+    }
 
-        return redirect()->route('leave-requests.approvals')->with('status', 'leave-request-decided');
+    /**
+     * 反映確認・休日勤務の確認を依頼する相手。担当が1人に固定されていないため全員に送る。
+     *
+     * @return \Illuminate\Support\Collection<int, Staff>
+     */
+    private function attendanceManagers()
+    {
+        return Staff::where('is_attendance_manager', true)->orWhere('is_administrator', true)->get();
+    }
+
+    /**
+     * 勤怠管理者による休日勤務申請の確認。ここで承認して初めて承認済みになる。
+     * 差し戻す場合は却下として扱い、本人と上長の双方に理由を伝える
+     * (上長が一度通した判断を覆すため、上長にも届かないと経緯が追えない)。
+     */
+    public function attendanceDecide(Request $request, LeaveRequest $leaveRequest): RedirectResponse
+    {
+        $this->authorize('attendanceDecide', $leaveRequest);
+
+        $data = $request->validate([
+            'action' => ['required', 'in:approve,reject'],
+            'rejection_reason' => ['nullable', 'string', 'max:2000', 'required_if:action,reject'],
+        ], ['rejection_reason.required_if' => '差し戻しの理由を入力してください。']);
+
+        $approved = $data['action'] === 'approve';
+
+        DB::transaction(function () use ($leaveRequest, $data, $approved) {
+            $leaveRequest->update([
+                'status' => $approved ? LeaveRequest::STATUS_APPROVED : LeaveRequest::STATUS_REJECTED,
+                'rejection_reason' => $approved ? null : $data['rejection_reason'],
+                'approved_at' => now(),
+            ]);
+
+            OperationLog::record(
+                $approved ? OperationLog::ACTION_LEAVE_REQUEST_ATTENDANCE_APPROVE : OperationLog::ACTION_LEAVE_REQUEST_ATTENDANCE_REJECT,
+                $leaveRequest,
+                $leaveRequest->staff_id,
+                $approved ? null : $data['rejection_reason']
+            );
+        });
+
+        if ($approved) {
+            $this->sendNotification(
+                $leaveRequest->staff->email,
+                new LeaveRequestNotificationMail($leaveRequest, '申請が承認されました')
+            );
+        } else {
+            // 差し戻しは本人と、承認した上長の双方に伝える。
+            foreach ([$leaveRequest->staff->email, $leaveRequest->approver->email] as $email) {
+                $this->sendNotification(
+                    $email,
+                    new LeaveRequestNotificationMail($leaveRequest, '休日勤務申請が勤怠管理者により差し戻されました')
+                );
+            }
+        }
+
+        return redirect()->route('leave-requests.cancellations')->with('status', 'leave-request-attendance-decided');
     }
 
     /**
@@ -405,9 +503,11 @@ class LeaveRequestController extends Controller
                 $this->authorize('decide', $leaveRequest);
 
                 $leaveRequest->update([
-                    'status' => LeaveRequest::STATUS_APPROVED,
+                    // 休日勤務は一括承認でも勤怠管理者の確認へ回す(単票の承認と同じ扱い)。
+                    'status' => $this->statusAfterSupervisorApproval($leaveRequest),
                     'rejection_reason' => null,
                     'approved_at' => now(),
+                    'supervisor_approved_at' => now(),
                 ]);
 
                 OperationLog::record(
@@ -419,10 +519,7 @@ class LeaveRequestController extends Controller
         });
 
         foreach ($leaveRequests as $leaveRequest) {
-            $this->sendNotification(
-                $leaveRequest->staff->email,
-                new LeaveRequestNotificationMail($leaveRequest, '申請が承認されました')
-            );
+            $this->notifyAfterSupervisorDecision($leaveRequest, true);
         }
 
         return redirect()->route('leave-requests.approvals')
@@ -500,7 +597,7 @@ class LeaveRequestController extends Controller
 
         if ($approved) {
             // 反映確認は勤怠管理者全員に依頼する(担当が1人に固定されていないため)。
-            foreach (Staff::where('is_attendance_manager', true)->orWhere('is_administrator', true)->get() as $manager) {
+            foreach ($this->attendanceManagers() as $manager) {
                 $this->sendNotification(
                     $manager->email,
                     new LeaveRequestNotificationMail($leaveRequest, '取消の反映確認をお願いします')
@@ -568,7 +665,8 @@ class LeaveRequestController extends Controller
     }
 
     /**
-     * 勤怠管理者向けの反映確認一覧。
+     * 勤怠管理者の確認画面。取消の反映確認と、上長承認済みの休日勤務申請の承認を
+     * 1画面にまとめる(どちらも勤怠管理者だけが判断する仕事のため)。
      */
     public function cancellations(): View
     {
@@ -577,6 +675,10 @@ class LeaveRequestController extends Controller
                 ->where('status', LeaveRequest::STATUS_APPROVED)
                 ->where('cancel_status', LeaveRequest::CANCEL_PENDING_REFLECTION)
                 ->orderBy('cancel_requested_at')
+                ->get(),
+            'attendanceApprovals' => LeaveRequest::with(['staff', 'approver'])
+                ->where('status', LeaveRequest::STATUS_PENDING_ATTENDANCE)
+                ->orderBy('start_date')
                 ->get(),
         ]);
     }

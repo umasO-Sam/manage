@@ -8,6 +8,7 @@ use App\Models\DailyReportEntry;
 use App\Models\LaborCost;
 use App\Models\OperationLog;
 use App\Models\OrderNumber;
+use App\Models\Staff;
 use App\Services\TimecardService;
 use App\Services\WorkTimeComplianceService;
 use Illuminate\Http\RedirectResponse;
@@ -22,11 +23,12 @@ class DailyReportController extends Controller
     public function show(Request $request, WorkTimeComplianceService $compliance, TimecardService $timecard): View
     {
         $workDate = $this->parseDate($request->query('date'));
+        $target = $this->resolveTarget($request->query('staff_id'));
 
         // date castの保存値は接続のフォーマット(Y-m-d H:i:s)になるため、firstOrNew/firstOrCreateの
         // 単純な配列一致では既存行を検索できない。whereDate()で日付部分のみ比較する。
-        $report = $this->findReport(Auth::id(), $workDate)
-            ?? new DailyReport(['staff_id' => Auth::id(), 'work_date' => $workDate]);
+        $report = $this->findReport($target->id, $workDate)
+            ?? new DailyReport(['staff_id' => $target->id, 'work_date' => $workDate]);
 
         // コード範囲(59〜71)だけで絞ると、たまたま範囲に入る材料側のコード(66:事務消耗品)まで
         // 拾ってしまうため、社内人工/雑人工の大分類で絞り込む。
@@ -48,7 +50,8 @@ class DailyReportController extends Controller
             ->map(fn (OrderNumber $o) => ['code' => $o->code, 'label' => $o->displayLabel()])
             ->values();
 
-        $staff = Auth::user();
+        // 36協定の集計・打刻の突き合わせは、いずれも日報を書く対象者のものを見る。
+        $staff = $target;
         $referenceDate = Carbon::parse($workDate);
 
         [$weekStart, $weekEnd] = $compliance->weekPeriod($referenceDate);
@@ -68,9 +71,20 @@ class DailyReportController extends Controller
 
         unset($weekWorkedByDate[$workDate], $monthWorkedByDate[$workDate]);
 
+        $canProxy = Auth::user()->canManageAttendance();
+
         return view('daily-reports.show', [
             'report' => $report,
             'workDate' => $workDate,
+            // 代理入力。勤怠管理者・administratorだけが対象者を選べる。
+            'canProxy' => $canProxy,
+            'targetStaff' => $target,
+            'isProxyInput' => $target->id !== Auth::id(),
+            'proxyTargets' => $canProxy ? Staff::forRoster()->get() : collect(),
+            // 自分が代理で出して差し戻されたもの。本人ではなく代理提出者が直す。
+            'rejectedProxyReports' => $canProxy
+                ? Auth::user()->rejectedProxyReportsQuery()->get()
+                : collect(),
             'prevDate' => Carbon::parse($workDate)->subDay()->format('Y-m-d'),
             'nextDate' => Carbon::parse($workDate)->addDay()->format('Y-m-d'),
             'categories' => $categories,
@@ -95,6 +109,7 @@ class DailyReportController extends Controller
     {
         $validated = $request->validate([
             'work_date' => ['required', 'date'],
+            'staff_id' => ['nullable', 'integer', 'exists:staff,id'],
             'remarks' => ['nullable', 'string', 'max:2000'],
             'entries' => ['array'],
             'entries.*.start_minute' => ['required', 'integer', 'min:0', 'max:1439'],
@@ -108,8 +123,11 @@ class DailyReportController extends Controller
             'entries.*.leave_type' => ['nullable', 'in:'.implode(',', array_keys(DailyReportEntry::LEAVE_TYPES))],
         ]);
 
-        $report = $this->findReport(Auth::id(), $validated['work_date'])
-            ?? DailyReport::create(['staff_id' => Auth::id(), 'work_date' => $validated['work_date']]);
+        $target = $this->resolveTarget($validated['staff_id'] ?? null);
+        $isProxy = $target->id !== Auth::id();
+
+        $report = $this->findReport($target->id, $validated['work_date'])
+            ?? DailyReport::create(['staff_id' => $target->id, 'work_date' => $validated['work_date']]);
 
         $wasSubmittedBefore = $report->isSubmitted();
 
@@ -118,7 +136,7 @@ class DailyReportController extends Controller
         $categoriesRequiringOrderNo = CategoryCode::whereNotIn('code', CategoryCode::ORDER_NO_OPTIONAL_CODES)
             ->pluck('id')->all();
 
-        DB::transaction(function () use ($report, $validated, $categoriesRequiringOrderNo) {
+        DB::transaction(function () use ($report, $validated, $categoriesRequiringOrderNo, $isProxy) {
             $report->remarks = $validated['remarks'] ?? null;
             $report->entries()->delete();
 
@@ -158,19 +176,44 @@ class DailyReportController extends Controller
             // (再提出のたびに以前の差し戻し理由が残り続けるのを防ぐため)。
             $report->rejected_at = null;
             $report->rejection_reason = null;
+            // 差し戻し先を決めるのは「最後に出した人」。本人が出し直したら代理の印は外れ、
+            // 以降の差し戻しは本人に返る(本人も上書きできる運用のため)。
+            $report->proxy_staff_id = $isProxy ? Auth::id() : null;
             $report->save();
 
             $this->syncLaborCosts($report);
         });
 
         OperationLog::record(
-            $wasSubmittedBefore ? OperationLog::ACTION_DAILY_REPORT_RESUBMIT : OperationLog::ACTION_DAILY_REPORT_SUBMIT,
+            match (true) {
+                $isProxy => OperationLog::ACTION_DAILY_REPORT_PROXY_SUBMIT,
+                $wasSubmittedBefore => OperationLog::ACTION_DAILY_REPORT_RESUBMIT,
+                default => OperationLog::ACTION_DAILY_REPORT_SUBMIT,
+            },
             $report,
-            $report->staff_id
+            $report->staff_id,
+            $isProxy ? Auth::user()->name.'が'.$target->name.'の分を代理提出' : null
         );
 
-        return redirect()->route('daily-reports.show', ['date' => $report->work_date->format('Y-m-d')])
-            ->with('status', 'daily-report-submitted');
+        return redirect()->route('daily-reports.show', array_filter([
+            'date' => $report->work_date->format('Y-m-d'),
+            'staff_id' => $isProxy ? $target->id : null,
+        ]))->with('status', $isProxy ? 'daily-report-proxy-submitted' : 'daily-report-submitted');
+    }
+
+    /**
+     * 日報を書く対象者。勤怠管理者・administratorだけが自分以外を指定できる
+     * (指定が無い・権限が無い場合は常に自分)。名簿から外した担当者は対象にしない。
+     */
+    private function resolveTarget(mixed $staffId): Staff
+    {
+        $staff = Auth::user();
+
+        if ($staffId === null || (int) $staffId === $staff->id || ! $staff->canManageAttendance()) {
+            return $staff;
+        }
+
+        return Staff::forRoster()->findOrFail((int) $staffId);
     }
 
     /**

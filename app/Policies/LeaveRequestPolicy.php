@@ -20,8 +20,9 @@ class LeaveRequestPolicy
      */
     public function view(Staff $staff, LeaveRequest $leaveRequest): bool
     {
-        // 取消の反映確認を任された勤怠管理者も、判断材料として中身を見る必要がある。
-        if ($staff->canManageAttendance() && $leaveRequest->cancel_status !== null) {
+        // 取消の反映確認・休日勤務の承認を任された勤怠管理者も、判断材料として中身を見る。
+        if ($staff->canManageAttendance()
+            && ($leaveRequest->cancel_status !== null || $leaveRequest->isPendingAttendance())) {
             return true;
         }
 
@@ -34,7 +35,7 @@ class LeaveRequestPolicy
      */
     public function withdraw(Staff $staff, LeaveRequest $leaveRequest): bool
     {
-        return $staff->id === $leaveRequest->staff_id && $leaveRequest->isPending();
+        return $staff->id === $leaveRequest->staff_id && $leaveRequest->isWithdrawable();
     }
 
     /**
@@ -43,6 +44,15 @@ class LeaveRequestPolicy
     public function decide(Staff $staff, LeaveRequest $leaveRequest): bool
     {
         return $staff->id === $leaveRequest->approver_id && $leaveRequest->isPending();
+    }
+
+    /**
+     * 上長が承認した休日勤務を確定させてよいかは勤怠管理者が判断する。
+     * 差し戻す場合は却下として本人・上長の双方に返す。
+     */
+    public function attendanceDecide(Staff $staff, LeaveRequest $leaveRequest): bool
+    {
+        return $staff->canManageAttendance() && $leaveRequest->isPendingAttendance();
     }
 
     /**

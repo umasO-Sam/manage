@@ -34,10 +34,60 @@
             @if (session('status') === 'daily-report-submitted')
                 <div class="p-3 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-800 text-sm">日報を提出しました。経理資材担当の確認後、正式な人工データとして反映されます。</div>
             @endif
+            @if (session('status') === 'daily-report-proxy-submitted')
+                <div class="p-3 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-800 text-sm">
+                    {{ $targetStaff->name }}さんの日報を代理で提出しました。通常どおり経理資材担当の確認対象になります。
+                    差し戻された場合は本人ではなく<strong>あなた</strong>に返ります。
+                </div>
+            @endif
             @if ($report->exists && $report->isRejected())
                 <div class="p-3 rounded-xl bg-red-50 border border-red-100 text-red-800 text-sm">
                     <p class="font-bold">この日報は差し戻されました。内容を修正のうえ、再度提出してください。</p>
                     <p class="mt-1 whitespace-pre-wrap">{{ $report->rejection_reason }}</p>
+                </div>
+            @endif
+
+            {{-- 代理提出したものが差し戻されたとき、本人ではなく代理提出者に返す。
+                 自分の日報画面に置かないと、返された側が気づけない。 --}}
+            @if ($canProxy && $rejectedProxyReports->isNotEmpty())
+                <div class="p-3 rounded-xl bg-red-50 border border-red-100 text-red-800 text-sm">
+                    <p class="font-bold">あなたが代理提出した日報が {{ $rejectedProxyReports->count() }} 件差し戻されています。</p>
+                    <ul class="mt-1 space-y-0.5">
+                        @foreach ($rejectedProxyReports as $rejected)
+                            <li>
+                                <a href="{{ route('daily-reports.show', ['date' => $rejected->work_date->format('Y-m-d'), 'staff_id' => $rejected->staff_id]) }}"
+                                   class="font-bold underline hover:text-red-900">
+                                    {{ $rejected->work_date->format('Y/m/d') }}／{{ $rejected->staff?->name }}
+                                </a>
+                                <span class="text-red-700">{{ $rejected->rejection_reason }}</span>
+                            </li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
+
+            {{-- 代理入力。勤怠管理者・administratorだけが対象者を選べる。 --}}
+            @if ($canProxy)
+                <div class="p-3 rounded-xl border text-sm flex items-center gap-3 flex-wrap
+                            {{ $isProxyInput ? 'bg-amber-50 border-amber-300 text-amber-900' : 'bg-white border-slate-200 text-slate-700' }}">
+                    <label class="flex items-center gap-2">
+                        <span class="text-[11px] font-bold">代理入力する担当者</span>
+                        <select onchange="location.href = '{{ route('daily-reports.show') }}?date={{ $workDate }}&staff_id=' + this.value"
+                                class="border rounded-lg p-2 border-slate-300 text-sm">
+                            @foreach ($proxyTargets as $person)
+                                <option value="{{ $person->id }}" @selected($person->id === $targetStaff->id)>
+                                    {{ $person->name }}{{ $person->id === auth()->id() ? '（自分）' : '' }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </label>
+                    @if ($isProxyInput)
+                        <span class="font-bold">
+                            {{ $targetStaff->name }}さんの日報を代理で入力しています。提出すると{{ $targetStaff->name }}さんの人工データになります。
+                        </span>
+                    @else
+                        <span class="text-[11px] text-slate-500">自分以外を選ぶと、その担当者の日報を代理で入力・提出できます。</span>
+                    @endif
                 </div>
             @endif
             @if ($errors->any())
@@ -50,14 +100,16 @@
 
             <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between gap-3 flex-wrap">
                 <div class="flex items-center gap-2">
-                    <a href="{{ route('daily-reports.show', ['date' => $prevDate]) }}"
+                    {{-- 代理入力中は日付を動かしても対象者を保つ(戻ると自分の日報に化けるため)。 --}}
+                    @php $staffQuery = $isProxyInput ? ['staff_id' => $targetStaff->id] : []; @endphp
+                    <a href="{{ route('daily-reports.show', ['date' => $prevDate, ...$staffQuery]) }}"
                        class="p-2 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-50">
                         <i data-lucide="chevron-left" class="w-4 h-4"></i>
                     </a>
                     <input type="date" value="{{ $workDate }}"
-                           onchange="location.href = '{{ route('daily-reports.show') }}?date=' + this.value"
+                           onchange="location.href = '{{ route('daily-reports.show', $staffQuery) }}{{ $isProxyInput ? '&' : '?' }}date=' + this.value"
                            class="border rounded-lg p-2 border-slate-300 text-sm font-bold">
-                    <a href="{{ route('daily-reports.show', ['date' => $nextDate]) }}"
+                    <a href="{{ route('daily-reports.show', ['date' => $nextDate, ...$staffQuery]) }}"
                        class="p-2 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-50">
                         <i data-lucide="chevron-right" class="w-4 h-4"></i>
                     </a>
@@ -76,6 +128,8 @@
             <form method="POST" action="{{ route('daily-reports.store') }}" class="space-y-4">
                 @csrf
                 <input type="hidden" name="work_date" value="{{ $workDate }}">
+                {{-- 代理入力の対象者。自分の分なら自分のIDが入るだけで従来どおり。 --}}
+                <input type="hidden" name="staff_id" value="{{ $targetStaff->id }}">
 
                 <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
                     <div>

@@ -24,6 +24,9 @@ class OperationLog extends Model
 
     public const ACTION_DAILY_REPORT_REJECT = 'daily_report_reject';
 
+    /** 勤怠管理者が本人に代わって提出した作業日報。誰の分かは対象者側に記録する。 */
+    public const ACTION_DAILY_REPORT_PROXY_SUBMIT = 'daily_report_proxy_submit';
+
     public const ACTION_LEAVE_REQUEST_CREATE = 'leave_request_create';
 
     public const ACTION_LEAVE_REQUEST_WITHDRAW = 'leave_request_withdraw';
@@ -42,6 +45,10 @@ class OperationLog extends Model
 
     public const ACTION_LEAVE_REQUEST_CANCEL_SEND_BACK = 'leave_request_cancel_send_back';
 
+    public const ACTION_LEAVE_REQUEST_ATTENDANCE_APPROVE = 'leave_request_attendance_approve';
+
+    public const ACTION_LEAVE_REQUEST_ATTENDANCE_REJECT = 'leave_request_attendance_reject';
+
     public const ACTION_LABOR_RECORD_UPDATE = 'labor_record_update';
 
     public const ACTION_LABOR_RECORD_DELETE = 'labor_record_delete';
@@ -52,6 +59,7 @@ class OperationLog extends Model
         self::ACTION_DAILY_REPORT_RESUBMIT => '作業日報を修正提出',
         self::ACTION_DAILY_REPORT_CONFIRM => '作業日報を確認',
         self::ACTION_DAILY_REPORT_REJECT => '作業日報を差し戻し',
+        self::ACTION_DAILY_REPORT_PROXY_SUBMIT => '作業日報を代理提出（勤怠管理者）',
         self::ACTION_LEAVE_REQUEST_CREATE => '休暇・休出を申請',
         self::ACTION_LEAVE_REQUEST_WITHDRAW => '申請を取消',
         self::ACTION_LEAVE_REQUEST_APPROVE => '申請を承認',
@@ -61,6 +69,8 @@ class OperationLog extends Model
         self::ACTION_LEAVE_REQUEST_CANCEL_REJECT => '取消申請を差し戻し（上長）',
         self::ACTION_LEAVE_REQUEST_CANCEL_REFLECT => '取消を反映（勤怠管理者）',
         self::ACTION_LEAVE_REQUEST_CANCEL_SEND_BACK => '取消を差し戻し（勤怠管理者）',
+        self::ACTION_LEAVE_REQUEST_ATTENDANCE_APPROVE => '休日勤務を承認（勤怠管理者）',
+        self::ACTION_LEAVE_REQUEST_ATTENDANCE_REJECT => '休日勤務を差し戻し（勤怠管理者）',
         self::ACTION_LABOR_RECORD_UPDATE => '人工レコードを修正',
         self::ACTION_LABOR_RECORD_DELETE => '人工レコードを削除',
     ];

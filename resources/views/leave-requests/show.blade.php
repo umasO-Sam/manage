@@ -21,14 +21,14 @@
                 <div class="flex items-center justify-between">
                     <span class="text-[11px] font-bold px-2.5 py-0.5 rounded-full
                         {{ match($leaveRequest->status) {
-                            'pending' => 'bg-amber-50 text-amber-700',
+                            'pending', 'pending_attendance' => 'bg-amber-50 text-amber-700',
                             'approved' => 'bg-emerald-50 text-emerald-700',
                             'rejected' => 'bg-red-50 text-red-700',
                             default => 'bg-slate-100 text-slate-600',
                         } }}">
                         {{ $leaveRequest->statusLabel() }}
                     </span>
-                    @if ($leaveRequest->isPending() && $leaveRequest->staff_id === auth()->id())
+                    @if ($leaveRequest->isWithdrawable() && $leaveRequest->staff_id === auth()->id())
                         <form method="POST" action="{{ route('leave-requests.withdraw', $leaveRequest) }}" onsubmit="return confirm('この申請を取り消します。よろしいですか？');">
                             @csrf
                             @method('DELETE')
@@ -196,6 +196,34 @@
                                     class="text-xs font-bold px-4 py-2 rounded-lg border border-red-300 text-red-700 hover:bg-red-50">差し戻し</button>
                             <button type="submit" name="action" value="reflect"
                                     class="text-xs font-bold px-4 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700">取消を反映する</button>
+                        </div>
+                    </form>
+                </div>
+            @endcan
+
+            {{-- 休日勤務の勤怠管理者承認。上長が通したあと、ここで承認して初めて承認済みになる。 --}}
+            @can('attendanceDecide', $leaveRequest)
+                <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5 space-y-3">
+                    <h3 class="text-sm font-bold text-slate-800">休日勤務の確認（勤怠管理者）</h3>
+                    <p class="text-[11px] text-slate-500">
+                        上長（{{ $leaveRequest->approver->name }}）が
+                        {{ $leaveRequest->supervisor_approved_at?->format('Y/m/d H:i') }} に承認しました。
+                        ここで承認すると承認済みになります。差し戻す場合は理由を書いてください
+                        （<span class="font-bold">本人と上長の双方に通知されます</span>）。
+                    </p>
+                    <form method="POST" action="{{ route('leave-requests.attendance.decide', $leaveRequest) }}" class="space-y-3">
+                        @csrf
+                        @method('PUT')
+                        <div>
+                            <x-input-label value="差し戻し理由（差し戻す場合のみ）" />
+                            <textarea name="rejection_reason" rows="2" class="mt-1 block w-full rounded-lg border-slate-300 text-sm">{{ old('rejection_reason') }}</textarea>
+                            <x-input-error class="mt-1" :messages="$errors->get('rejection_reason')" />
+                        </div>
+                        <div class="flex justify-end gap-2">
+                            <button type="submit" name="action" value="reject"
+                                    class="text-xs font-bold px-4 py-2 rounded-lg border border-red-300 text-red-700 hover:bg-red-50">差し戻し</button>
+                            <button type="submit" name="action" value="approve"
+                                    class="text-xs font-bold px-4 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700">承認する</button>
                         </div>
                     </form>
                 </div>

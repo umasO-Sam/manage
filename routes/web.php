@@ -69,6 +69,8 @@ Route::middleware('auth')->group(function () {
     // 勤怠管理者の反映確認一覧。{leaveRequest} より前に置かないとIDとして食われる。
     Route::get('/leave-requests/cancellations', [LeaveRequestController::class, 'cancellations'])
         ->middleware('attendance.manager')->name('leave-requests.cancellations');
+    Route::put('/leave-requests/{leaveRequest}/attendance-decide', [LeaveRequestController::class, 'attendanceDecide'])
+        ->middleware('attendance.manager')->name('leave-requests.attendance.decide');
     Route::get('/leave-requests/{leaveRequest}', [LeaveRequestController::class, 'show'])->name('leave-requests.show');
     Route::put('/leave-requests/{leaveRequest}/decide', [LeaveRequestController::class, 'decide'])->name('leave-requests.decide');
     Route::post('/leave-requests/{leaveRequest}/cancel-request', [LeaveRequestController::class, 'requestCancel'])->name('leave-requests.cancel.request');

@@ -33,6 +33,11 @@
             @if (session('status') === 'daily-report-rejected')
                 <div class="p-3 rounded-xl bg-amber-50 border border-amber-100 text-amber-800 text-sm">作業日報を差し戻しました。本人に修正・再提出を依頼してください。</div>
             @endif
+            @if (session('status') === 'daily-report-rejected-to-proxy')
+                <div class="p-3 rounded-xl bg-amber-50 border border-amber-100 text-amber-800 text-sm">
+                    作業日報を差し戻しました。これは代理提出されたものなので、<strong>本人ではなく代理提出した勤怠管理者</strong>に返っています。
+                </div>
+            @endif
             @if ($errors->any())
                 <div class="p-3 rounded-xl bg-red-50 border border-red-100 text-red-800 text-sm">
                     @foreach ($errors->all() as $error)
@@ -54,6 +59,11 @@
                         <div class="flex items-center justify-between flex-wrap gap-2">
                             <div class="flex items-center gap-3 flex-wrap">
                                 <span class="font-bold text-slate-900">{{ $report->staff->name }}</span>
+                                {{-- 代理提出は差し戻し先が本人ではないため、確認する側にも分かるようにする。 --}}
+                                @if ($report->isProxySubmitted())
+                                    <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800"
+                                          title="差し戻すと {{ $report->proxyStaff?->name }} に返ります">代理提出（{{ $report->proxyStaff?->name }}）</span>
+                                @endif
                                 @if ($status === \App\Http\Controllers\DailyReportReviewController::STATUS_CONFIRMED)
                                     <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">確認済</span>
                                 @elseif ($status === \App\Http\Controllers\DailyReportReviewController::STATUS_REJECTED)

@@ -59,7 +59,7 @@
                                 <td class="p-3">
                                     <span class="text-[11px] font-bold px-2.5 py-0.5 rounded-full
                                         {{ match($leaveRequest->status) {
-                                            'pending' => 'bg-amber-50 text-amber-700',
+                                            'pending', 'pending_attendance' => 'bg-amber-50 text-amber-700',
                                             'approved' => 'bg-emerald-50 text-emerald-700',
                                             'rejected' => 'bg-red-50 text-red-700',
                                             default => 'bg-slate-100 text-slate-600',
@@ -68,7 +68,7 @@
                                     </span>
                                 </td>
                                 <td class="p-3 text-center">
-                                    @if ($leaveRequest->isPending())
+                                    @if ($leaveRequest->isWithdrawable())
                                         <form method="POST" action="{{ route('leave-requests.withdraw', $leaveRequest) }}" onsubmit="return confirm('この申請を取り消します。よろしいですか？');">
                                             @csrf
                                             @method('DELETE')

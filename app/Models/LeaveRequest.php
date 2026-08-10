@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'reason_code', 'reason_detail', 'day_count', 'order_no', 'work_location',
     'substitute_holiday_date', 'no_substitute_needed', 'actual_worked_hours',
     'compensatory_date', 'approver_id', 'status', 'rejection_reason',
-    'approved_at', 'remarks',
+    'approved_at', 'supervisor_approved_at', 'remarks',
     'cancel_status', 'cancel_reason', 'cancel_rejection_reason',
     'cancel_requested_at', 'cancelled_at',
     'funeral_venue_address', 'funeral_venue_phone', 'wake_datetime',
@@ -20,6 +20,13 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class LeaveRequest extends Model
 {
     public const STATUS_PENDING = 'pending';
+
+    /**
+     * 上長は承認したが、勤怠管理者の確認がまだの状態。休日勤務申請だけが通る。
+     * まだ承認済みではないため、有給残日数や全社の終日休み判定からは除外される
+     * (承認済みかで判定している箇所を変えずに済むよう、承認済みとは別の値にした)。
+     */
+    public const STATUS_PENDING_ATTENDANCE = 'pending_attendance';
 
     public const STATUS_APPROVED = 'approved';
 
@@ -35,6 +42,22 @@ class LeaveRequest extends Model
 
     /** 上長が取消を認めた。勤怠管理者の反映確認待ち。 */
     public const CANCEL_PENDING_REFLECTION = 'pending_reflection';
+
+    /**
+     * まだ決裁が終わっていない状態。勤務状況一覧・個人カレンダーはどちらも
+     * 同じ「承認待ち」として扱う(上長待ちか勤怠管理者待ちかで見た目は変えない)。
+     *
+     * @var array<int, string>
+     */
+    public const PENDING_STATUSES = [self::STATUS_PENDING, self::STATUS_PENDING_ATTENDANCE];
+
+    /**
+     * 勤怠管理者の承認を要する申請種別。休日勤務は法定休日の割増や振替の成立に
+     * 関わるため、上長の承認だけでは確定させない。
+     *
+     * @var array<int, string>
+     */
+    public const ATTENDANCE_APPROVAL_TYPES = ['holiday_work'];
 
     /** @var array<string, string> type値 => 表示名 */
     public const TYPES = [
@@ -86,6 +109,7 @@ class LeaveRequest extends Model
             'compensatory_date' => 'date',
             'no_substitute_needed' => 'boolean',
             'approved_at' => 'datetime',
+            'supervisor_approved_at' => 'datetime',
             'cancel_requested_at' => 'datetime',
             'cancelled_at' => 'datetime',
             'hours' => 'decimal:1',
@@ -108,9 +132,31 @@ class LeaveRequest extends Model
         return $this->belongsTo(Staff::class, 'approver_id');
     }
 
+    /** 上長の判断待ちか。勤怠管理者待ち(pending_attendance)はここには含めない。 */
     public function isPending(): bool
     {
         return $this->status === self::STATUS_PENDING;
+    }
+
+    /** この申請は上長の承認のあとに勤怠管理者の確認を要するか。 */
+    public function needsAttendanceApproval(): bool
+    {
+        return in_array($this->type, self::ATTENDANCE_APPROVAL_TYPES, true);
+    }
+
+    /** 上長が承認済みで、勤怠管理者の確認を待っている状態か。 */
+    public function isPendingAttendance(): bool
+    {
+        return $this->status === self::STATUS_PENDING_ATTENDANCE;
+    }
+
+    /**
+     * 本人が取り下げられるか。決裁が終わるまでは、上長待ち・勤怠管理者待ちの
+     * どちらでも取り下げられる(まだ効力が無いため、承認後の取消フローは通さない)。
+     */
+    public function isWithdrawable(): bool
+    {
+        return in_array($this->status, self::PENDING_STATUSES, true);
     }
 
     /**
@@ -226,6 +272,8 @@ class LeaveRequest extends Model
 
         return match ($this->status) {
             self::STATUS_PENDING => '承認待ち',
+            // 上長は通したがまだ確定していない。承認済みと誤読されないよう待ち先を添える。
+            self::STATUS_PENDING_ATTENDANCE => '承認待ち（勤怠管理者）',
             self::STATUS_APPROVED => '承認済み',
             self::STATUS_REJECTED => '却下',
             self::STATUS_WITHDRAWN => '取消済み',

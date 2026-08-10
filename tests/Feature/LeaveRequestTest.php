@@ -523,7 +523,11 @@ class LeaveRequestTest extends TestCase
             ->assertSee($applicant->name);
     }
 
-    public function test_holiday_work_request_can_be_self_approved_by_supervisor(): void
+    /**
+     * 休日勤務は上長が承認しても承認済みにはならず、勤怠管理者の確認待ちになる
+     * (上長が自分の申請を承認する場合も同じ)。
+     */
+    public function test_holiday_work_request_self_approved_by_supervisor_waits_for_the_attendance_manager(): void
     {
         $applicant = Staff::factory()->create(['is_supervisor' => true]);
 
@@ -542,7 +546,9 @@ class LeaveRequestTest extends TestCase
             'action' => 'approve',
         ])->assertRedirect(route('leave-requests.approvals'));
 
-        $this->assertSame('approved', $leaveRequest->fresh()->status);
+        $leaveRequest->refresh();
+        $this->assertSame(LeaveRequest::STATUS_PENDING_ATTENDANCE, $leaveRequest->status);
+        $this->assertNotNull($leaveRequest->supervisor_approved_at);
     }
 
     /**

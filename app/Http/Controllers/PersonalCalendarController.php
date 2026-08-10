@@ -78,7 +78,7 @@ class PersonalCalendarController extends Controller
     private function buildLeaveRequestsByDate(Carbon $gridStart, Carbon $gridEnd): Collection
     {
         $requests = LeaveRequest::where('staff_id', Auth::id())
-            ->whereIn('status', [LeaveRequest::STATUS_PENDING, LeaveRequest::STATUS_APPROVED])
+            ->whereIn('status', [...LeaveRequest::PENDING_STATUSES, LeaveRequest::STATUS_APPROVED])
             ->where(function ($query) use ($gridStart, $gridEnd) {
                 $query->where(function ($q) use ($gridStart, $gridEnd) {
                     $q->whereDate('start_date', '<=', $gridEnd->toDateString())

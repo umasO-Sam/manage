@@ -38,6 +38,8 @@ class DailyReportReviewController extends Controller
             ->whereNotNull('submitted_at')
             ->with([
                 'staff',
+                // 代理提出されたものは、差し戻し先が本人ではなく代理提出者になる。
+                'proxyStaff',
                 'entries' => fn ($q) => $q->orderBy('start_minute'),
                 'entries.category',
             ])
@@ -155,15 +157,23 @@ class DailyReportReviewController extends Controller
                 'rejection_reason' => $data['rejection_reason'],
             ]);
 
+            // 代理提出されたものは、直すのが本人ではなく代理提出した勤怠管理者になる。
+            // 誰に返ったかを操作ログからも追えるようにしておく。
+            $detail = $dailyReport->isProxySubmitted()
+                ? $data['rejection_reason'].'（代理提出者 '.$dailyReport->proxyStaff?->name.' に差し戻し）'
+                : $data['rejection_reason'];
+
             OperationLog::record(
                 OperationLog::ACTION_DAILY_REPORT_REJECT,
                 $dailyReport,
                 $dailyReport->staff_id,
-                $data['rejection_reason']
+                $detail
             );
         });
 
-        return back()->with('status', 'daily-report-rejected');
+        return back()->with('status', $dailyReport->isProxySubmitted()
+            ? 'daily-report-rejected-to-proxy'
+            : 'daily-report-rejected');
     }
 
     /**

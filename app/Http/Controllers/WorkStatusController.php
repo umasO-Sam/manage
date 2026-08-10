@@ -83,7 +83,7 @@ class WorkStatusController extends Controller
         $rangeStartStr = $rangeStart->toDateString();
         $rangeEndStr = $rangeEnd->toDateString();
 
-        $requests = LeaveRequest::whereIn('status', [LeaveRequest::STATUS_PENDING, LeaveRequest::STATUS_APPROVED])
+        $requests = LeaveRequest::whereIn('status', [...LeaveRequest::PENDING_STATUSES, LeaveRequest::STATUS_APPROVED])
             ->where(function ($query) use ($rangeStartStr, $rangeEndStr) {
                 $query->where(function ($q) use ($rangeStartStr, $rangeEndStr) {
                     $q->whereDate('start_date', '<=', $rangeEndStr)
