@@ -45,18 +45,20 @@
         <table>
             <thead>
                 <tr>
-                    <th style="width: 15%;">注番</th>
-                    <th style="width: 35%;">品名・形式/寸法</th>
-                    <th style="width: 10%;">数量</th>
-                    <th style="width: 10%;">単位</th>
-                    <th style="width: 15%;">単価</th>
-                    <th style="width: 15%;">金額</th>
+                    <th style="width: 13%;">注番</th>
+                    <th style="width: 12%;">機械装置No</th>
+                    <th style="width: 30%;">品名・形式/寸法</th>
+                    <th style="width: 9%;">数量</th>
+                    <th style="width: 8%;">単位</th>
+                    <th style="width: 14%;">単価</th>
+                    <th style="width: 14%;">金額</th>
                 </tr>
             </thead>
             <tbody>
                 @foreach ($details as $detail)
                     <tr>
                         <td>{{ $detail->item_code }}</td>
+                        <td>{{ $detail->machine_no }}</td>
                         <td>{{ $detail->item_name }}<br><span style="font-size: 8pt; color: #555;">{{ $detail->dimensions }}</span></td>
                         <td class="text-right">{{ number_format((float) $detail->order_qty) }}</td>
                         <td style="text-align: center;">{{ $detail->unit }}</td>

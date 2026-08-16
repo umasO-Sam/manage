@@ -707,12 +707,29 @@ class PurchasingModuleTest extends TestCase
         $response->assertSee('確定品')->assertDontSee('仮登録品');
     }
 
+    public function test_order_search_filters_by_item_code(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        PurchaseDetail::create([
+            'item_code' => 'HI016-N03', 'supplier_name' => '大津屋', 'order_date' => now(),
+            'item_name' => '対象の品', 'order_qty' => 1, 'unit_price' => 100,
+        ]);
+        PurchaseDetail::create([
+            'item_code' => 'HI999-N01', 'supplier_name' => '大津屋', 'order_date' => now(),
+            'item_name' => '対象外の品', 'order_qty' => 1, 'unit_price' => 100,
+        ]);
+
+        $response = $this->actingAs($manager)->get(route('purchasing.orders.index', ['item_code' => 'HI016']));
+
+        $response->assertSee('対象の品')->assertDontSee('対象外の品');
+    }
+
     public function test_order_print_renders_selected_items_with_total(): void
     {
         $manager = Staff::factory()->procurementManager()->create();
         $detail = PurchaseDetail::create([
             'item_code' => 'A1', 'supplier_name' => '大津屋', 'item_name' => 'テスト部品',
-            'order_qty' => 3, 'unit_price' => 1000,
+            'machine_no' => 'M-100', 'order_qty' => 3, 'unit_price' => 1000,
         ]);
 
         $response = $this->actingAs($manager)->post(route('purchasing.orders.print'), [
@@ -720,7 +737,8 @@ class PurchasingModuleTest extends TestCase
             'staff_name' => '瀧上',
         ]);
 
-        $response->assertOk()->assertSee('テスト部品')->assertSee('3,000');
+        $response->assertOk()->assertSee('テスト部品')->assertSee('3,000')
+            ->assertSee('機械装置No')->assertSee('M-100');
     }
 
     public function test_order_screen_shows_direct_edit_inputs_that_post_to_bulk_update(): void

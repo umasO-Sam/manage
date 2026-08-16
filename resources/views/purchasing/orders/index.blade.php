@@ -13,10 +13,15 @@
                 <div class="p-3 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-800 text-sm">変更を保存しました。</div>
             @endif
 
-            <form method="GET" action="{{ route('purchasing.orders.index') }}" class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+            <form method="GET" action="{{ route('purchasing.orders.index') }}" class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
                 <div>
                     <label class="block text-xs font-semibold text-slate-600 mb-1">商社名(部分一致)</label>
                     <input type="text" name="supplier_name" value="{{ $filters['supplier'] }}" placeholder="例: 大津屋"
+                           class="w-full text-sm bg-slate-50 border border-slate-200 rounded-lg py-1.5 px-3">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">注番(部分一致)</label>
+                    <input type="text" name="item_code" value="{{ $filters['itemCode'] }}" placeholder="例: HI016"
                            class="w-full text-sm bg-slate-50 border border-slate-200 rounded-lg py-1.5 px-3">
                 </div>
                 <div>
@@ -27,7 +32,7 @@
                     <label class="block text-xs font-semibold text-slate-600 mb-1">注文日(終了)</label>
                     <input type="date" name="date_to" value="{{ $filters['dateTo'] }}" class="w-full text-sm bg-slate-50 border border-slate-200 rounded-lg py-1.5 px-3">
                 </div>
-                <div class="flex items-center gap-4">
+                <div class="flex flex-wrap items-center gap-3">
                     <label class="flex items-center gap-1.5 text-xs font-semibold text-slate-600 whitespace-nowrap">
                         <input type="checkbox" name="include_provisional" value="1" @checked($filters['includeProvisional']) class="rounded border-slate-300">
                         仮を対象に含む
@@ -111,6 +116,7 @@
                             <thead>
                                 <tr class="bg-slate-50 border-b border-slate-200 font-semibold text-slate-600 sticky top-0">
                                     <th class="p-2.5 w-10 text-center"><input type="checkbox" x-on:change="checked = $event.target.checked ? [{{ $details->pluck('id')->implode(',') }}] : []" class="w-4 h-4"></th>
+                                    <th class="p-2.5">注番</th>
                                     <th class="p-2.5">注文日付</th>
                                     <th class="p-2.5">商社名</th>
                                     <th class="p-2.5">品名 / 形式</th>
@@ -125,6 +131,7 @@
                                             <input type="checkbox" name="target_ids[]" value="{{ $detail->id }}" x-model="checked" class="w-4 h-4">
                                             <input type="hidden" form="bulk-edit-form" name="updates[{{ $detail->id }}][item_code]" value="{{ $detail->item_code }}">
                                         </td>
+                                        <td class="p-2.5 font-mono whitespace-nowrap">{{ $detail->item_code }}</td>
                                         <td class="p-2.5">
                                             <span x-show="!editMode">{{ $detail->order_date?->format('Y/m/d') ?? '-' }}</span>
                                             <input x-show="editMode" x-cloak type="date" form="bulk-edit-form" name="updates[{{ $detail->id }}][order_date]"
@@ -168,7 +175,7 @@
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="6" class="p-8 text-center text-slate-400">検索条件を指定してデータを抽出してください。</td>
+                                        <td colspan="7" class="p-8 text-center text-slate-400">検索条件を指定してデータを抽出してください。</td>
                                     </tr>
                                 @endforelse
                             </tbody>

@@ -12,6 +12,7 @@ class PurchaseOrderController extends Controller
     public function index(Request $request): View
     {
         $supplier = trim((string) $request->query('supplier_name', ''));
+        $itemCode = trim((string) $request->query('item_code', ''));
         $dateFrom = $request->query('date_from', '');
         $dateTo = $request->query('date_to', '');
         $includeProvisional = $request->boolean('include_provisional');
@@ -24,6 +25,9 @@ class PurchaseOrderController extends Controller
         if ($supplier !== '') {
             $query->where('supplier_name', 'like', "%{$supplier}%");
         }
+        if ($itemCode !== '') {
+            $query->where('item_code', 'like', "%{$itemCode}%");
+        }
         if ($dateFrom !== '') {
             $query->whereDate('order_date', '>=', $dateFrom);
         }
@@ -31,13 +35,13 @@ class PurchaseOrderController extends Controller
             $query->whereDate('order_date', '<=', $dateTo);
         }
 
-        $details = ($supplier !== '' || $dateFrom !== '' || $dateTo !== '')
+        $details = ($supplier !== '' || $itemCode !== '' || $dateFrom !== '' || $dateTo !== '')
             ? $query->orderBy('supplier_name')->orderByDesc('order_date')->limit(500)->get()
             : collect();
 
         return view('purchasing.orders.index', [
             'details' => $details,
-            'filters' => compact('supplier', 'dateFrom', 'dateTo', 'includeProvisional'),
+            'filters' => compact('supplier', 'itemCode', 'dateFrom', 'dateTo', 'includeProvisional'),
         ]);
     }
 
