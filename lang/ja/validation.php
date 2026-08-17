@@ -271,6 +271,7 @@ return [
         // 休暇・勤務申請(leave_requests)
         'type' => '申請種別',
         'approver_id' => '承認者',
+        'target_staff_id' => '代理で申請する対象者',
         'start_date' => '開始日',
         'end_date' => '終了日',
         'granularity' => '粒度',

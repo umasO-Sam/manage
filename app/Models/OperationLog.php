@@ -29,6 +29,8 @@ class OperationLog extends Model
 
     public const ACTION_LEAVE_REQUEST_CREATE = 'leave_request_create';
 
+    public const ACTION_LEAVE_REQUEST_PROXY_CREATE = 'leave_request_proxy_create';
+
     public const ACTION_LEAVE_REQUEST_WITHDRAW = 'leave_request_withdraw';
 
     public const ACTION_LEAVE_REQUEST_APPROVE = 'leave_request_approve';
@@ -61,6 +63,7 @@ class OperationLog extends Model
         self::ACTION_DAILY_REPORT_REJECT => '作業日報を差し戻し',
         self::ACTION_DAILY_REPORT_PROXY_SUBMIT => '作業日報を代理提出（勤怠管理者）',
         self::ACTION_LEAVE_REQUEST_CREATE => '休暇・休出を申請',
+        self::ACTION_LEAVE_REQUEST_PROXY_CREATE => '休暇・休出を代理申請（勤怠管理者）',
         self::ACTION_LEAVE_REQUEST_WITHDRAW => '申請を取消',
         self::ACTION_LEAVE_REQUEST_APPROVE => '申請を承認',
         self::ACTION_LEAVE_REQUEST_REJECT => '申請を却下',

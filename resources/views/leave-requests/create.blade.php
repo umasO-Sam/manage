@@ -2,7 +2,7 @@
     <x-slot name="header">
         <h2 class="font-bold text-2xl text-slate-900 flex items-center gap-2">
             <i data-lucide="calendar-check" class="text-slate-600 w-6 h-6"></i>
-            <span>休暇・休出申請</span>
+            <span>休暇・休出申請{{ ($isProxy ?? false) ? '（代理申請）' : '' }}</span>
         </h2>
     </x-slot>
 
@@ -63,6 +63,35 @@
                   @input="if ($event.target.name === 'start_date') startDateText = $event.target.value">
                 @csrf
 
+                {{-- 代理申請。誰の分を出すかを最初に決めさせる(種別より先に選ばせないと、
+                     入力し終えてから対象者を選び忘れて自分の申請になってしまう)。 --}}
+                @if ($isProxy ?? false)
+                    <div class="p-4 rounded-xl border border-amber-300 bg-amber-50 space-y-2">
+                        <label class="block">
+                            <span class="block text-xs font-bold text-amber-900 mb-1">代理で申請する対象者 <span class="text-red-600">*</span></span>
+                            <select name="target_staff_id" required
+                                    onchange="if (this.value) location.href = '{{ route('leave-requests.proxy.create') }}?target_staff_id=' + this.value"
+                                    class="border rounded-lg p-2 border-amber-300 text-sm w-64">
+                                <option value="">選択してください</option>
+                                @foreach ($proxyTargets as $person)
+                                    <option value="{{ $person->id }}" @selected($targetStaff && $person->id === $targetStaff->id)>
+                                        {{ $person->name }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        </label>
+                        @if ($targetStaff)
+                            <p class="text-xs font-bold text-amber-900">
+                                {{ $targetStaff->name }}さんの申請として登録します。承認者と{{ $targetStaff->name }}さんの双方にメールで通知します。
+                            </p>
+                        @else
+                            <p class="text-xs text-amber-800">
+                                対象者を選ぶと、その担当者の有給残日数を見ながら入力できます。
+                            </p>
+                        @endif
+                    </div>
+                @endif
+
                 <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-4"
                      x-data="{ otherLeaveTypes: ['ceremonial_leave', 'special_leave_paid', 'special_leave_unpaid', 'juror_leave', 'volunteer_leave', 'banked_paid_leave'] }">
                     <div>
@@ -106,14 +135,18 @@
                 <fieldset x-show="type === 'paid_leave'" x-cloak :disabled="type !== 'paid_leave'"
                           x-data="{ granularity: '{{ old('granularity', '') }}' }"
                           class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
-                    <div class="text-xs bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-600">
-                        有給休暇の残日数:
-                        <strong class="text-slate-900">{{ $paidLeaveBalance['remainingTotal'] }}日</strong>
-                        (前年度繰越 {{ $paidLeaveBalance['remainingLastYear'] }}日 ／ 当年度 {{ $paidLeaveBalance['remainingCurrentYear'] }}日)
-                        @if ($paidLeaveBalance['pending'] > 0)
-                            <span class="text-amber-700">※承認待ちの{{ $paidLeaveBalance['pending'] }}日分を差し引いた残数です</span>
-                        @endif
-                    </div>
+                    {{-- 代理申請で対象者が未選択のときは出さない。自分の残日数を
+                         対象者のものと取り違えたまま入力させないため。 --}}
+                    @if (! ($isProxy ?? false) || $targetStaff)
+                        <div class="text-xs bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-600">
+                            {{ ($isProxy ?? false) && $targetStaff ? $targetStaff->name.'さんの' : '' }}有給休暇の残日数:
+                            <strong class="text-slate-900">{{ $paidLeaveBalance['remainingTotal'] }}日</strong>
+                            (前年度繰越 {{ $paidLeaveBalance['remainingLastYear'] }}日 ／ 当年度 {{ $paidLeaveBalance['remainingCurrentYear'] }}日)
+                            @if ($paidLeaveBalance['pending'] > 0)
+                                <span class="text-amber-700">※承認待ちの{{ $paidLeaveBalance['pending'] }}日分を差し引いた残数です</span>
+                            @endif
+                        </div>
+                    @endif
                     <div>
                         <x-input-label value="対象日" />
                         <x-date-text-input name="start_date" class="mt-1 block w-full" :value="old('start_date', $prefillDate ?? null)" />

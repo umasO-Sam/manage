@@ -59,6 +59,9 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/leave-requests', [LeaveRequestController::class, 'index'])->name('leave-requests.index');
     Route::get('/leave-requests/create', [LeaveRequestController::class, 'create'])->name('leave-requests.create');
+    // 勤怠管理者による代理申請。{leaveRequest} より前に置かないとIDとして食われる。
+    Route::get('/leave-requests/proxy/create', [LeaveRequestController::class, 'createProxy'])
+        ->middleware('attendance.manager')->name('leave-requests.proxy.create');
     Route::post('/leave-requests', [LeaveRequestController::class, 'store'])->name('leave-requests.store');
     // 承認待ち一覧は経理資材担当・上長限定。個別の承認/却下(decide)は承認者本人に
     // 指定された社員であればPolicyで許可する(メール内リンクから詳細経由で操作できる)。

@@ -25,6 +25,31 @@ class LeaveRequestController extends Controller
 
     public function create(Request $request): View
     {
+        return $this->createView($request, null);
+    }
+
+    /**
+     * 勤怠管理者による代理申請。本人がPCを使えない・入院しているなどで自分では
+     * 出せない場合に、勤怠管理者が代わりに申請する(作業日報の代理提出と同じ考え方)。
+     * ルートに attendance.manager を掛けているのでここでの権限チェックは不要。
+     */
+    public function createProxy(Request $request): View
+    {
+        $targetId = (int) $request->query('target_staff_id');
+        $target = $targetId !== 0 ? Staff::forRoster()->find($targetId) : null;
+
+        return $this->createView($request, $target);
+    }
+
+    /**
+     * 申請フォーム。対象者(target)を渡すと代理申請の画面になり、有給残日数も
+     * その担当者のものを出す(自分の残日数を見ながら他人の有給を申請すると事故になる)。
+     * 対象者が未選択の代理申請では、選ぶまで残日数の欄を出さない。
+     */
+    private function createView(Request $request, ?Staff $target): View
+    {
+        $isProxy = $request->routeIs('leave-requests.proxy.create');
+
         return view('leave-requests.create', [
             // 上長は自分自身も承認者に選べる(上長本人の申請を承認できる者が
             // 他にいない運用があるため)。上長でなければ自分は候補に出ない。
@@ -35,8 +60,14 @@ class LeaveRequestController extends Controller
             'hiddenOrderNumbers' => OrderNumber::hiddenFromDropdown()->get()
                 ->map(fn (OrderNumber $o) => ['value' => $o->code, 'label' => $o->displayLabel()])
                 ->values(),
-            'paidLeaveBalance' => Auth::user()->paidLeaveBalance(),
+            'paidLeaveBalance' => ($target ?? Auth::user())->paidLeaveBalance(),
             'prefillDate' => $this->parseDateQuery($request->query('date')),
+            'isProxy' => $isProxy,
+            'targetStaff' => $target,
+            // 自分の分は「代理」ではないので候補から外す。
+            'proxyTargets' => $isProxy
+                ? Staff::forRoster()->where('id', '!=', Auth::id())->get()
+                : collect(),
         ]);
     }
 
@@ -61,6 +92,8 @@ class LeaveRequestController extends Controller
         $this->authorize('create', LeaveRequest::class);
 
         $data = $request->validate([
+            // 代理申請の対象者。勤怠管理者だけが指定でき、無ければ自分の申請になる。
+            'target_staff_id' => ['nullable', 'integer', 'exists:staff,id'],
             'type' => ['required', 'string', 'in:'.implode(',', array_keys(LeaveRequest::TYPES))],
             'approver_id' => [
                 'required', 'integer', 'exists:staff,id',
@@ -91,10 +124,22 @@ class LeaveRequestController extends Controller
             'telegram_declined' => ['nullable', 'boolean'],
         ]);
 
-        $fields = $this->buildTypeFields($data);
+        // 代理申請。勤怠管理者以外が target_staff_id を送ってきても自分の申請として扱う
+        // (画面には出ないが、値を足せば他人名義で出せてしまうため)。
+        $target = null;
+        if (! empty($data['target_staff_id']) && Auth::user()->canManageAttendance()) {
+            $candidate = Staff::find($data['target_staff_id']);
+            $target = $candidate !== null && $candidate->id !== Auth::id() ? $candidate : null;
+        }
+
+        // 有給の残日数などは「申請者」で判定する。代理申請でログイン者を見てしまうと、
+        // 対象者に残数があるのに勤怠管理者の残数で弾かれる(逆に、勤怠管理者に残数が
+        // あれば対象者の残数を超えて申請できてしまう)。
+        $fields = $this->buildTypeFields($data, $target ?? Auth::user());
 
         $leaveRequest = LeaveRequest::create([
-            'staff_id' => Auth::id(),
+            'staff_id' => $target?->id ?? Auth::id(),
+            'proxy_staff_id' => $target !== null ? Auth::id() : null,
             'type' => $data['type'],
             'approver_id' => $data['approver_id'],
             'remarks' => $data['remarks'] ?? null,
@@ -102,14 +147,29 @@ class LeaveRequestController extends Controller
             ...$fields,
         ]);
 
-        OperationLog::record(OperationLog::ACTION_LEAVE_REQUEST_CREATE, $leaveRequest, $leaveRequest->staff_id);
+        OperationLog::record(
+            $target !== null ? OperationLog::ACTION_LEAVE_REQUEST_PROXY_CREATE : OperationLog::ACTION_LEAVE_REQUEST_CREATE,
+            $leaveRequest,
+            $leaveRequest->staff_id,
+            $target !== null ? Auth::user()->name.'が'.$target->name.'の分を代理申請' : null
+        );
 
         $this->sendNotification(
             $leaveRequest->approver->email,
             new LeaveRequestNotificationMail($leaveRequest, '休暇・勤務申請が届きました')
         );
 
-        return redirect()->route('leave-requests.index')->with('status', 'leave-request-created');
+        // 代理申請は本人の知らないところで申請が立つため、本人にも知らせる。
+        if ($target !== null) {
+            $this->sendNotification(
+                $target->email,
+                new LeaveRequestNotificationMail($leaveRequest, '代理で休暇・勤務申請が行われました')
+            );
+        }
+
+        return redirect()->route('leave-requests.index')
+            ->with('status', $target !== null ? 'leave-request-proxy-created' : 'leave-request-created')
+            ->with('proxy_target_name', $target?->name);
     }
 
     /**
@@ -118,10 +178,10 @@ class LeaveRequestController extends Controller
      * @param  array<string, mixed>  $data
      * @return array<string, mixed>
      */
-    private function buildTypeFields(array $data): array
+    private function buildTypeFields(array $data, Staff $applicant): array
     {
         return match ($data['type']) {
-            'paid_leave' => $this->buildPaidLeaveFields($data),
+            'paid_leave' => $this->buildPaidLeaveFields($data, $applicant),
             'ceremonial_leave' => $this->buildCeremonialLeaveFields($data),
             'special_leave_paid' => $this->buildDateRangeFields($data, 'special_leave_paid', required: ['reason_code']),
             'special_leave_unpaid' => $this->buildDateRangeFields($data, 'special_leave_unpaid', required: ['reason_code']),
@@ -155,7 +215,7 @@ class LeaveRequestController extends Controller
         return $fields;
     }
 
-    private function buildPaidLeaveFields(array $data): array
+    private function buildPaidLeaveFields(array $data, Staff $applicant): array
     {
         if (empty($data['granularity'])) {
             throw ValidationException::withMessages(['granularity' => '有給休暇の粒度（1日/半日/2時間）を選択してください。']);
@@ -177,7 +237,7 @@ class LeaveRequestController extends Controller
             default => null,
         };
 
-        $remaining = Auth::user()->paidLeaveBalance()['remainingTotal'];
+        $remaining = $applicant->paidLeaveBalance()['remainingTotal'];
         if ($dayCount > $remaining) {
             throw ValidationException::withMessages([
                 'granularity' => "有給休暇の残日数が不足しています（残り{$remaining}日）。",
@@ -296,11 +356,21 @@ class LeaveRequestController extends Controller
 
     public function index(): View
     {
+        $canProxy = Auth::user()->canManageAttendance();
+
         return view('leave-requests.index', [
             'leaveRequests' => LeaveRequest::with('approver')
                 ->where('staff_id', Auth::id())
                 ->orderByDesc('id')
                 ->get(),
+            'canProxy' => $canProxy,
+            // 自分が代理で出した分。本人の一覧にしか出ないと、出した側が結果を追えない。
+            'proxyRequests' => $canProxy
+                ? LeaveRequest::with(['approver', 'staff'])
+                    ->where('proxy_staff_id', Auth::id())
+                    ->orderByDesc('id')
+                    ->get()
+                : collect(),
         ]);
     }
 

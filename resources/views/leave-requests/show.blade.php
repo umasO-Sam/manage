@@ -47,6 +47,12 @@
 
                 <dl class="divide-y divide-slate-100 text-xs">
                     <div class="py-2 flex justify-between"><dt class="text-slate-500">申請者</dt><dd class="font-semibold">{{ $leaveRequest->staff->name }}</dd></div>
+                    @if ($leaveRequest->isProxySubmitted())
+                        <div class="py-2 flex justify-between">
+                            <dt class="text-slate-500">代理申請者</dt>
+                            <dd class="font-semibold text-amber-800">{{ $leaveRequest->proxyStaff?->name }}（勤怠管理者）</dd>
+                        </div>
+                    @endif
                     <div class="py-2 flex justify-between"><dt class="text-slate-500">承認者</dt><dd class="font-semibold">{{ $leaveRequest->approver->name }}</dd></div>
                     <div class="py-2 flex justify-between">
                         <dt class="text-slate-500">対象日</dt>

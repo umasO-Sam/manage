@@ -40,6 +40,9 @@
 @endif
 @endif
 | 申請者 | {{ $leaveRequest->staff->name }} |
+@if ($leaveRequest->isProxySubmitted())
+| 代理申請者 | {{ $leaveRequest->proxyStaff?->name }}（勤怠管理者） |
+@endif
 | 承認者 | {{ $leaveRequest->approver->name }} |
 | 現在の状態 | {{ $leaveRequest->statusLabel() }} |
 @if ($leaveRequest->isRejected() && $leaveRequest->rejection_reason)

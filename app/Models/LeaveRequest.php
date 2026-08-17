@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 #[Fillable([
-    'staff_id', 'type', 'start_date', 'end_date', 'granularity', 'half_day_period', 'hours',
+    'staff_id', 'proxy_staff_id', 'type', 'start_date', 'end_date', 'granularity', 'half_day_period', 'hours',
     'reason_code', 'reason_detail', 'day_count', 'order_no', 'work_location',
     'substitute_holiday_date', 'no_substitute_needed', 'actual_worked_hours',
     'compensatory_date', 'approver_id', 'status', 'rejection_reason',
@@ -130,6 +130,18 @@ class LeaveRequest extends Model
     public function approver(): BelongsTo
     {
         return $this->belongsTo(Staff::class, 'approver_id');
+    }
+
+    /** 代理で申請した勤怠管理者。本人が出した申請ではnull。 */
+    public function proxyStaff(): BelongsTo
+    {
+        return $this->belongsTo(Staff::class, 'proxy_staff_id');
+    }
+
+    /** 勤怠管理者が本人に代わって出した申請か。 */
+    public function isProxySubmitted(): bool
+    {
+        return $this->proxy_staff_id !== null;
     }
 
     /** 上長の判断待ちか。勤怠管理者待ち(pending_attendance)はここには含めない。 */
