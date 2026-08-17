@@ -64,21 +64,39 @@ class QuoteNumberAllocator
 
         $baseSuffix = $extra !== null ? $this->normalizeBaseNo($baseNo) : null;
 
-        // 過去注番リストから引用したのに元番号を読み取れない場合は、N01があったものとして扱う。
-        // 見積台帳の大半は「Q511」のようにハイフン以降を持たない旧形式で、そのままでは
-        // 元番号が空として新規案件に倒れてしまうため。補ったことは画面側で注意喚起する。
-        $quotedOldFormat = $extra !== null
-            && $baseSuffix === null
-            && $this->normalizeUnit($unitNo) !== null;
+        // 見積単位が決まっているか。客先番号だけを見ているのか、特定の装置を指しているのかで
+        // 元番号が無いときの扱いが変わる(下の fellBackToNew)。
+        $unitSpecified = $this->normalizeUnit($unitNo) !== null;
 
-        if ($quotedOldFormat) {
-            $baseSuffix = QuoteNumber::TYPE_NORMAL.'01';
+        // 見積単位が決まっていて元番号だけが無い場合は、その見積単位に実在する注番から選ぶ。
+        // 1つしか無ければ迷いようがないので自動で決め、複数あればどれにぶら下げるかを聞く。
+        $baseChoices = ($extra !== null && $baseSuffix === null && $unitSpecified)
+            ? $this->baseNoChoices($customerCode, $unitNo)
+            : collect();
+
+        $baseAutoSelected = false;
+        $quotedOldFormat = false;
+
+        if ($extra !== null && $baseSuffix === null && $unitSpecified) {
+            if ($baseChoices->count() === 1) {
+                $baseSuffix = (string) $baseChoices->first();
+                $baseAutoSelected = true;
+            } elseif ($baseChoices->isEmpty()) {
+                // 見積台帳には「Q511」のようにハイフン以降を持たない旧形式の行がある。
+                // その見積単位に読み取れる注番が1つも無いときだけ、N01があったものとして
+                // 補う。補ったことは画面側で注意喚起する。
+                $baseSuffix = QuoteNumber::TYPE_NORMAL.'01';
+                $quotedOldFormat = true;
+            }
         }
 
         // 改造・修理・部品で元注番が無い場合は、過去の自社装置に紐づかない案件なので
         // 補足区分を付けず新規案件(N)として採番する。間違えやすいので画面側で注釈を出す。
+        // ただし見積単位を指定しているときは倒さない。特定の装置を指しておきながら
+        // 別の装置の番号(老番+1)を発番してしまい、気づかず取得する事故になるため。
         $fellBackToNew = $extra !== null
             && $baseSuffix === null
+            && ! $unitSpecified
             && in_array($mode, self::OPTIONAL_BASE_MODES, true);
 
         if ($fellBackToNew) {
@@ -107,7 +125,7 @@ class QuoteNumberAllocator
         }
 
         if ($missing !== []) {
-            return $this->result(null, $unitNo, $quoteType, null, $extra, $missing, false);
+            return $this->result(null, $unitNo, $quoteType, null, $extra, $missing, false, $baseChoices);
         }
 
         if ($extra !== null) {
@@ -132,6 +150,8 @@ class QuoteNumberAllocator
             'candidate' => $candidate,
             'fell_back_to_new' => $fellBackToNew,
             'quoted_old_format' => $quotedOldFormat,
+            'base_auto_selected' => $baseAutoSelected,
+            'base_choices' => $baseChoices,
             'unit_no' => $unitNo,
             'base_suffix' => $baseSuffix,
             'suffix' => $suffix,
@@ -191,6 +211,43 @@ class QuoteNumberAllocator
             ->max() ?? 0;
 
         return str_pad((string) ($max + 1), 2, '0', STR_PAD_LEFT);
+    }
+
+    /**
+     * その見積単位で、補足区分(T/K/S/B/H)をぶら下げられる元番号の一覧。
+     *
+     * 規約どおり補足区分は多段になりうる(N01K01B01 = 改造1回目の部品)ため、実在する注番の
+     * ハイフン以降をそのまま候補にする。あわせて先頭グループ(N99)も候補に入れる。
+     * 「N02B01〜B04」だけがあって「N02」単体の行が無い、という台帳の持ち方をするため、
+     * 実在する行だけを見ると元番号として N02 を選べなくなる。
+     *
+     * @return Collection<int, string>
+     */
+    public function baseNoChoices(string $customerCode, ?string $unitNo): Collection
+    {
+        $customerCode = strtoupper(trim($customerCode));
+        $unitNo = $this->normalizeUnit($unitNo);
+
+        if ($unitNo === null) {
+            return collect();
+        }
+
+        return $this->sameUnit($customerCode, $unitNo)
+            ->flatMap(function (QuoteNumber $q) {
+                $suffix = strtoupper(trim((string) $q->suffix));
+
+                if ($suffix === '') {
+                    return [];
+                }
+
+                $parsed = QuoteNumber::parseSuffix($suffix);
+                $head = $parsed !== null ? $parsed['quote_type'].$parsed['quote_seq'] : null;
+
+                return array_filter([$suffix, $head]);
+            })
+            ->unique()
+            ->sort()
+            ->values();
     }
 
     /**
@@ -285,14 +342,17 @@ class QuoteNumberAllocator
 
     /**
      * @param  array<int, string>  $missing
+     * @param  Collection<int, string>|null  $baseChoices
      * @return array<string, mixed>
      */
-    private function result(?string $candidate, ?string $unitNo, ?string $quoteType, ?string $quoteSeq, ?string $extra, array $missing, bool $duplicate): array
+    private function result(?string $candidate, ?string $unitNo, ?string $quoteType, ?string $quoteSeq, ?string $extra, array $missing, bool $duplicate, ?Collection $baseChoices = null): array
     {
         return [
             'candidate' => $candidate,
             'fell_back_to_new' => false,
             'quoted_old_format' => false,
+            'base_auto_selected' => false,
+            'base_choices' => $baseChoices ?? collect(),
             'unit_no' => $unitNo,
             'base_suffix' => null,
             'suffix' => null,

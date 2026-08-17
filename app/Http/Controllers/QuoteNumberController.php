@@ -29,21 +29,30 @@ class QuoteNumberController extends Controller
         // 「Q」なら客先の全件、「Q511」のように通番まで入れたら過去注番リストを絞る。
         // 客先の注番は900件を超えることがあり、目的の1件に辿り着けないため。
         $searchTerm = strtoupper(trim((string) $request->query('customer_code', '')));
-        preg_match('/^([A-Z]*)/', $searchTerm, $m);
+        preg_match('/^([A-Z]*)(\d*)/', $searchTerm, $m);
         $customerCode = $m[1];
 
         $mode = (string) $request->query('mode', '');
         $mode = array_key_exists($mode, QuoteNumberAllocator::MODES) ? $mode : '';
 
+        // 「TL091」のように通番まで入れて検索したら、その通番を採番の見積単位としても使う。
+        // 絞り込みのためだけに入れたつもりでも、画面上は特定の装置を指しているため
+        // (ここで拾わないと客先の老番+1に倒れ、別の装置の番号を発番してしまう)。
+        // 過去注番リストから引用したときは、そちらの通番を優先する。
+        $unitNo = trim((string) $request->query('unit_no', ''));
+        if ($unitNo === '') {
+            $unitNo = $m[2];
+        }
+
         $allocation = ($customerCode !== '' && $mode !== '')
-            ? $allocator->build($customerCode, $mode, $request->query('unit_no'), $request->query('base_no'))
+            ? $allocator->build($customerCode, $mode, $unitNo, $request->query('base_no'))
             : null;
 
         return view('quote-numbers.index', [
             'customerCode' => $customerCode,
             'searchTerm' => $searchTerm,
             'mode' => $mode,
-            'unitNo' => (string) $request->query('unit_no', ''),
+            'unitNo' => $unitNo,
             'baseNo' => (string) $request->query('base_no', ''),
             'allocation' => $allocation,
             'history' => $customerCode !== ''

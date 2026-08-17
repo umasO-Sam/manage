@@ -58,7 +58,9 @@
 
                 {{-- 案件種別と元番号。変えるたびに候補を計算し直すためGETで送る。 --}}
                 <form method="GET" action="{{ route('quote-numbers.index') }}" class="space-y-4">
-                <input type="hidden" name="customer_code" value="{{ $customerCode }}">
+                {{-- 検索語(「TL091」など)をそのまま持ち回る。客先番号だけに切り詰めると、
+                     案件種別を選んだ瞬間に過去注番リストの絞り込みが解けてしまう。 --}}
+                <input type="hidden" name="customer_code" value="{{ $searchTerm }}">
 
                 <div>
                     <span class="block text-[11px] font-bold text-slate-600 mb-1">案件種別（1つ選ぶと候補を計算します）</span>
@@ -97,10 +99,34 @@
                             <label class="block">
                                 <span class="block text-[11px] font-bold text-amber-800 mb-0.5">元の見積番号（ハイフン以降。N01 / N01K01 など）</span>
                                 {{-- プレースホルダが入力済みに見えないよう、薄い色にして「例：」を付ける。 --}}
-                                <input type="text" name="base_no" value="{{ $baseNo }}" placeholder="例：N01"
+                                <input type="text" name="base_no" value="{{ $baseNo }}" placeholder="例：N01" list="base-no-choices"
                                        class="border rounded-lg p-2 border-amber-300 text-sm font-mono uppercase w-32 placeholder:text-slate-300 placeholder:font-sans">
                                 <span class="block text-[10px] text-amber-700 mt-0.5">H（変更）は T/K/S/B の後ろにも付けられます。</span>
                             </label>
+                            {{-- この見積単位に実在する注番。どれにぶら下げるかを選ぶ。 --}}
+                            @if (($allocation['base_choices'] ?? collect())->isNotEmpty())
+                                <datalist id="base-no-choices">
+                                    @foreach ($allocation['base_choices'] as $choice)
+                                        <option value="{{ $choice }}"></option>
+                                    @endforeach
+                                </datalist>
+                                <div class="w-full">
+                                    <span class="block text-[11px] font-bold text-amber-800 mb-1">
+                                        {{ $customerCode }}{{ $allocation['unit_no'] }} にある注番（押すと元の見積番号に入ります）
+                                    </span>
+                                    <div class="flex flex-wrap gap-1.5">
+                                        {{-- GETで組み立てるだけなので、フォーム送信ではなくリンクにする
+                                             （入力欄の値を書き換えてから submit すると、反映前の値が飛ぶ）。 --}}
+                                        @foreach ($allocation['base_choices'] as $choice)
+                                            <a href="{{ route('quote-numbers.index', array_merge(request()->query(), ['base_no' => $choice])) }}"
+                                               class="px-2 py-1 rounded-lg border text-xs font-mono font-bold
+                                                      {{ $baseNo === $choice ? 'border-amber-500 bg-amber-100 text-amber-900' : 'border-amber-300 bg-white text-amber-800 hover:bg-amber-100' }}">
+                                                {{ $choice }}
+                                            </a>
+                                        @endforeach
+                                    </div>
+                                </div>
+                            @endif
                         @else
                             <input type="hidden" name="base_no" value="{{ $baseNo }}">
                         @endif
@@ -144,9 +170,17 @@
                         </p>
                         @if ($allocation['quoted_old_format'] ?? false)
                             <p class="mt-2 text-xs font-bold text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-2">
-                                引用した過去注番が<strong>今の形式に合わない</strong>ため（ハイフン以降の見積区分・通番を持たない旧形式）、
+                                {{ $customerCode }}{{ $allocation['unit_no'] }} に<strong>今の形式で読み取れる注番が無い</strong>ため
+                                （ハイフン以降の見積区分・通番を持たない旧形式）、
                                 <strong>元の見積番号を「{{ $allocation['base_suffix'] }}」として補って</strong>採番しています。
                                 実際の元注番が別の通番であれば、「元の見積番号」を直してから取得してください。
+                            </p>
+                        @endif
+                        @if ($allocation['base_auto_selected'] ?? false)
+                            <p class="mt-2 text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-lg p-2">
+                                {{ $customerCode }}{{ $allocation['unit_no'] }} にある注番が
+                                <span class="font-mono font-bold">{{ $allocation['base_suffix'] }}</span> の1つだけのため、
+                                これを元の見積番号として採番しています。
                             </p>
                         @endif
                         @if ($allocation['fell_back_to_new'] ?? false)

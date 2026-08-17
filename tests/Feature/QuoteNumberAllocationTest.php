@@ -589,4 +589,138 @@ class QuoteNumberAllocationTest extends TestCase
             ->assertOk()
             ->assertViewHas('allocation', fn (array $a) => $a['candidate'] === 'DH021-N01');
     }
+
+    /**
+     * 本番の TL091 と同じ形。通常番号 N01 のほかに、N02 にぶら下がる部品提供が
+     * B01〜B04 まであり、N02 単体の行は台帳に無い。
+     */
+    private function seedUnitWithSeveralBaseNumbers(): void
+    {
+        CustomerCode::create(['code' => 'TL', 'company_name' => 'テスト装置客先']);
+
+        foreach ([
+            ['TL091-N01', 'N01', 'N', '01', null],
+            ['TL091-N01T1', 'N01T1', 'N', '01', 'T'],
+            ['TL091-N02B01', 'N02B01', 'N', '02', 'B'],
+            ['TL091-N02B02', 'N02B02', 'N', '02', 'B'],
+            ['TL091-N02B03', 'N02B03', 'N', '02', 'B'],
+            ['TL091-N02B04', 'N02B04', 'N', '02', 'B'],
+        ] as [$full, $suffix, $type, $seq, $extra]) {
+            QuoteNumber::create([
+                'full_no' => $full, 'customer_code' => 'TL', 'unit_no' => '091', 'suffix' => $suffix,
+                'quote_type' => $type, 'quote_seq' => $seq, 'extra_code' => $extra, 'source' => 'legacy',
+            ]);
+        }
+
+        // 客先の老番。ここに倒れてしまうと別の装置の番号を発番することになる。
+        QuoteNumber::create([
+            'full_no' => 'TL147-N01', 'customer_code' => 'TL', 'unit_no' => '147', 'suffix' => 'N01',
+            'quote_type' => 'N', 'quote_seq' => '01', 'extra_code' => null, 'source' => 'legacy',
+        ]);
+    }
+
+    /**
+     * 見積単位に元番号が複数あるときは、どれにぶら下げるかを決められないので聞き返す。
+     * 勝手にどちらかを選ぶと、別の装置の部品として採番してしまう。
+     */
+    public function test_a_unit_with_several_base_numbers_asks_which_one_to_hang_off(): void
+    {
+        $this->seedUnitWithSeveralBaseNumbers();
+
+        $result = $this->allocator->build('TL', 'parts', '091', null);
+
+        $this->assertNull($result['candidate']);
+        $this->assertSame(['元の見積番号'], $result['missing']);
+        // 実在する注番と、その先頭グループ(台帳に単体の行が無い N02 を含む)。
+        $this->assertSame(
+            ['N01', 'N01T1', 'N02', 'N02B01', 'N02B02', 'N02B03', 'N02B04'],
+            $result['base_choices']->all()
+        );
+    }
+
+    /**
+     * 元番号を選べば、その番号にぶら下がる補足区分の老番+1で採番する。
+     */
+    public function test_choosing_the_base_number_hangs_the_parts_off_it(): void
+    {
+        $this->seedUnitWithSeveralBaseNumbers();
+
+        // N01 に部品提供はまだ無いので B01。
+        $this->assertSame('TL091-N01B01', $this->allocator->build('TL', 'parts', '091', 'N01')['candidate']);
+        // N02 は B04 まで使われているので B05。
+        $this->assertSame('TL091-N02B05', $this->allocator->build('TL', 'parts', '091', 'N02')['candidate']);
+        // 規約どおり B は改造(K)の後ろにも付く。
+        $this->assertSame('TL091-N01K01B01', $this->allocator->build('TL', 'parts', '091', 'N01K01')['candidate']);
+    }
+
+    /**
+     * 元番号が1つしか無ければ迷いようがないので自動で決める。
+     */
+    public function test_a_unit_with_a_single_base_number_selects_it_automatically(): void
+    {
+        $result = $this->allocator->build('DH', 'parts', '020', null);
+
+        $this->assertSame('DH020-N01B01', $result['candidate']);
+        $this->assertTrue($result['base_auto_selected']);
+        $this->assertFalse($result['fell_back_to_new']);
+        $this->assertFalse($result['quoted_old_format']);
+    }
+
+    /**
+     * 見積単位を指定しているときは新規案件に倒さない。特定の装置を指しておきながら
+     * 客先の老番+1(別の装置)を発番し、気づかず取得してしまう事故を防ぐ。
+     */
+    public function test_specifying_a_unit_does_not_fall_back_to_a_new_project(): void
+    {
+        $this->seedUnitWithSeveralBaseNumbers();
+
+        $result = $this->allocator->build('TL', 'parts', '091', null);
+
+        $this->assertFalse($result['fell_back_to_new']);
+        $this->assertNotSame('TL148-N01', $result['candidate']);
+
+        // 客先番号だけのときは従来どおり新規案件として採番する。
+        $withoutUnit = $this->allocator->build('TL', 'parts', null, null);
+        $this->assertSame('TL148-N01', $withoutUnit['candidate']);
+        $this->assertTrue($withoutUnit['fell_back_to_new']);
+    }
+
+    /**
+     * 「TL091」のように通番まで入れて検索したら、その通番を採番にも使う。
+     * 客先番号だけを見て老番+1に倒れると、別の装置の番号を発番してしまう。
+     */
+    public function test_the_searched_unit_number_is_used_for_the_allocation(): void
+    {
+        $this->seedUnitWithSeveralBaseNumbers();
+        $manager = Staff::factory()->procurementManager()->create();
+
+        $this->actingAs($manager)->get(route('quote-numbers.index', ['customer_code' => 'TL091', 'mode' => 'parts']))
+            ->assertOk()
+            ->assertViewHas('unitNo', '091')
+            ->assertViewHas('allocation', fn (array $a) => $a['candidate'] === null
+                && $a['missing'] === ['元の見積番号']
+                && $a['fell_back_to_new'] === false);
+
+        // 元番号を選べば候補が決まる。
+        $this->actingAs($manager)->get(route('quote-numbers.index', [
+            'customer_code' => 'TL091', 'mode' => 'parts', 'base_no' => 'N01',
+        ]))->assertOk()->assertViewHas('allocation', fn (array $a) => $a['candidate'] === 'TL091-N01B01');
+    }
+
+    /**
+     * 案件種別を選んでも過去注番リストの絞り込みを保つ。種別のフォームが客先番号だけを
+     * 送っていると、選んだ瞬間に絞り込みが解けて900件の一覧に戻ってしまう。
+     */
+    public function test_choosing_a_mode_keeps_the_history_filter(): void
+    {
+        $this->seedUnitWithSeveralBaseNumbers();
+        $manager = Staff::factory()->procurementManager()->create();
+
+        $this->actingAs($manager)->get(route('quote-numbers.index', ['customer_code' => 'TL091', 'mode' => 'parts']))
+            ->assertOk()
+            ->assertViewHas('searchTerm', 'TL091')
+            ->assertViewHas('history', fn ($history) => $history->count() === 6
+                && $history->every(fn ($q) => str_starts_with($q->full_no, 'TL091')))
+            ->assertSee('で絞り込み中');
+    }
 }
