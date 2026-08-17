@@ -184,6 +184,10 @@ Alpine.data('bulkPasteGrid', (initialText, columns, maxRows = 200) => ({
      * 日本語入力の変換中(isComposing)は何もしない。品名・商社名・メーカーは日本語を
      * 打つ列で、変換候補の選択に上下、確定にEnterを使うため、ここを見落とすと
      * 変換を確定しただけでセルが飛ぶ。
+     *
+     * 移動先を探すのは $el ではなく $root。イベントハンドラの中の $el は
+     * 「発火した要素」＝入力欄そのものを指すため、その中を探しても隣のセルは
+     * 見つからない(キーは効くが移動しないという症状になる)。
      */
     moveFocus(event, r, c, delta) {
         if (event.isComposing) {
@@ -192,7 +196,7 @@ Alpine.data('bulkPasteGrid', (initialText, columns, maxRows = 200) => ({
 
         event.preventDefault();
 
-        const target = this.$el.querySelector(`[data-cell="${r + delta}-${c}"]`);
+        const target = this.$root.querySelector(`[data-cell="${r + delta}-${c}"]`);
         if (target) {
             target.focus();
             target.select();
