@@ -220,6 +220,55 @@ class LaborRecordTest extends TestCase
             ->assertViewHas('rejectedRecords', fn ($rejected) => $rejected->count() === 1);
     }
 
+    /**
+     * 差し戻し枠の操作は由来で出し分ける。
+     * 仕入入力の分は日報を開いても直せない（時間帯を持たずグリッドに出ない）ため修正・削除を出し、
+     * 作業日報の分は本人が出し直せば作り直されるので触らせず日報へ誘導する。
+     */
+    public function test_a_rejected_daily_report_record_only_links_to_the_report(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        $record = $this->makeRejectedRecord('FROM-REPORT', LaborCost::ORIGIN_DAILY_REPORT);
+
+        // 「修正」「削除」「日報」の語はメニューや説明文にも出るため、その行に固有のURLで判定する。
+        $this->actingAs($manager)->get(route('labor-records.index'))
+            ->assertOk()
+            ->assertSee('FROM-REPORT')
+            // 本人が日報を出し直せば作り直されるので、ここでは触らせない。
+            ->assertDontSee('labor-records/'.$record->id, false)
+            ->assertSee('daily-reports/review?date=2026-08-05', false);
+    }
+
+    public function test_a_rejected_purchase_input_record_offers_edit_and_delete(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        $record = $this->makeRejectedRecord('FROM-INPUT', LaborCost::ORIGIN_PURCHASE_INPUT);
+
+        $this->actingAs($manager)->get(route('labor-records.index'))
+            ->assertOk()
+            ->assertSee('FROM-INPUT')
+            // 修正フォームと削除フォームの送信先。
+            ->assertSee('labor-records/'.$record->id, false)
+            // 日報を開いても直せない（時間帯を持たずグリッドに出ない）ため誘導しない。
+            ->assertDontSee('daily-reports/review?date=2026-08-05', false);
+    }
+
+    /** 差し戻し中の日報にぶら下がる未確認レコードを1件作る。 */
+    private function makeRejectedRecord(string $orderNo, string $origin): LaborCost
+    {
+        $staff = Staff::factory()->create();
+        $report = DailyReport::create([
+            'staff_id' => $staff->id, 'work_date' => '2026-08-05', 'submitted_at' => now(),
+            'rejected_at' => now(), 'rejection_reason' => '要修正',
+        ]);
+
+        return LaborCost::create([
+            'work_date' => '2026-08-05', 'staff_id' => $staff->id, 'daily_report_id' => $report->id,
+            'order_no' => $orderNo, 'work_hours' => 1, 'work_minutes' => 0,
+            'is_overtime' => false, 'is_provisional' => true, 'origin' => $origin,
+        ]);
+    }
+
     /** 差し戻し枠のレコードも削除できる。 */
     public function test_a_rejected_record_can_be_deleted(): void
     {

@@ -184,6 +184,7 @@
                                 <span class="text-sm font-bold text-red-900">差し戻し {{ $rejectedRecords->count() }}件</span>
                                 <span class="text-[11px] text-red-800">
                                     作業日報が差し戻されたまま未確認で残っている人工です。確定していないため原価計算には乗りません。
+                                    仕入入力の分はここで直し、作業日報の分は本人に出し直してもらってください。
                                 </span>
                             </div>
                             <div class="overflow-x-auto">
@@ -225,28 +226,38 @@
                                                         {{ $rejectedRecord->dailyReport?->rejection_reason ?: '—' }}
                                                     </div>
                                                 </td>
+                                                {{-- 由来で直し方が違うので、操作も出し分ける。
+                                                     仕入入力の分は日報を開いても直せない（時間帯を持たず
+                                                     グリッドに出ない）ため、ここで直接修正・削除する。
+                                                     作業日報の分は本人が日報を出し直せば作り直されるので、
+                                                     ここでは触らせず日報へ誘導する。 --}}
                                                 <td class="p-2.5 whitespace-nowrap text-center">
                                                     <div class="flex items-center gap-1 justify-center">
-                                                        <button type="button" @click="editing = ! editing"
-                                                                class="px-2 py-1 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-50 font-bold">修正</button>
-                                                        <form method="POST" action="{{ route('labor-records.destroy', $rejectedRecord) }}"
-                                                              onsubmit="return confirm('この人工レコードを削除します。よろしいですか？');">
-                                                            @csrf
-                                                            @method('DELETE')
-                                                            <button type="submit"
-                                                                    class="px-2 py-1 rounded-lg border border-red-300 text-red-600 hover:bg-red-50 font-bold">削除</button>
-                                                        </form>
-                                                        <a href="{{ route('daily-reports.review.index', ['date' => $rejectedRecord->work_date?->format('Y-m-d')]) }}"
-                                                           class="px-2 py-1 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-50 font-bold">日報</a>
+                                                        @if ($rejectedRecord->origin === \App\Models\LaborCost::ORIGIN_PURCHASE_INPUT)
+                                                            <button type="button" @click="editing = ! editing"
+                                                                    class="px-2 py-1 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-50 font-bold">修正</button>
+                                                            <form method="POST" action="{{ route('labor-records.destroy', $rejectedRecord) }}"
+                                                                  onsubmit="return confirm('この人工レコードを削除します。よろしいですか？');">
+                                                                @csrf
+                                                                @method('DELETE')
+                                                                <button type="submit"
+                                                                        class="px-2 py-1 rounded-lg border border-red-300 text-red-600 hover:bg-red-50 font-bold">削除</button>
+                                                            </form>
+                                                        @else
+                                                            <a href="{{ route('daily-reports.review.index', ['date' => $rejectedRecord->work_date?->format('Y-m-d')]) }}"
+                                                               class="px-2 py-1 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-50 font-bold">日報</a>
+                                                        @endif
                                                     </div>
                                                 </td>
                                             </tr>
-                                            <tr x-show="editing" x-cloak class="bg-slate-50">
-                                                <td colspan="9" class="p-3">
-                                                    {{-- 修正しても未確認のまま。確定は作業日報確認で行う。 --}}
-                                                    @include('labor-records.partials.edit-form', ['record' => $rejectedRecord, 'rejected' => true])
-                                                </td>
-                                            </tr>
+                                            @if ($rejectedRecord->origin === \App\Models\LaborCost::ORIGIN_PURCHASE_INPUT)
+                                                <tr x-show="editing" x-cloak class="bg-slate-50">
+                                                    <td colspan="9" class="p-3">
+                                                        {{-- 修正しても未確認のまま。確定は作業日報確認で行う。 --}}
+                                                        @include('labor-records.partials.edit-form', ['record' => $rejectedRecord, 'rejected' => true])
+                                                    </td>
+                                                </tr>
+                                            @endif
                                     </tbody>
                                     @endforeach
                                 </table>
