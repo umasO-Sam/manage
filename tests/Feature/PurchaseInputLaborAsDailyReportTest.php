@@ -164,6 +164,56 @@ class PurchaseInputLaborAsDailyReportTest extends TestCase
         $this->assertSame(LaborCost::ORIGIN_DAILY_REPORT, LaborCost::where('order_no', 'FROM-REPORT')->sole()->origin);
     }
 
+    /**
+     * 差し戻しても人工レコードは消えない。未確認(is_provisional=true)のまま残り、
+     * 原価計算には乗らない状態で保持される。差し戻しが変えるのは日報の状態だけ。
+     */
+    public function test_rejecting_the_report_keeps_the_labor_as_unconfirmed(): void
+    {
+        Mail::fake();
+        $worker = Staff::factory()->create(['position_weight' => 1]);
+        $this->actingAs($this->manager())->post(route('purchasing.input.store'), $this->laborPayload($worker));
+        $report = DailyReport::sole();
+
+        $this->actingAs($this->reviewer())->post(route('daily-reports.review.decide', $report), [
+            'action' => 'reject',
+            'rejection_reason' => '注番が違います',
+        ])->assertRedirect();
+
+        $labor = LaborCost::sole();
+        $this->assertTrue($labor->is_provisional, '差し戻しても消えず、未確認のまま残る');
+        $this->assertSame(LaborCost::ORIGIN_PURCHASE_INPUT, $labor->origin);
+        $this->assertSame($report->id, $labor->daily_report_id, '日報とのつながりも切れない');
+        $this->assertNotNull($report->fresh()->rejected_at);
+    }
+
+    /**
+     * 差し戻し中の人工は「人工レコード」画面には出ない(確定済みだけを扱う画面のため)。
+     * 作業日報の確認画面で日付を指定すれば見られる。
+     */
+    public function test_rejected_labor_does_not_appear_on_the_labor_record_screen(): void
+    {
+        Mail::fake();
+        $worker = Staff::factory()->create(['position_weight' => 1]);
+        $manager = $this->manager();
+        $this->actingAs($manager)->post(route('purchasing.input.store'), $this->laborPayload($worker));
+        $report = DailyReport::sole();
+
+        $this->actingAs($this->reviewer())->post(route('daily-reports.review.decide', $report), [
+            'action' => 'reject',
+            'rejection_reason' => '注番が違います',
+        ]);
+
+        $this->actingAs($manager)->get(route('labor-records.index'))
+            ->assertOk()
+            ->assertViewHas('records', fn ($records) => $records->isEmpty());
+
+        // 作業日報の確認画面では、日付を指定すればその日の日報として出てくる。
+        $this->actingAs($this->reviewer())->get(route('daily-reports.review.index', ['date' => '2026-08-05']))
+            ->assertOk()
+            ->assertViewHas('reports', fn ($reports) => $reports->contains('id', $report->id));
+    }
+
     /** 差し戻しは代理提出と同じく、日報単位で効く。 */
     public function test_rejecting_the_report_notifies_the_worker(): void
     {

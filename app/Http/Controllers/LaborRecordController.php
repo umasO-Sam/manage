@@ -17,6 +17,9 @@ class LaborRecordController extends Controller
      * 同じ一覧で確認する。どちらも確定済み(is_provisional=false)が対象で、
      * originで「日報」「仕入入力」を区別して表示する。
      * 未確定(is_provisional=true)の日報由来レコードは作業日報確認で扱うためここには出さない。
+     *
+     * 例外として、差し戻された日報にぶら下がったままの未確認レコードだけは一覧の下に
+     * 別枠で出す。差し戻すと確認待ちの集計からも外れるため、どこにも出ないまま滞留するのを防ぐ。
      */
     public function index(Request $request): View
     {
@@ -27,33 +30,49 @@ class LaborRecordController extends Controller
         $orderNo = trim((string) $request->query('order_no', ''));
         $source = (string) $request->query('source', '');
 
-        $query = LaborCost::query()
-            ->with(['staff', 'category'])
-            ->where('is_provisional', false);
+        // 一覧と差し戻し枠で同じ条件を使う。片方だけ絞り込まれていると、
+        // 日付で絞ったときに無関係な差し戻しが並んで混乱するため。
+        $applyFilters = function ($query) use ($dateFrom, $dateTo, $staffId, $categoryId, $orderNo, $source) {
+            // 日付カラムへの文字列比較は境界日を取りこぼすことがあるため、必ずwhereDateで比較する。
+            if ($dateFrom !== '') {
+                $query->whereDate('work_date', '>=', $dateFrom);
+            }
+            if ($dateTo !== '') {
+                $query->whereDate('work_date', '<=', $dateTo);
+            }
+            if ($staffId !== '') {
+                $query->where('staff_id', $staffId);
+            }
+            if ($categoryId !== '') {
+                $query->where('category_id', $categoryId);
+            }
+            if ($orderNo !== '') {
+                $query->where('order_no', 'like', '%'.$orderNo.'%');
+            }
+            // 仕入管理から入れた人工も日報にぶら下がるようになったため、daily_report_idの
+            // 有無ではなく origin で見分ける。
+            if (in_array($source, [LaborCost::ORIGIN_DAILY_REPORT, LaborCost::ORIGIN_PURCHASE_INPUT], true)) {
+                $query->where('origin', $source);
+            }
 
-        // 日付カラムへの文字列比較は境界日を取りこぼすことがあるため、必ずwhereDateで比較する。
-        if ($dateFrom !== '') {
-            $query->whereDate('work_date', '>=', $dateFrom);
-        }
-        if ($dateTo !== '') {
-            $query->whereDate('work_date', '<=', $dateTo);
-        }
-        if ($staffId !== '') {
-            $query->where('staff_id', $staffId);
-        }
-        if ($categoryId !== '') {
-            $query->where('category_id', $categoryId);
-        }
-        if ($orderNo !== '') {
-            $query->where('order_no', 'like', '%'.$orderNo.'%');
-        }
-        // 仕入管理から入れた人工も日報にぶら下がるようになったため、daily_report_idの
-        // 有無ではなく origin で見分ける。
-        if (in_array($source, [LaborCost::ORIGIN_DAILY_REPORT, LaborCost::ORIGIN_PURCHASE_INPUT], true)) {
-            $query->where('origin', $source);
-        }
+            return $query;
+        };
+
+        $query = $applyFilters(
+            LaborCost::query()->with(['staff', 'category'])->where('is_provisional', false)
+        );
 
         $records = $query->orderByDesc('work_date')->orderByDesc('id')->paginate(100)->withQueryString();
+
+        // 差し戻された日報にぶら下がったまま未確認で残っている人工。確定していないので
+        // 上の一覧には出ず、確認待ちのバッジからも外れるため、放っておくと誰の目にも
+        // 触れずに滞留する。ここに別枠で出して拾えるようにする。
+        $rejectedRecords = $applyFilters(
+            LaborCost::query()
+                ->with(['staff', 'category', 'dailyReport'])
+                ->where('is_provisional', true)
+                ->whereHas('dailyReport', fn ($q) => $q->whereNotNull('rejected_at'))
+        )->orderByDesc('work_date')->orderByDesc('id')->get();
 
         $totalMinutes = 0;
         foreach ($records as $record) {
@@ -62,6 +81,7 @@ class LaborRecordController extends Controller
 
         return view('labor-records.index', [
             'records' => $records,
+            'rejectedRecords' => $rejectedRecords,
             'staffList' => Staff::forRoster()->get(),
             'categories' => $this->categoriesUsedInLaborCosts(),
             // 絞り込み用(実際に使われている分類のみ)とは別に、修正時は全分類から選べるようにする。

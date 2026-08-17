@@ -11,6 +11,7 @@
 
             <p class="text-xs text-slate-500">
                 作業日報の確認で確定した人工レコードと、仕入管理のデータ入力で登録した人工レコードを表示しています。
+                作業日報が差し戻されたまま未確認で残っている分は、一覧の下に「差し戻し」として別枠で出します。
             </p>
 
             @if (session('status') === 'labor-record-updated')
@@ -244,6 +245,67 @@
 
                     @if ($records->hasPages())
                         <div>{{ $records->links() }}</div>
+                    @endif
+
+                    {{-- 差し戻された日報にぶら下がったままの未確認レコード。確定していないので
+                         上の一覧には出ず、確認待ちのバッジからも外れるため、ここで拾えるようにする。 --}}
+                    @if ($rejectedRecords->isNotEmpty())
+                        <div class="bg-white rounded-xl border border-red-200 shadow-sm overflow-hidden">
+                            <div class="px-4 py-2.5 bg-red-50 border-b border-red-200 flex items-center justify-between gap-3 flex-wrap">
+                                <span class="text-sm font-bold text-red-900">差し戻し {{ $rejectedRecords->count() }}件</span>
+                                <span class="text-[11px] text-red-800">
+                                    作業日報が差し戻されたまま未確認で残っている人工です。確定していないため原価計算には乗りません。
+                                </span>
+                            </div>
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-left border-collapse text-xs">
+                                    <thead>
+                                        <tr class="bg-slate-50 border-b border-slate-200 font-semibold text-slate-600">
+                                            <th class="p-2.5 whitespace-nowrap">作業日</th>
+                                            <th class="p-2.5 whitespace-nowrap">担当者</th>
+                                            <th class="p-2.5 whitespace-nowrap">注番</th>
+                                            <th class="p-2.5 whitespace-nowrap">分類</th>
+                                            <th class="p-2.5 text-right whitespace-nowrap">時間</th>
+                                            <th class="p-2.5 text-right whitespace-nowrap">人工</th>
+                                            <th class="p-2.5 whitespace-nowrap">登録元</th>
+                                            <th class="p-2.5">差し戻し理由</th>
+                                            <th class="p-2.5 whitespace-nowrap text-center">操作</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-slate-100">
+                                        @foreach ($rejectedRecords as $rejected)
+                                            <tr class="hover:bg-red-50">
+                                                <td class="p-2.5 whitespace-nowrap">{{ $rejected->work_date?->format('Y/m/d') }}</td>
+                                                <td class="p-2.5 font-bold whitespace-nowrap">{{ $rejected->staff?->name ?? '-' }}</td>
+                                                <td class="p-2.5 font-mono whitespace-nowrap">{{ $rejected->order_no ?: '-' }}</td>
+                                                <td class="p-2.5 font-mono whitespace-nowrap text-center"
+                                                    title="{{ $rejected->category ? $rejected->category->code.'：'.$rejected->category->item_name : '未分類' }}">
+                                                    {{ $rejected->category?->code ?? '—' }}
+                                                </td>
+                                                <td class="p-2.5 text-right whitespace-nowrap">{{ $rejected->work_hours }}h {{ $rejected->work_minutes }}m</td>
+                                                <td class="p-2.5 text-right font-bold text-slate-700 whitespace-nowrap">{{ round($rejected->totalMinutes() / 480, 3) }}</td>
+                                                <td class="p-2.5 whitespace-nowrap">
+                                                    @if ($rejected->origin === \App\Models\LaborCost::ORIGIN_DAILY_REPORT)
+                                                        <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 border border-emerald-200">作業日報</span>
+                                                    @else
+                                                        <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 border border-blue-200">仕入入力</span>
+                                                    @endif
+                                                </td>
+                                                <td class="p-2.5 text-slate-600" title="{{ $rejected->dailyReport?->rejection_reason }}">
+                                                    <div style="max-width: 18rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                                                        {{ $rejected->dailyReport?->rejection_reason ?: '—' }}
+                                                    </div>
+                                                </td>
+                                                <td class="p-2.5 whitespace-nowrap text-center">
+                                                    <a href="{{ route('daily-reports.review.index', ['date' => $rejected->work_date?->format('Y-m-d')]) }}"
+                                                       class="px-2 py-1 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-50 font-bold">日報を開く</a>
+                                                </td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
                     @endif
                 </div>
             </div>

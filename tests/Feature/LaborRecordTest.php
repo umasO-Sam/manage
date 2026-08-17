@@ -137,6 +137,89 @@ class LaborRecordTest extends TestCase
             ->assertDontSee('PROVISIONAL-1');
     }
 
+    /**
+     * 差し戻された日報にぶら下がったままの未確認レコードは、一覧の下に別枠で出す。
+     * 確定していないので上の一覧には出ず、確認待ちのバッジからも外れるため、
+     * ここに出さないとどこにも現れないまま滞留する。
+     */
+    public function test_shows_rejected_records_in_a_separate_block(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        $staff = Staff::factory()->create(['name' => '差戻太郎']);
+
+        $rejectedReport = DailyReport::create([
+            'staff_id' => $staff->id, 'work_date' => '2026-08-05', 'submitted_at' => now(),
+            'rejected_at' => now(), 'rejection_reason' => '注番が違います',
+        ]);
+        LaborCost::create([
+            'work_date' => '2026-08-05', 'staff_id' => $staff->id, 'daily_report_id' => $rejectedReport->id,
+            'order_no' => 'REJECTED-1', 'work_hours' => 2, 'work_minutes' => 0,
+            'is_overtime' => false, 'is_provisional' => true, 'origin' => LaborCost::ORIGIN_PURCHASE_INPUT,
+        ]);
+
+        // 差し戻されていない確認待ちは、従来どおりどちらにも出さない(作業日報確認で扱う)。
+        $pendingReport = DailyReport::create([
+            'staff_id' => $staff->id, 'work_date' => '2026-08-06', 'submitted_at' => now(),
+        ]);
+        LaborCost::create([
+            'work_date' => '2026-08-06', 'staff_id' => $staff->id, 'daily_report_id' => $pendingReport->id,
+            'order_no' => 'PENDING-1', 'work_hours' => 2, 'work_minutes' => 0,
+            'is_overtime' => false, 'is_provisional' => true, 'origin' => LaborCost::ORIGIN_PURCHASE_INPUT,
+        ]);
+
+        $this->actingAs($manager)->get(route('labor-records.index'))
+            ->assertOk()
+            ->assertSee('差し戻し 1件')
+            ->assertSee('REJECTED-1')
+            ->assertSee('注番が違います')
+            ->assertDontSee('PENDING-1')
+            // 上の一覧(確定済み)には入れない。
+            ->assertViewHas('records', fn ($records) => $records->isEmpty())
+            ->assertViewHas('rejectedRecords', fn ($rejected) => $rejected->count() === 1
+                && $rejected->first()->order_no === 'REJECTED-1');
+    }
+
+    /** 差し戻しが無ければ枠ごと出さない。 */
+    public function test_the_rejected_block_is_hidden_when_there_is_none(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+
+        $this->actingAs($manager)->get(route('labor-records.index'))
+            ->assertOk()
+            // 画面上部の説明文にも「差し戻し」の語があるため、枠の中身で判定する。
+            ->assertDontSee('差し戻し理由')
+            ->assertViewHas('rejectedRecords', fn ($rejected) => $rejected->isEmpty());
+    }
+
+    /**
+     * 差し戻し枠にも一覧と同じ絞り込みを効かせる。片方だけ絞り込まれていると、
+     * 日付で絞ったときに無関係な差し戻しが並んで混乱する。
+     */
+    public function test_the_rejected_block_follows_the_same_filters(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        $staff = Staff::factory()->create();
+
+        foreach ([['2026-08-05', 'IN-RANGE'], ['2026-09-05', 'OUT-OF-RANGE']] as [$date, $orderNo]) {
+            $report = DailyReport::create([
+                'staff_id' => $staff->id, 'work_date' => $date, 'submitted_at' => now(),
+                'rejected_at' => now(), 'rejection_reason' => '要修正',
+            ]);
+            LaborCost::create([
+                'work_date' => $date, 'staff_id' => $staff->id, 'daily_report_id' => $report->id,
+                'order_no' => $orderNo, 'work_hours' => 1, 'work_minutes' => 0,
+                'is_overtime' => false, 'is_provisional' => true, 'origin' => LaborCost::ORIGIN_PURCHASE_INPUT,
+            ]);
+        }
+
+        $this->actingAs($manager)->get(route('labor-records.index', [
+            'date_from' => '2026-08-01', 'date_to' => '2026-08-31',
+        ]))
+            ->assertOk()
+            ->assertSee('IN-RANGE')
+            ->assertDontSee('OUT-OF-RANGE');
+    }
+
     public function test_filters_by_order_no(): void
     {
         $manager = Staff::factory()->procurementManager()->create();
