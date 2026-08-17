@@ -88,6 +88,11 @@ ssh -i ~/.ssh/xserver_manage -p 10022 saitokoken@saitokoken.xsrv.jp 'cd ~/manage
 npm run build
 ```
 
+転送は上書き展開のため、本番の `public/build/assets/` には**過去のビルド成果物が溜まっていく**
+（2026-08-17時点で16ファイル）。使われるのは `manifest.json` が指す2つだけなので実害は無いが、
+気になったら manifest が指すファイル以外を消す。**反映直後は消さない**（古いページを開いたままの
+利用者がいる）。
+
 ```bash
 tar czf build.tar.gz -C public build
 scp -i ~/.ssh/xserver_manage -P 10022 build.tar.gz saitokoken@saitokoken.xsrv.jp:~/manage/
