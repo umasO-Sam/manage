@@ -92,9 +92,13 @@ class LaborRecordController extends Controller
     }
 
     /**
-     * 確定済み人工レコードを1件修正する。作業日報由来のレコードもここで直接直せるが、
+     * 人工レコードを1件修正する。作業日報由来のレコードもここで直接直せるが、
      * その日報が再提出されると syncLaborCosts() により作り直されて修正内容は失われる
      * (画面上でもその旨を注意書きしている)。
+     *
+     * 差し戻し中の未確認レコードもこの経路で直す。**is_provisional は変えない**ので、
+     * 直しても未確認のまま＝作業日報確認の対象として残る。ここで確定にしてしまうと
+     * 誰も内容を確認しないまま原価計算に乗ってしまう。
      */
     public function update(Request $request, LaborCost $laborRecord): RedirectResponse
     {

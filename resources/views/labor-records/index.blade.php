@@ -156,79 +156,8 @@
                                             </td>
                                         </tr>
                                         <tr x-show="editing" x-cloak class="bg-slate-50">
-                                            {{-- 幅の要になるのは分類のセレクト。selectの既定幅は最も長い選択肢
-                                                 （分類名は200文字を超えるものがある）で決まるため、幅を指定しないと
-                                                 表ごと数千pxに広がり、保存ボタンまで右に見切れる。ここで幅を抑えれば
-                                                 表は画面内に収まり、項目は折り返して複数行に並ぶ。
-                                                 Tailwindの任意値クラスはビルドできないためインラインstyleで指定する。 --}}
                                             <td colspan="9" class="p-3">
-                                                <form method="POST" action="{{ route('labor-records.update', $record) }}"
-                                                      class="flex flex-wrap items-end gap-3">
-                                                    @csrf
-                                                    @method('PUT')
-                                                    <label class="block">
-                                                        <span class="block text-[11px] font-bold text-slate-600 mb-0.5">作業日</span>
-                                                        <input type="date" name="work_date" value="{{ $record->work_date?->format('Y-m-d') }}"
-                                                               class="border rounded-lg p-1.5 border-slate-300 text-xs" required>
-                                                    </label>
-                                                    <label class="block">
-                                                        <span class="block text-[11px] font-bold text-slate-600 mb-0.5">担当者</span>
-                                                        <select name="staff_id" class="border rounded-lg p-1.5 border-slate-300 text-xs"
-                                                                style="width: 9rem;" required>
-                                                            @foreach ($staffList as $person)
-                                                                <option value="{{ $person->id }}" @selected($record->staff_id === $person->id)>{{ $person->name }}</option>
-                                                            @endforeach
-                                                        </select>
-                                                    </label>
-                                                    <label class="block">
-                                                        <span class="block text-[11px] font-bold text-slate-600 mb-0.5">注番</span>
-                                                        <input type="text" name="order_no" value="{{ $record->order_no }}"
-                                                               class="border rounded-lg p-1.5 border-slate-300 text-xs font-mono w-40">
-                                                    </label>
-                                                    <label class="block">
-                                                        <span class="block text-[11px] font-bold text-slate-600 mb-0.5">分類</span>
-                                                        {{-- 選択肢は200文字を超えることがある。閉じている間は幅を固定して
-                                                             表を広げないようにし、開いたときは一覧側で全文が読める。 --}}
-                                                        <select name="category_id" class="border rounded-lg p-1.5 border-slate-300 text-xs"
-                                                                style="width: 16rem;">
-                                                            <option value="">未分類</option>
-                                                            @foreach ($editableCategories as $category)
-                                                                <option value="{{ $category->id }}" @selected($record->category_id === $category->id)
-                                                                        title="{{ $category->code }}：{{ $category->item_name }}">{{ $category->code }}：{{ $category->item_name }}</option>
-                                                            @endforeach
-                                                        </select>
-                                                    </label>
-                                                    <label class="block">
-                                                        <span class="block text-[11px] font-bold text-slate-600 mb-0.5">時間</span>
-                                                        <input type="number" name="work_hours" min="0" max="99" value="{{ $record->work_hours }}"
-                                                               class="border rounded-lg p-1.5 border-slate-300 text-xs w-16" required>
-                                                    </label>
-                                                    <label class="block">
-                                                        <span class="block text-[11px] font-bold text-slate-600 mb-0.5">分</span>
-                                                        <input type="number" name="work_minutes" min="0" max="59" value="{{ $record->work_minutes }}"
-                                                               class="border rounded-lg p-1.5 border-slate-300 text-xs w-16" required>
-                                                    </label>
-                                                    <label class="flex items-center gap-1 text-xs font-bold text-slate-600 pb-1.5">
-                                                        <input type="hidden" name="is_overtime" value="0">
-                                                        <input type="checkbox" name="is_overtime" value="1" @checked($record->is_overtime)>
-                                                        時間外
-                                                    </label>
-                                                    <label class="block flex-1 min-w-[10rem]">
-                                                        <span class="block text-[11px] font-bold text-slate-600 mb-0.5">補足</span>
-                                                        <input type="text" name="note" value="{{ $record->note }}"
-                                                               class="border rounded-lg p-1.5 border-slate-300 text-xs w-full">
-                                                    </label>
-                                                    <div class="flex items-center gap-2 pb-0.5">
-                                                        <button type="submit" class="px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-bold hover:bg-blue-700">保存</button>
-                                                        <button type="button" @click="editing = false"
-                                                                class="px-3 py-1.5 rounded-lg border border-slate-300 text-slate-600 text-xs font-bold">取消</button>
-                                                    </div>
-                                                    @if ($record->origin === \App\Models\LaborCost::ORIGIN_DAILY_REPORT)
-                                                        <p class="w-full text-[11px] text-amber-700">
-                                                            このレコードは作業日報から生成されています。本人が同じ日の日報を修正提出すると、この修正内容は日報の内容で作り直されます。
-                                                        </p>
-                                                    @endif
-                                                </form>
+                                                @include('labor-records.partials.edit-form', ['record' => $record])
                                             </td>
                                         </tr>
                                     </tbody>
@@ -272,37 +201,54 @@
                                             <th class="p-2.5 whitespace-nowrap text-center">操作</th>
                                         </tr>
                                     </thead>
-                                    <tbody class="divide-y divide-slate-100">
-                                        @foreach ($rejectedRecords as $rejected)
+                                    @foreach ($rejectedRecords as $rejectedRecord)
+                                    <tbody class="divide-y divide-slate-100 border-b border-slate-100" x-data="{ editing: false }">
                                             <tr class="hover:bg-red-50">
-                                                <td class="p-2.5 whitespace-nowrap">{{ $rejected->work_date?->format('Y/m/d') }}</td>
-                                                <td class="p-2.5 font-bold whitespace-nowrap">{{ $rejected->staff?->name ?? '-' }}</td>
-                                                <td class="p-2.5 font-mono whitespace-nowrap">{{ $rejected->order_no ?: '-' }}</td>
+                                                <td class="p-2.5 whitespace-nowrap">{{ $rejectedRecord->work_date?->format('Y/m/d') }}</td>
+                                                <td class="p-2.5 font-bold whitespace-nowrap">{{ $rejectedRecord->staff?->name ?? '-' }}</td>
+                                                <td class="p-2.5 font-mono whitespace-nowrap">{{ $rejectedRecord->order_no ?: '-' }}</td>
                                                 <td class="p-2.5 font-mono whitespace-nowrap text-center"
-                                                    title="{{ $rejected->category ? $rejected->category->code.'：'.$rejected->category->item_name : '未分類' }}">
-                                                    {{ $rejected->category?->code ?? '—' }}
+                                                    title="{{ $rejectedRecord->category ? $rejectedRecord->category->code.'：'.$rejectedRecord->category->item_name : '未分類' }}">
+                                                    {{ $rejectedRecord->category?->code ?? '—' }}
                                                 </td>
-                                                <td class="p-2.5 text-right whitespace-nowrap">{{ $rejected->work_hours }}h {{ $rejected->work_minutes }}m</td>
-                                                <td class="p-2.5 text-right font-bold text-slate-700 whitespace-nowrap">{{ round($rejected->totalMinutes() / 480, 3) }}</td>
+                                                <td class="p-2.5 text-right whitespace-nowrap">{{ $rejectedRecord->work_hours }}h {{ $rejectedRecord->work_minutes }}m</td>
+                                                <td class="p-2.5 text-right font-bold text-slate-700 whitespace-nowrap">{{ round($rejectedRecord->totalMinutes() / 480, 3) }}</td>
                                                 <td class="p-2.5 whitespace-nowrap">
-                                                    @if ($rejected->origin === \App\Models\LaborCost::ORIGIN_DAILY_REPORT)
+                                                    @if ($rejectedRecord->origin === \App\Models\LaborCost::ORIGIN_DAILY_REPORT)
                                                         <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 border border-emerald-200">作業日報</span>
                                                     @else
                                                         <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 border border-blue-200">仕入入力</span>
                                                     @endif
                                                 </td>
-                                                <td class="p-2.5 text-slate-600" title="{{ $rejected->dailyReport?->rejection_reason }}">
+                                                <td class="p-2.5 text-slate-600" title="{{ $rejectedRecord->dailyReport?->rejection_reason }}">
                                                     <div style="max-width: 18rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                                                        {{ $rejected->dailyReport?->rejection_reason ?: '—' }}
+                                                        {{ $rejectedRecord->dailyReport?->rejection_reason ?: '—' }}
                                                     </div>
                                                 </td>
                                                 <td class="p-2.5 whitespace-nowrap text-center">
-                                                    <a href="{{ route('daily-reports.review.index', ['date' => $rejected->work_date?->format('Y-m-d')]) }}"
-                                                       class="px-2 py-1 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-50 font-bold">日報を開く</a>
+                                                    <div class="flex items-center gap-1 justify-center">
+                                                        <button type="button" @click="editing = ! editing"
+                                                                class="px-2 py-1 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-50 font-bold">修正</button>
+                                                        <form method="POST" action="{{ route('labor-records.destroy', $rejectedRecord) }}"
+                                                              onsubmit="return confirm('この人工レコードを削除します。よろしいですか？');">
+                                                            @csrf
+                                                            @method('DELETE')
+                                                            <button type="submit"
+                                                                    class="px-2 py-1 rounded-lg border border-red-300 text-red-600 hover:bg-red-50 font-bold">削除</button>
+                                                        </form>
+                                                        <a href="{{ route('daily-reports.review.index', ['date' => $rejectedRecord->work_date?->format('Y-m-d')]) }}"
+                                                           class="px-2 py-1 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-50 font-bold">日報</a>
+                                                    </div>
                                                 </td>
                                             </tr>
-                                        @endforeach
+                                            <tr x-show="editing" x-cloak class="bg-slate-50">
+                                                <td colspan="9" class="p-3">
+                                                    {{-- 修正しても未確認のまま。確定は作業日報確認で行う。 --}}
+                                                    @include('labor-records.partials.edit-form', ['record' => $rejectedRecord, 'rejected' => true])
+                                                </td>
+                                            </tr>
                                     </tbody>
+                                    @endforeach
                                 </table>
                             </div>
                         </div>

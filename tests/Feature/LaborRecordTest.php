@@ -179,6 +179,67 @@ class LaborRecordTest extends TestCase
                 && $rejected->first()->order_no === 'REJECTED-1');
     }
 
+    /**
+     * 差し戻し枠のレコードも修正できる。ただし修正しても確定させない
+     * (未確認のまま＝作業日報確認の対象として残す)。ここで確定にしてしまうと、
+     * 誰も内容を確認しないまま原価計算に乗ってしまう。
+     */
+    public function test_a_rejected_record_can_be_edited_and_stays_unconfirmed(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        $staff = Staff::factory()->create();
+        $report = DailyReport::create([
+            'staff_id' => $staff->id, 'work_date' => '2026-08-05', 'submitted_at' => now(),
+            'rejected_at' => now(), 'rejection_reason' => '注番が違います',
+        ]);
+        $record = LaborCost::create([
+            'work_date' => '2026-08-05', 'staff_id' => $staff->id, 'daily_report_id' => $report->id,
+            'order_no' => 'WRONG-1', 'work_hours' => 2, 'work_minutes' => 0,
+            'is_overtime' => false, 'is_provisional' => true, 'origin' => LaborCost::ORIGIN_PURCHASE_INPUT,
+        ]);
+
+        $this->actingAs($manager)->put(route('labor-records.update', $record), [
+            'work_date' => '2026-08-05',
+            'staff_id' => $staff->id,
+            'order_no' => 'FIXED-1',
+            'work_hours' => 3,
+            'work_minutes' => 30,
+        ])->assertRedirect();
+
+        $record->refresh();
+        $this->assertSame('FIXED-1', $record->order_no);
+        $this->assertSame(3, $record->work_hours);
+        $this->assertTrue($record->is_provisional, '修正しても未確認のまま残る');
+        $this->assertSame($report->id, $record->daily_report_id, '日報とのつながりも切れない');
+
+        // 直したあとも差し戻し枠に残り、確定済みの一覧には移らない。
+        $this->actingAs($manager)->get(route('labor-records.index'))
+            ->assertOk()
+            ->assertSee('FIXED-1')
+            ->assertViewHas('records', fn ($records) => $records->isEmpty())
+            ->assertViewHas('rejectedRecords', fn ($rejected) => $rejected->count() === 1);
+    }
+
+    /** 差し戻し枠のレコードも削除できる。 */
+    public function test_a_rejected_record_can_be_deleted(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        $staff = Staff::factory()->create();
+        $report = DailyReport::create([
+            'staff_id' => $staff->id, 'work_date' => '2026-08-05', 'submitted_at' => now(),
+            'rejected_at' => now(), 'rejection_reason' => '不要な登録でした',
+        ]);
+        $record = LaborCost::create([
+            'work_date' => '2026-08-05', 'staff_id' => $staff->id, 'daily_report_id' => $report->id,
+            'order_no' => 'DELETE-ME', 'work_hours' => 1, 'work_minutes' => 0,
+            'is_overtime' => false, 'is_provisional' => true, 'origin' => LaborCost::ORIGIN_PURCHASE_INPUT,
+        ]);
+
+        $this->actingAs($manager)->delete(route('labor-records.destroy', $record))->assertRedirect();
+
+        $this->assertDatabaseMissing('labor_costs', ['id' => $record->id]);
+    }
+
     /** 差し戻しが無ければ枠ごと出さない。 */
     public function test_the_rejected_block_is_hidden_when_there_is_none(): void
     {
