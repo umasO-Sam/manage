@@ -117,6 +117,7 @@
                                 <tr class="bg-slate-50 border-b border-slate-200 font-semibold text-slate-600 sticky top-0">
                                     <th class="p-2.5 w-10 text-center"><input type="checkbox" x-on:change="checked = $event.target.checked ? [{{ $details->pluck('id')->implode(',') }}] : []" class="w-4 h-4"></th>
                                     <th class="p-2.5">注番</th>
+                                    <th class="p-2.5">機械装置No</th>
                                     <th class="p-2.5">注文日付</th>
                                     <th class="p-2.5">商社名</th>
                                     <th class="p-2.5">品名 / 形式</th>
@@ -132,6 +133,12 @@
                                             <input type="hidden" form="bulk-edit-form" name="updates[{{ $detail->id }}][item_code]" value="{{ $detail->item_code }}">
                                         </td>
                                         <td class="p-2.5 font-mono whitespace-nowrap">{{ $detail->item_code }}</td>
+                                        <td class="p-2.5">
+                                            <span x-show="!editMode">{{ $detail->machine_no }}</span>
+                                            <input x-show="editMode" x-cloak type="text" form="bulk-edit-form" name="updates[{{ $detail->id }}][machine_no]"
+                                                   value="{{ $detail->machine_no }}" data-original="{{ $detail->machine_no }}" data-label="機械装置No"
+                                                   class="w-full min-w-[120px] text-xs border rounded px-1.5 py-1 border-slate-300">
+                                        </td>
                                         <td class="p-2.5">
                                             <span x-show="!editMode">{{ $detail->order_date?->format('Y/m/d') ?? '-' }}</span>
                                             <input x-show="editMode" x-cloak type="date" form="bulk-edit-form" name="updates[{{ $detail->id }}][order_date]"
@@ -175,7 +182,7 @@
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="7" class="p-8 text-center text-slate-400">検索条件を指定してデータを抽出してください。</td>
+                                        <td colspan="8" class="p-8 text-center text-slate-400">検索条件を指定してデータを抽出してください。</td>
                                     </tr>
                                 @endforelse
                             </tbody>

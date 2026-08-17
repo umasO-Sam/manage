@@ -756,6 +756,22 @@ class PurchasingModuleTest extends TestCase
         $response->assertSee("updates[{$detail->id}][item_code]", false);
     }
 
+    public function test_order_screen_lists_machine_no_between_the_item_code_and_the_order_date(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        $detail = PurchaseDetail::create([
+            'item_code' => 'A1', 'machine_no' => 'M-100', 'supplier_name' => '大津屋',
+            'item_name' => 'テスト部品', 'order_date' => '2026-06-01', 'order_qty' => 3, 'unit_price' => 1000,
+        ]);
+
+        $response = $this->actingAs($manager)->get(route('purchasing.orders.index', ['supplier_name' => '大津屋']));
+
+        // 注文書に載せる項目なので、発行前にこの画面で見て直せるようにする。
+        $response->assertSeeInOrder(['注番', '機械装置No', '注文日付'], false);
+        $response->assertSee('M-100');
+        $response->assertSee("updates[{$detail->id}][machine_no]", false);
+    }
+
     public function test_order_screen_direct_edit_returns_to_orders_screen_with_filters(): void
     {
         $manager = Staff::factory()->procurementManager()->create();
