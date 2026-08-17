@@ -449,7 +449,12 @@ class PurchaseDetailController extends Controller
                 $validated = Validator::make((array) $fields, self::BULK_EDITABLE_FIELDS, [
                     'unit.regex' => '単位に数字は使用できません。',
                 ])->validate();
-                $validated['is_provisional'] = $request->boolean("updates.{$id}.is_provisional");
+                // 仮登録は検索画面にしかチェック欄が無い。キーが来ていない画面(注文書発行・
+                // 買掛明細書発行)で無条件に boolean() を取ると、そこで1文字直しただけで
+                // 仮のフラグが外れてしまうため、送られてきたときだけ反映する。
+                if (array_key_exists('is_provisional', (array) $fields)) {
+                    $validated['is_provisional'] = $request->boolean("updates.{$id}.is_provisional");
+                }
 
                 BusinessOrder::syncChangedFromDetail($purchaseDetail, $validated);
 

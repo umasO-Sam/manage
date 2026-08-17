@@ -336,14 +336,46 @@ class PurchaseDetailSearchTest extends TestCase
             'item_code' => 'BLK003-N01', 'item_name' => '対象', 'is_provisional' => true,
         ]);
 
-        // HTMLのチェックボックスは未チェック時に値が送信されないため、is_provisionalキー自体を省略する。
+        // チェックボックスは未チェックだと値が送信されないため、検索画面では同名のhiddenで「0」を送る。
         $this->actingAs($manager)->post(route('purchasing.bulk-update'), [
             'updates' => [
-                $detail->id => ['item_code' => 'BLK003-N01', 'item_name' => '対象'],
+                $detail->id => ['item_code' => 'BLK003-N01', 'item_name' => '対象', 'is_provisional' => '0'],
             ],
         ]);
 
         $this->assertFalse($detail->fresh()->is_provisional);
+    }
+
+    public function test_bulk_update_keeps_is_provisional_when_the_screen_has_no_such_field(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        $detail = PurchaseDetail::create([
+            'item_code' => 'BLK003-N02', 'item_name' => '対象', 'is_provisional' => true,
+        ]);
+
+        // 注文書発行・買掛明細書発行の直接編集には仮登録の欄が無い。そこで1項目直しただけで
+        // 仮のフラグが外れると、注文書の仮／確定の選別が崩れる。
+        $this->actingAs($manager)->post(route('purchasing.bulk-update'), [
+            'updates' => [
+                $detail->id => ['item_code' => 'BLK003-N02', 'item_name' => '更新後'],
+            ],
+            'return_to' => 'orders',
+        ]);
+
+        $this->assertSame('更新後', $detail->fresh()->item_name);
+        $this->assertTrue($detail->fresh()->is_provisional);
+    }
+
+    public function test_search_screen_sends_zero_for_an_unchecked_provisional_checkbox(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        $detail = PurchaseDetail::create([
+            'item_code' => 'BLK003-N03', 'item_name' => '対象', 'is_provisional' => true,
+        ]);
+
+        $response = $this->actingAs($manager)->get(route('purchasing.index', ['item_code' => 'BLK003-N03']));
+
+        $response->assertSee('<input type="hidden" name="updates['.$detail->id.'][is_provisional]" value="0">', false);
     }
 
     public function test_bulk_update_rejects_blanking_out_item_code(): void

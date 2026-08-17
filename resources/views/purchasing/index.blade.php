@@ -483,6 +483,9 @@
                                                     <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-yellow-100 text-yellow-800 border border-yellow-300">仮</span>
                                                 @endif
                                             </span>
+                                            {{-- チェックを外したときもキーを送る。サーバーはキーの有無で「この画面が仮登録を扱うか」を
+                                                 判断するため(注文書発行・買掛明細書発行にはこの欄が無い)、無いと外した操作が伝わらない。 --}}
+                                            <input type="hidden" name="updates[{{ $detail->id }}][is_provisional]" value="0">
                                             <input x-show="editMode" x-cloak type="checkbox" name="updates[{{ $detail->id }}][is_provisional]" value="1"
                                                    @checked($detail->is_provisional) data-original="{{ $detail->is_provisional ? '1' : '0' }}" data-label="仮登録"
                                                    class="rounded border-slate-300">

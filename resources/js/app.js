@@ -72,7 +72,16 @@ Alpine.data('bulkEditor', () => ({
 
     reviewChanges() {
         const rows = {};
-        document.querySelectorAll('#bulk-edit-form [data-original]').forEach((el) => {
+        const form = document.getElementById('bulk-edit-form');
+        if (! form) return;
+
+        // 走査は form.elements で行う。`#bulk-edit-form [data-original]` のような子孫セレクタだと、
+        // 注文書発行・買掛明細書発行のように入力欄がフォームの外にあり form="bulk-edit-form" 属性で
+        // 紐づけている画面で1件も拾えず、常に「変更はありません。」になる(送信自体は成立するため
+        // 気づきにくい)。form.elements は属性で紐づけた要素も含む。
+        Array.from(form.elements).forEach((el) => {
+            if (el.dataset.original === undefined) return;
+
             const isCheckbox = el.type === 'checkbox';
             const current = isCheckbox ? (el.checked ? '1' : '0') : el.value;
             const original = el.dataset.original ?? '';
