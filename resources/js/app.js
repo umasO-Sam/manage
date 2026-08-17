@@ -173,6 +173,32 @@ Alpine.data('bulkPasteGrid', (initialText, columns, maxRows = 200) => ({
         });
     },
 
+    /**
+     * 上下矢印とEnterで、同じ列の隣の行へ移動する。エクセルを見ながら手で直すときに
+     * マウスへ持ち替えずに済むようにするため。移動先は中身を選択した状態にして、
+     * エクセルと同じくそのまま打てば上書きになるようにする。
+     *
+     * 左右矢印には割り当てない。入力欄は常に編集中のため、左右をセル移動にすると
+     * 打ち間違いを直すのにカーソルを文字の途中へ戻せなくなる。横移動はTabに任せる。
+     *
+     * 日本語入力の変換中(isComposing)は何もしない。品名・商社名・メーカーは日本語を
+     * 打つ列で、変換候補の選択に上下、確定にEnterを使うため、ここを見落とすと
+     * 変換を確定しただけでセルが飛ぶ。
+     */
+    moveFocus(event, r, c, delta) {
+        if (event.isComposing) {
+            return;
+        }
+
+        event.preventDefault();
+
+        const target = this.$el.querySelector(`[data-cell="${r + delta}-${c}"]`);
+        if (target) {
+            target.focus();
+            target.select();
+        }
+    },
+
     serialized() {
         return this.rows
             .filter((row) => row.some((value) => value !== ''))

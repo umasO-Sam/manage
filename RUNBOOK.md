@@ -80,8 +80,15 @@ ssh -i ~/.ssh/xserver_manage -p 10022 saitokoken@saitokoken.xsrv.jp 'cd ~/manage
 
 <details><summary>フロントも送る場合（CSS/JSを変更したとき）</summary>
 
+`npm run build` は **PowerShell で `dev-tools-path.ps1` を読み込めば実行できる**
+（node/npm は既定のPATHに無い。Bashツールからは使えないので PowerShell で行う）。
+
+```powershell
+. C:\Users\OSAMU\claude\dev-tools-path.ps1   # node v24 / npm 11 がPATHに入る
+npm run build
+```
+
 ```bash
-npm run build     # ※この環境では node/npm がPATHに無く実行できない（7章）
 tar czf build.tar.gz -C public build
 scp -i ~/.ssh/xserver_manage -P 10022 build.tar.gz saitokoken@saitokoken.xsrv.jp:~/manage/
 rm -f build.tar.gz
@@ -193,9 +200,6 @@ ssh -i ~/.ssh/xserver_manage -p 10022 saitokoken@saitokoken.xsrv.jp 'cd ~/manage
 - **新サーバー簡単移行**（Xserverの案内分）。休日出勤のない日に別途計画する。
   現環境は sv8637。**手順とチェックリストは12章**
 - ログの日次ローテーション未設定
-- **この環境では `npm run build` を実行できない**（node/npm がPATHに無い）。Tailwind は
-  ビルド済みCSSに含まれるクラスしか効かないため、画面を直すときは既存クラスで組む。
-  新しいクラスを使いたくなったら、まずビルドできる環境を用意するところから
 - **勤怠管理画面でセルをクリックしてその日のステータスを強制変更する機能は不採用**（2026-08-07）。
   勤務状況一覧は申請から導出するだけの読み取り専用ビューで、実装には別テーブルが要る
 
@@ -211,6 +215,7 @@ ssh -i ~/.ssh/xserver_manage -p 10022 saitokoken@saitokoken.xsrv.jp 'cd ~/manage
 | 注番がプルダウンに出ない | 注番管理の「プルダウン」チェック。各画面の「非表示の注番も表示する」で一時的に選べる |
 | 打刻と日報の乖離警告が出ない | `timecard` 接続とSIDの一致（SIDを正とする） |
 | 仕入管理の検索で注番が0件になる（ZATSU など） | **人工にしか無い注番**。仕入明細には1件も無い（ZATSU＝雑人工で本番2万件超、他に `3D勉強会` `AC-05` など多数）。注番で検索すると「人工データ」の別表に並ぶ（2026-08-10）。人工が持たない項目（品名・製品名・型式・メーカー・商社名・各日付）で絞り込むと別表は出ない |
+| エクセル一括登録の貼り付け欄でセルを移動したい | ↑↓・Enterで上下、Tab / Shift+Tabで左右（2026-08-17）。←→ はセル内の文字カーソルのまま。日本語変換中の↑↓・Enterはセルを動かさない |
 | 画面が真っ白 | 1章のエラーログ。`view:cache` の作り直しで直ることが多い |
 | 承認済みの申請を取り消したい | 申請詳細の「取消を申請する」。上長の承認後、勤怠管理者が反映して初めて確定する（9章） |
 | 休日勤務を上長が承認したのに「承認待ち」のまま | 仕様（2026-08-10）。休日勤務だけは勤怠管理者の確認を経て承認済みになる（9章）。勤務状況一覧・カレンダーには橙の「承認待ち」として出る |
