@@ -483,6 +483,28 @@ class LeaveRequestController extends Controller
                 $approved ? '申請が承認されました' : '申請が却下されました'
             )
         );
+
+        // 承認済みになった申請は勤怠管理者にも知らせる。勤務状況や有給残に効いてくるため、
+        // 決まった時点で把握できるようにする。却下は誰の予定も動かないので送らない。
+        if ($approved) {
+            $this->notifyAttendanceManagers($leaveRequest, '申請が承認されました（勤怠管理者へのお知らせ）');
+        }
+    }
+
+    /**
+     * 勤怠管理者への「お知らせ」。自分が操作した分は送らない(自分の操作の控えが届いても
+     * 行動を求めないため)。確認・反映を依頼する通知は行動を求めるので、そちらは
+     * 操作者を除かず全員に送っている。
+     */
+    private function notifyAttendanceManagers(LeaveRequest $leaveRequest, string $headline): void
+    {
+        foreach ($this->attendanceManagers() as $manager) {
+            if ($manager->id === Auth::id()) {
+                continue;
+            }
+
+            $this->sendNotification($manager->email, new LeaveRequestNotificationMail($leaveRequest, $headline));
+        }
     }
 
     /**
