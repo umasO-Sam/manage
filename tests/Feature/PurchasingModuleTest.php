@@ -741,6 +741,27 @@ class PurchasingModuleTest extends TestCase
             ->assertSee('機械装置No')->assertSee('M-100');
     }
 
+    /** 取引先に出す書面なので、自社の住所・連絡先が正しいことを固定しておく。 */
+    public function test_order_sheet_prints_the_company_address_and_contact(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        $detail = PurchaseDetail::create([
+            'item_code' => 'A1', 'supplier_name' => '大津屋', 'item_name' => 'テスト部品',
+            'order_qty' => 1, 'unit_price' => 1000,
+        ]);
+
+        $response = $this->actingAs($manager)->post(route('purchasing.orders.print'), [
+            'target_ids' => [$detail->id],
+            'staff_name' => '瀧上',
+        ]);
+
+        $response->assertOk()
+            ->assertSee('株式会社サイトウ工研')
+            ->assertSee('〒512-1113 三重県四日市市鹿間町1100')
+            ->assertSee('059-328-1818')
+            ->assertSee('059-328-2989');
+    }
+
     public function test_order_screen_shows_direct_edit_inputs_that_post_to_bulk_update(): void
     {
         $manager = Staff::factory()->procurementManager()->create();

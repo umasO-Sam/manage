@@ -34,8 +34,9 @@
         <div class="company-info">
             発行日: {{ now()->format('Y年m月d日') }}<br>
             株式会社サイトウ工研<br>
-            〒512-0000 三重県四日市市<br>
+            〒512-1113 三重県四日市市鹿間町1100<br>
             TEL: 059-328-1818<br>
+            FAX: 059-328-2989<br>
             担当: {{ $staffName }}@if($staffPhone) ({{ $staffPhone }})@endif
         </div>
         <div style="clear: both;"></div>
