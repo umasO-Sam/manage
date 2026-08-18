@@ -215,10 +215,12 @@ class EstimateAssistTest extends TestCase
             'unit_price' => 800, 'is_provisional' => false,
         ]);
 
+        // 'D8'のような短い文字列でページ全体を検索すると、CSRFトークンやビルドハッシュに
+        // たまたま含まれて誤検出する(実際に落ちたことがある)。その行にしか出ない商社名で見る。
         $byOrderNo = $this->actingAs($manager)->get(route('purchasing.estimate.index', ['ref_item_code' => 'D9']));
-        $byOrderNo->assertSee('D9')->assertDontSee('D8');
+        $byOrderNo->assertSee('丸紅商事')->assertDontSee('別商社');
 
         $bySupplier = $this->actingAs($manager)->get(route('purchasing.estimate.index', ['ref_supplier_name' => '丸紅']));
-        $bySupplier->assertSee('D9')->assertDontSee('D8');
+        $bySupplier->assertSee('丸紅商事')->assertDontSee('別商社');
     }
 }
