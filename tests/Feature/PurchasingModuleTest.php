@@ -724,12 +724,13 @@ class PurchasingModuleTest extends TestCase
         $response->assertSee('対象の品')->assertDontSee('対象外の品');
     }
 
-    public function test_order_print_renders_selected_items_with_total(): void
+    public function test_order_print_renders_the_selected_items(): void
     {
         $manager = Staff::factory()->procurementManager()->create();
         $detail = PurchaseDetail::create([
             'item_code' => 'A1', 'supplier_name' => '大津屋', 'item_name' => 'テスト部品',
-            'machine_no' => 'M-100', 'order_qty' => 3, 'unit_price' => 1000,
+            'machine_no' => 'M-100', 'manufacturer' => 'キッツ', 'dimensions' => 'G-10BJUE-50A',
+            'order_qty' => 3, 'unit' => '個', 'unit_price' => 1000,
         ]);
 
         $response = $this->actingAs($manager)->post(route('purchasing.orders.print'), [
@@ -737,8 +738,60 @@ class PurchasingModuleTest extends TestCase
             'staff_name' => '瀧上',
         ]);
 
-        $response->assertOk()->assertSee('テスト部品')->assertSee('3,000')
-            ->assertSee('機械装置No')->assertSee('M-100');
+        $response->assertOk()
+            ->assertSee('キッツ')
+            ->assertSee('テスト部品')
+            ->assertSee('G-10BJUE-50A')
+            ->assertSee('3 個')          // 単位は数量と同じ枠に入れて幅を詰める
+            ->assertSee('A1')
+            ->assertSee('M-100');
+    }
+
+    /**
+     * 注文書に金額は載せない(2026-08-18)。単価・行の金額・合計のいずれも出さない。
+     */
+    public function test_order_print_shows_no_prices(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        $detail = PurchaseDetail::create([
+            'item_code' => 'A1', 'supplier_name' => '大津屋', 'item_name' => 'テスト部品',
+            'order_qty' => 3, 'unit_price' => 1234,
+        ]);
+
+        $response = $this->actingAs($manager)->post(route('purchasing.orders.print'), [
+            'target_ids' => [$detail->id],
+            'staff_name' => '瀧上',
+        ]);
+
+        $response->assertOk()
+            ->assertDontSee('1,234')      // 単価
+            ->assertDontSee('3,702')      // 数量×単価
+            ->assertDontSee('単価')
+            ->assertDontSee('金額')
+            ->assertDontSee('合計');
+    }
+
+    /**
+     * 客先に送る書面なので、ブラウザが付ける日時・ファイル名・URLを印字させない。
+     * Chromeは余白が0のときこれを出さないため、@page の余白は0で固定する。
+     */
+    public function test_order_print_suppresses_the_browser_header_and_footer_and_numbers_pages(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        $detail = PurchaseDetail::create([
+            'item_code' => 'A1', 'supplier_name' => '大津屋', 'item_name' => 'テスト部品',
+            'order_qty' => 1, 'unit_price' => 100,
+        ]);
+
+        $response = $this->actingAs($manager)->post(route('purchasing.orders.print'), [
+            'target_ids' => [$detail->id],
+            'staff_name' => '瀧上',
+        ]);
+
+        $response->assertOk()
+            ->assertSee('@page { size: A4 portrait; margin: 0; }', false)
+            ->assertSee('page-foot', false)
+            ->assertSee("' / '", false);
     }
 
     /** 取引先に出す書面なので、自社の住所・連絡先が正しいことを固定しておく。 */

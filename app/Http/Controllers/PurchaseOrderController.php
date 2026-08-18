@@ -63,12 +63,11 @@ class PurchaseOrderController extends Controller
             ]);
         }
 
+        // 注文書に金額は載せない(2026-08-18)。仮登録かどうかは表題の「(仮)」だけで示す。
         $isProvisional = (bool) $details->first()?->is_provisional;
-        $total = $isProvisional ? null : $details->sum(fn (PurchaseDetail $d) => $d->lineTotal());
 
         return view('purchasing.orders.print', [
             'details' => $details,
-            'total' => $total,
             'isProvisional' => $isProvisional,
             'staffName' => $data['staff_name'],
             'staffPhone' => $data['staff_phone'] ?? '',
