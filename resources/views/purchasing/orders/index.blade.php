@@ -7,7 +7,7 @@
     </x-slot>
 
     <div class="py-8" x-data="bulkEditor()">
-        <div class="max-w-6xl mx-auto sm:px-6 lg:px-8 space-y-6">
+        <div class="max-w-[1400px] mx-auto sm:px-6 lg:px-8 space-y-6">
 
             @if (session('status') === 'bulk-update-success')
                 <div class="p-3 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-800 text-sm">変更を保存しました。</div>
@@ -43,7 +43,7 @@
 
             @if ($details->isNotEmpty())
                 <div class="flex justify-end">
-                    <button type="button" @click="editMode = ! editMode"
+                    <button type="button" @click="toggleEditMode()"
                             class="text-xs font-semibold rounded-lg py-1.5 px-4 transition-colors border"
                             :class="editMode ? 'bg-amber-100 border-amber-300 text-amber-800' : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-50'">
                         <span x-text="editMode ? '直接編集を終了' : '直接編集'"></span>
@@ -53,7 +53,7 @@
                 <div x-show="editMode" x-cloak class="sticky top-2 z-10 bg-white border border-amber-200 rounded-xl p-3 shadow-sm flex flex-wrap justify-between items-center gap-2">
                     <span class="text-xs text-amber-700 font-semibold">直接編集モード: セルを編集し、「変更を保存」を押してください。</span>
                     <div class="flex gap-2">
-                        <button type="button" @click="editMode = false" class="text-xs font-semibold px-3 py-1.5 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50">編集をやめる</button>
+                        <button type="button" @click="cancelEdit()" class="text-xs font-semibold px-3 py-1.5 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50">編集をやめる</button>
                         <button type="button" @click="reviewChanges()" class="text-xs font-bold px-4 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white">変更を保存</button>
                     </div>
                 </div>
@@ -112,17 +112,19 @@
 
                 <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden mb-6">
                     <div class="overflow-x-auto max-h-[50vh]">
-                        <table class="w-full text-left border-collapse text-xs">
+                        <table class="w-full text-left border-collapse text-xs" :class="editMode ? 'table-fixed' : ''">
                             <thead>
                                 <tr class="bg-slate-50 border-b border-slate-200 font-semibold text-slate-600 sticky top-0">
                                     <th class="p-2.5 w-10 text-center"><input type="checkbox" x-on:change="checked = $event.target.checked ? [{{ $details->pluck('id')->implode(',') }}] : []" class="w-4 h-4"></th>
-                                    <th class="p-2.5">注番</th>
-                                    <th class="p-2.5">機械装置No</th>
-                                    <th class="p-2.5">注文日付</th>
-                                    <th class="p-2.5">商社名</th>
+                                    <th class="p-2.5" :class="editMode ? 'w-[80px]' : ''">注番</th>
+                                    <th class="p-2.5" :class="editMode ? 'w-[90px]' : ''">機械装置No</th>
+                                    <th class="p-2.5" :class="editMode ? 'w-[138px]' : ''">注文日付</th>
+                                    <th class="p-2.5" :class="editMode ? 'w-[119px]' : ''">商社名</th>
+                                    {{-- 品名だけ幅を指定しない。table-fixed では幅未指定の列が残りを吸うため、
+                                         他の列を詰めて空いた分がそのまま品名・形式の幅になる。 --}}
                                     <th class="p-2.5">品名 / 形式</th>
-                                    <th class="p-2.5 text-right">数量</th>
-                                    <th class="p-2.5 text-right">単価</th>
+                                    <th class="p-2.5 text-right" :class="editMode ? 'w-[95px]' : ''">数量</th>
+                                    <th class="p-2.5 text-right" :class="editMode ? 'w-[142px]' : ''">単価</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-slate-100">
@@ -137,7 +139,7 @@
                                             <span x-show="!editMode">{{ $detail->machine_no }}</span>
                                             <input x-show="editMode" x-cloak type="text" form="bulk-edit-form" name="updates[{{ $detail->id }}][machine_no]"
                                                    value="{{ $detail->machine_no }}" data-original="{{ $detail->machine_no }}" data-label="機械装置No"
-                                                   class="w-full min-w-[120px] text-xs border rounded px-1.5 py-1 border-slate-300">
+                                                   class="w-full min-w-0 text-xs border rounded px-1.5 py-1 border-slate-300">
                                         </td>
                                         <td class="p-2.5">
                                             <span x-show="!editMode">{{ $detail->order_date?->format('Y/m/d') ?? '-' }}</span>
@@ -154,17 +156,17 @@
                                             </span>
                                             <input x-show="editMode" x-cloak type="text" form="bulk-edit-form" name="updates[{{ $detail->id }}][supplier_name]"
                                                    value="{{ $detail->supplier_name }}" data-original="{{ $detail->supplier_name }}" data-label="商社名"
-                                                   class="w-full min-w-[120px] text-xs border rounded px-1.5 py-1 border-slate-300">
+                                                   class="w-full min-w-0 text-xs border rounded px-1.5 py-1 border-slate-300">
                                         </td>
                                         <td class="p-2.5">
                                             <span x-show="!editMode">{{ $detail->item_name }} <span class="text-slate-400">{{ $detail->dimensions }}</span></span>
                                             <div x-show="editMode" x-cloak class="flex flex-col gap-1">
                                                 <input type="text" form="bulk-edit-form" name="updates[{{ $detail->id }}][item_name]"
                                                        value="{{ $detail->item_name }}" data-original="{{ $detail->item_name }}" data-label="品名"
-                                                       placeholder="品名" class="w-full min-w-[140px] text-xs border rounded px-1.5 py-1 border-slate-300">
+                                                       placeholder="品名" class="w-full min-w-0 text-xs border rounded px-1.5 py-1 border-slate-300">
                                                 <input type="text" form="bulk-edit-form" name="updates[{{ $detail->id }}][dimensions]"
                                                        value="{{ $detail->dimensions }}" data-original="{{ $detail->dimensions }}" data-label="形式/寸法"
-                                                       placeholder="形式/寸法" class="w-full min-w-[140px] text-xs border rounded px-1.5 py-1 border-slate-300">
+                                                       placeholder="形式/寸法" class="w-full min-w-0 text-xs border rounded px-1.5 py-1 border-slate-300">
                                             </div>
                                         </td>
                                         <td class="p-2.5 text-right">

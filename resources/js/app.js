@@ -25,18 +25,48 @@ Alpine.data('bulkEditor', () => ({
     showDeleteConfirm: false,
     deleteTargets: [],
 
+    /** 編集欄(data-original を持つ入力欄)を、フォームの外に置いた分も含めて列挙する。 */
+    editableFields() {
+        const form = document.getElementById('bulk-edit-form');
+        if (! form) return [];
+
+        return Array.from(form.elements).filter((el) => el.dataset.original !== undefined);
+    },
+
     toggleEditMode() {
-        this.editMode = ! this.editMode;
         if (this.editMode) {
-            this.deleteMode = false;
-            this.selectedIds = [];
+            this.cancelEdit();
+            return;
         }
+
+        this.editMode = true;
+        this.deleteMode = false;
+        this.selectedIds = [];
+    },
+
+    /**
+     * 編集をやめたら入力欄を元の値へ戻す。画面から隠すだけだと、直したつもりで
+     * やめた値がフォームに残ったままになり、次に別の行を直して保存したときに
+     * 一緒に書き込まれてしまう。
+     */
+    cancelEdit() {
+        this.editableFields().forEach((el) => {
+            if (el.type === 'checkbox') {
+                el.checked = el.dataset.original === '1';
+            } else {
+                el.value = el.dataset.original ?? '';
+            }
+        });
+
+        this.changes = [];
+        this.showConfirm = false;
+        this.editMode = false;
     },
 
     toggleDeleteMode() {
         this.deleteMode = ! this.deleteMode;
         if (this.deleteMode) {
-            this.editMode = false;
+            this.cancelEdit();
         } else {
             this.selectedIds = [];
         }
@@ -72,16 +102,12 @@ Alpine.data('bulkEditor', () => ({
 
     reviewChanges() {
         const rows = {};
-        const form = document.getElementById('bulk-edit-form');
-        if (! form) return;
 
-        // 走査は form.elements で行う。`#bulk-edit-form [data-original]` のような子孫セレクタだと、
-        // 注文書発行・買掛明細書発行のように入力欄がフォームの外にあり form="bulk-edit-form" 属性で
-        // 紐づけている画面で1件も拾えず、常に「変更はありません。」になる(送信自体は成立するため
-        // 気づきにくい)。form.elements は属性で紐づけた要素も含む。
-        Array.from(form.elements).forEach((el) => {
-            if (el.dataset.original === undefined) return;
-
+        // 走査は editableFields()(= form.elements)で行う。`#bulk-edit-form [data-original]` のような
+        // 子孫セレクタだと、注文書発行・買掛明細書発行のように入力欄がフォームの外にあり
+        // form="bulk-edit-form" 属性で紐づけている画面で1件も拾えず、常に「変更はありません。」に
+        // なる(送信自体は成立するため気づきにくい)。form.elements は属性で紐づけた要素も含む。
+        this.editableFields().forEach((el) => {
             const isCheckbox = el.type === 'checkbox';
             const current = isCheckbox ? (el.checked ? '1' : '0') : el.value;
             const original = el.dataset.original ?? '';

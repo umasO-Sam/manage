@@ -349,7 +349,7 @@
                 <div x-show="editMode" x-cloak class="sticky top-2 z-10 bg-white border border-amber-200 rounded-xl p-3 shadow-sm flex flex-wrap justify-between items-center gap-2">
                     <span class="text-xs text-amber-700 font-semibold">直接編集モード: 表示中のレコードのセルを編集し、「変更を保存」を押してください。</span>
                     <div class="flex gap-2">
-                        <button type="button" @click="editMode = false" class="text-xs font-semibold px-3 py-1.5 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50">編集をやめる</button>
+                        <button type="button" @click="cancelEdit()" class="text-xs font-semibold px-3 py-1.5 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50">編集をやめる</button>
                         <button type="button" @click="reviewChanges()" class="text-xs font-bold px-4 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white">変更を保存</button>
                     </div>
                 </div>
