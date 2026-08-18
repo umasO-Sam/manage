@@ -843,6 +843,38 @@ class PurchasingModuleTest extends TestCase
         $response->assertSee("updates[{$detail->id}][item_code]", false);
     }
 
+    /**
+     * 「直接編集を終了」と「編集をやめる」が並んでいて、どちらを押せば変更が残るのか
+     * 分からなかった。編集中に画面から抜ける道は編集バーの2つのボタンだけにする。
+     */
+    public function test_direct_edit_offers_only_a_cancel_and_a_save_button_while_editing(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        PurchaseDetail::create([
+            'item_code' => 'A1', 'supplier_name' => '大津屋', 'invoice_date' => '2024-03-15',
+            'order_date' => '2024-03-15', 'item_name' => 'テスト部品', 'order_qty' => 1, 'unit_price' => 1000,
+        ]);
+
+        $screens = [
+            route('purchasing.index', ['item_code' => 'A1']),
+            route('purchasing.orders.index', ['supplier_name' => '大津屋']),
+            route('purchasing.invoices.index', [
+                'date_from' => '2024-03-01', 'date_to' => '2024-03-31',
+                'date_type' => 'invoice_date', 'supplier_name' => '大津屋',
+            ]),
+        ];
+
+        foreach ($screens as $url) {
+            $response = $this->actingAs($manager)->get($url);
+
+            $response->assertSee('直接編集中');
+            $response->assertSee('編集をキャンセル');
+            $response->assertSee('編集を保存');
+            $response->assertDontSee('直接編集を終了');
+            $response->assertDontSee('編集をやめる');
+        }
+    }
+
     public function test_invoice_screen_direct_edit_returns_to_invoices_screen_with_filters(): void
     {
         $manager = Staff::factory()->procurementManager()->create();

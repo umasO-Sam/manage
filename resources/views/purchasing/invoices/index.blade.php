@@ -59,18 +59,22 @@
 
                     @if ($details->isNotEmpty())
                         <div class="flex justify-end">
-                            <button type="button" @click="toggleEditMode()"
-                                    class="text-xs font-semibold rounded-lg py-1.5 px-4 transition-colors border"
-                                    :class="editMode ? 'bg-amber-100 border-amber-300 text-amber-800' : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-50'">
-                                <span x-text="editMode ? '直接編集を終了' : '直接編集'"></span>
+                            {{-- 編集中はボタンではなく状態表示にする。終了と取消の2つのボタンが並ぶと
+                                 どちらを押せば変更が残るのか分からないため、抜けるのは編集バーの
+                                 「編集をキャンセル」「編集を保存」だけにする。 --}}
+                            <button type="button" x-show="!editMode" @click="toggleEditMode()"
+                                    class="text-xs font-semibold rounded-lg py-1.5 px-4 transition-colors border bg-white border-slate-300 text-slate-700 hover:bg-slate-50">
+                                直接編集
                             </button>
+                            <span x-show="editMode" x-cloak
+                            class="text-xs font-semibold rounded-lg py-1.5 px-4 border bg-amber-100 border-amber-300 text-amber-800">直接編集中</span>
                         </div>
 
                         <div x-show="editMode" x-cloak class="sticky top-2 z-10 bg-white border border-amber-200 rounded-xl p-3 shadow-sm flex flex-wrap justify-between items-center gap-2">
-                            <span class="text-xs text-amber-700 font-semibold">直接編集モード: セルを編集し、「変更を保存」を押してください。</span>
+                            <span class="text-xs text-amber-700 font-semibold">直接編集モード: セルを編集し、「編集を保存」を押してください。</span>
                             <div class="flex gap-2">
-                                <button type="button" @click="cancelEdit()" class="text-xs font-semibold px-3 py-1.5 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50">編集をやめる</button>
-                                <button type="button" @click="reviewChanges()" class="text-xs font-bold px-4 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white">変更を保存</button>
+                                <button type="button" @click="cancelEdit()" class="text-xs font-semibold px-3 py-1.5 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50">編集をキャンセル</button>
+                                <button type="button" @click="reviewChanges()" class="text-xs font-bold px-4 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white">編集を保存</button>
                             </div>
                         </div>
 
