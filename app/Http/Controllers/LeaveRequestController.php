@@ -407,7 +407,16 @@ class LeaveRequestController extends Controller
     {
         $this->authorize('view', $leaveRequest);
 
-        return view('leave-requests.show', ['leaveRequest' => $leaveRequest]);
+        // 通知のリンクを後から開いたときに、何がどう処理されたのかを追えるようにする。
+        return view('leave-requests.show', [
+            'leaveRequest' => $leaveRequest,
+            'logs' => OperationLog::with('staff')
+                ->where('subject_type', LeaveRequest::class)
+                ->where('subject_id', $leaveRequest->id)
+                ->orderBy('created_at')
+                ->orderBy('id')
+                ->get(),
+        ]);
     }
 
     public function decide(Request $request, LeaveRequest $leaveRequest): RedirectResponse

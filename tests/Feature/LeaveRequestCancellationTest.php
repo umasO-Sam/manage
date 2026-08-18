@@ -39,6 +39,76 @@ class LeaveRequestCancellationTest extends TestCase
         return Staff::factory()->create(['is_attendance_manager' => true]);
     }
 
+    /**
+     * 通知メールのリンクは対応が済んでから開かれることが多い。以前は勤怠管理者が
+     * 反映を終えたあとに開くと403になり、何が起きたのか分からなかった。
+     */
+    public function test_the_attendance_manager_can_still_open_a_request_after_reflecting_the_cancellation(): void
+    {
+        $manager = $this->attendanceManager();
+        $leaveRequest = $this->approvedRequest();
+        $leaveRequest->update([
+            'cancel_status' => LeaveRequest::CANCEL_PENDING_REFLECTION,
+            'cancel_reason' => '出張が入ったため',
+        ]);
+
+        $this->actingAs($manager)->put(route('leave-requests.cancel.reflect', $leaveRequest), [
+            'action' => 'reflect',
+        ])->assertRedirect(route('leave-requests.cancellations'));
+
+        // 反映後にメールのリンクをたどっても403にせず、対処済みと履歴を見せる。
+        $response = $this->actingAs($manager)->get(route('leave-requests.show', $leaveRequest));
+
+        $response->assertOk()
+            ->assertSee('この申請は対処済みです。')
+            ->assertSee('取消済み（承認後）')
+            ->assertSee('対応履歴')
+            ->assertSee('取消を反映（勤怠管理者）');
+    }
+
+    /** 休日勤務の確認依頼も同じ。勤怠管理者が承認したあとに開いても中身が見られる。 */
+    public function test_the_attendance_manager_can_still_open_a_holiday_work_request_after_approving_it(): void
+    {
+        $manager = $this->attendanceManager();
+        $leaveRequest = $this->approvedRequest();
+        $leaveRequest->update(['type' => 'holiday_work', 'status' => LeaveRequest::STATUS_PENDING_ATTENDANCE]);
+
+        $this->actingAs($manager)->put(route('leave-requests.attendance.decide', $leaveRequest), [
+            'action' => 'approve',
+        ]);
+
+        $this->actingAs($manager)->get(route('leave-requests.show', $leaveRequest))
+            ->assertOk()
+            ->assertSee('この申請は対処済みです。')
+            ->assertSee('休日勤務を承認（勤怠管理者）');
+    }
+
+    /** 対応待ちのあいだは「対処済み」とは出さない。 */
+    public function test_a_request_still_awaiting_a_decision_is_not_shown_as_settled(): void
+    {
+        $manager = $this->attendanceManager();
+        $leaveRequest = $this->approvedRequest();
+        $leaveRequest->update([
+            'cancel_status' => LeaveRequest::CANCEL_PENDING_REFLECTION,
+            'cancel_reason' => '出張が入ったため',
+        ]);
+
+        $this->actingAs($manager)->get(route('leave-requests.show', $leaveRequest))
+            ->assertOk()
+            ->assertDontSee('この申請は対処済みです。')
+            ->assertSee('取消の反映確認');
+    }
+
+    /** 勤怠管理者でも本人でも承認者でもない人は、今までどおり見られない。 */
+    public function test_an_unrelated_staff_member_still_cannot_open_someone_elses_request(): void
+    {
+        $leaveRequest = $this->approvedRequest();
+
+        $this->actingAs(Staff::factory()->create())
+            ->get(route('leave-requests.show', $leaveRequest))
+            ->assertForbidden();
+    }
+
     public function test_the_applicant_can_request_a_cancellation_with_a_reason(): void
     {
         $applicant = Staff::factory()->create();
@@ -283,8 +353,9 @@ class LeaveRequestCancellationTest extends TestCase
         $manager = $this->attendanceManager();
         $leaveRequest = $this->approvedRequest();
 
-        // 取消手続きに入っていない他人の申請は見られない。
-        $this->actingAs($manager)->get(route('leave-requests.show', $leaveRequest))->assertForbidden();
+        // 手続きに入っていない他人の申請も見られる(2026-08-18)。承認済みのお知らせも
+        // 勤怠管理者に飛ぶため、状態で閲覧を切ると通知のリンクが403になる。操作できるかは別判定。
+        $this->actingAs($manager)->get(route('leave-requests.show', $leaveRequest))->assertOk();
 
         $leaveRequest->update(['cancel_status' => LeaveRequest::CANCEL_PENDING_REFLECTION]);
         $this->actingAs($manager)->get(route('leave-requests.show', $leaveRequest))->assertOk();

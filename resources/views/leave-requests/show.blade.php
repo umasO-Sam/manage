@@ -17,6 +17,18 @@
                 </div>
             @endif
 
+            {{--
+                通知メールのリンクは、対応が済んだあとに開かれることが多い。
+                以前はその場合に403を返していたため、何が起きたのか分からなかった。
+                対応の要らない状態なら、そう伝えて下の履歴へ誘導する。
+            --}}
+            @if ($leaveRequest->isSettled())
+                <div class="p-3 rounded-xl bg-slate-100 border border-slate-200 text-slate-700 text-sm">
+                    <span class="font-bold">この申請は対処済みです。</span>
+                    現在の状態は「{{ $leaveRequest->statusLabel() }}」です。経過は下の「対応履歴」で確認できます。
+                </div>
+            @endif
+
             <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5 space-y-3 text-sm">
                 <div class="flex items-center justify-between">
                     <span class="text-[11px] font-bold px-2.5 py-0.5 rounded-full
@@ -234,6 +246,31 @@
                     </form>
                 </div>
             @endcan
+
+            {{-- 誰がいつ何をしたか。通知から来た人がこれだけを見て状況を把握できるようにする。 --}}
+            <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5 space-y-3">
+                <h3 class="text-sm font-bold text-slate-800">対応履歴</h3>
+                @if ($logs->isEmpty())
+                    <p class="text-xs text-slate-500">履歴はありません。</p>
+                @else
+                    <ol class="divide-y divide-slate-100 text-xs">
+                        @foreach ($logs as $log)
+                            <li class="py-2 flex justify-between gap-3">
+                                <div>
+                                    <div class="font-semibold text-slate-700">{{ $log->actionLabel() }}</div>
+                                    @if ($log->description)
+                                        <div class="text-slate-500 mt-0.5">{{ $log->description }}</div>
+                                    @endif
+                                </div>
+                                <div class="text-right shrink-0 text-slate-500">
+                                    <div class="font-mono">{{ $log->created_at->format('Y/m/d H:i') }}</div>
+                                    <div>{{ $log->staff?->name ?? '（不明）' }}</div>
+                                </div>
+                            </li>
+                        @endforeach
+                    </ol>
+                @endif
+            </div>
 
             @if ($leaveRequest->isPending() && $leaveRequest->approver_id === auth()->id())
                 <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5 space-y-3">

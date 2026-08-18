@@ -163,6 +163,16 @@ class LeaveRequest extends Model
     }
 
     /**
+     * 誰の対応も待っていない状態か。通知メールのリンクを後から開いたときに
+     * 「対処済みです」と伝えるための判定で、承認・却下・取消のいずれで
+     * 終わったかは問わない(取消手続きの途中は未対応として扱う)。
+     */
+    public function isSettled(): bool
+    {
+        return ! $this->isPending() && ! $this->isPendingAttendance() && $this->cancel_status === null;
+    }
+
+    /**
      * 本人が取り下げられるか。決裁が終わるまでは、上長待ち・勤怠管理者待ちの
      * どちらでも取り下げられる(まだ効力が無いため、承認後の取消フローは通さない)。
      */

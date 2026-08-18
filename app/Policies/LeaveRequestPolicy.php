@@ -20,9 +20,10 @@ class LeaveRequestPolicy
      */
     public function view(Staff $staff, LeaveRequest $leaveRequest): bool
     {
-        // 取消の反映確認・休日勤務の承認を任された勤怠管理者も、判断材料として中身を見る。
-        if ($staff->canManageAttendance()
-            && ($leaveRequest->cancel_status !== null || $leaveRequest->isPendingAttendance())) {
+        // 勤怠管理者は状態を問わず中身を見られる。取消の反映確認・休日勤務の承認・承認済みの
+        // お知らせがいずれも勤怠管理者へ飛ぶため、対応が済んだあとに通知のリンクを開いただけで
+        // 403になっていた。判断材料として見るだけで、操作できるかは各policyが別に判定する。
+        if ($staff->canManageAttendance()) {
             return true;
         }
 
