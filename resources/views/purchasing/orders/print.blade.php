@@ -52,7 +52,7 @@
         table.items th,
         table.items td {
             border: 1px solid #000;
-            padding: 1mm;
+            padding: 1.8mm 1mm;
             font-size: 10pt;
             line-height: 1.3;
             vertical-align: top;
@@ -117,20 +117,23 @@
                 幅は「その文字数が1行に収まる」ことを実測して決めた値(MS PGothicは
                 プロポーショナルなので、字によって幅が変わる。英大文字の幅で見ている)。
                 内訳は 文字幅 + 左右のpadding 2mm + 罫線。型式等だけ幅を指定せず残りを取る。
+                  №         半角3桁 (5.6mm)
                   メーカー   全角6文字 (20.7mm) / 品名 全角8文字 (27.5mm)
                   数量       半角4桁 + 全角1文字の単位 (12.7mm)
-                  注番       半角12文字 (23.6mm) / 機械装置No 半角19文字 (39.4mm)
+                  注番       半角12文字 (23.6mm) / 機械装置No 半角10文字 (20.8mm)
             --}}
             <colgroup>
+                <col style="width: 9mm;">
                 <col style="width: 23mm;">
                 <col style="width: 30mm;">
                 <col>
                 <col style="width: 16mm;">
                 <col style="width: 26mm;">
-                <col style="width: 42mm;">
+                <col style="width: 23mm;">
             </colgroup>
             <thead>
                 <tr>
+                    <th>№</th>
                     <th>メーカー</th>
                     <th>品名</th>
                     <th>型式等</th>
@@ -146,6 +149,7 @@
     <template id="tpl-rows">
         @foreach ($details as $detail)
             <tr>
+                <td class="center"><div class="clamp2">{{ str_pad((string) $loop->iteration, 3, '0', STR_PAD_LEFT) }}</div></td>
                 <td><div class="clamp2">{{ $detail->manufacturer }}</div></td>
                 <td><div class="clamp2">{{ $detail->item_name }}</div></td>
                 <td><div class="clamp2">{{ $detail->dimensions }}</div></td>

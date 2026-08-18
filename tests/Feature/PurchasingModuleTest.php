@@ -747,6 +747,28 @@ class PurchasingModuleTest extends TestCase
             ->assertSee('M-100');
     }
 
+    /** №はこの注文書の中での通番。3桁でゼロ埋めし、明細の並び順のまま振る。 */
+    public function test_order_print_numbers_each_line_within_the_sheet(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        $ids = [];
+        foreach (['先頭の品', '2番目の品', '3番目の品'] as $i => $name) {
+            $ids[] = PurchaseDetail::create([
+                'item_code' => 'A'.$i, 'supplier_name' => '大津屋', 'item_name' => $name,
+                'order_qty' => 1, 'unit_price' => 100,
+            ])->id;
+        }
+
+        $response = $this->actingAs($manager)->post(route('purchasing.orders.print'), [
+            'target_ids' => $ids,
+            'staff_name' => '瀧上',
+        ]);
+
+        $response->assertOk()
+            ->assertSee('№')
+            ->assertSeeInOrder(['001', '先頭の品', '002', '2番目の品', '003', '3番目の品'], false);
+    }
+
     /**
      * 注文書に金額は載せない(2026-08-18)。単価・行の金額・合計のいずれも出さない。
      */
