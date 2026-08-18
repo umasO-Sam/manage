@@ -117,7 +117,7 @@
                 幅は「その文字数が1行に収まる」ことを実測して決めた値(MS PGothicは
                 プロポーショナルなので、字によって幅が変わる。英大文字の幅で見ている)。
                 内訳は 文字幅 + 左右のpadding 2mm + 罫線。型式等だけ幅を指定せず残りを取る。
-                  №         半角3桁 (5.6mm)
+                  №         半角3桁ぶん (5.6mm。表示はゼロ埋めしない)
                   メーカー   全角6文字 (20.7mm) / 品名 全角8文字 (27.5mm)
                   数量       半角4桁 + 全角1文字の単位 (12.7mm)
                   注番       半角12文字 (23.6mm) / 機械装置No 半角10文字 (20.8mm)
@@ -149,7 +149,7 @@
     <template id="tpl-rows">
         @foreach ($details as $detail)
             <tr>
-                <td class="center"><div class="clamp2">{{ str_pad((string) $loop->iteration, 3, '0', STR_PAD_LEFT) }}</div></td>
+                <td class="center"><div class="clamp2">{{ $loop->iteration }}</div></td>
                 <td><div class="clamp2">{{ $detail->manufacturer }}</div></td>
                 <td><div class="clamp2">{{ $detail->item_name }}</div></td>
                 <td><div class="clamp2">{{ $detail->dimensions }}</div></td>

@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Models\PurchaseDetail;
 use Illuminate\Http\Request;
-use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class PurchaseOrderController extends Controller
@@ -57,14 +56,9 @@ class PurchaseOrderController extends Controller
 
         $details = PurchaseDetail::whereIn('id', $data['target_ids'])->get();
 
-        if ($details->pluck('is_provisional')->unique()->count() > 1) {
-            throw ValidationException::withMessages([
-                'target_ids' => '仮登録と確定済みのレコードは同じ注文書にまとめて印刷できません。',
-            ]);
-        }
-
-        // 注文書に金額は載せない(2026-08-18)。仮登録かどうかは表題の「(仮)」だけで示す。
-        $isProvisional = (bool) $details->first()?->is_provisional;
+        // 仮登録と確定済みは同じ注文書に混ぜてよい(2026-08-18)。金額を載せなくなり、
+        // 仮かどうかで書面の中身が変わらなくなったため。表題の「(仮)」は全件が仮のときだけ出す。
+        $isProvisional = $details->isNotEmpty() && $details->every(fn (PurchaseDetail $d) => (bool) $d->is_provisional);
 
         return view('purchasing.orders.print', [
             'details' => $details,

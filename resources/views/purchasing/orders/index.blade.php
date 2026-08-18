@@ -104,14 +104,7 @@
             @enderror
 
             <form method="POST" action="{{ route('purchasing.orders.print') }}" target="_blank"
-                  x-data="{
-                      checked: [],
-                      provisional: {{ \Illuminate\Support\Js::from($details->pluck('is_provisional', 'id')) }},
-                      get mixedSelection() {
-                          const types = new Set(this.checked.map(id => this.provisional[id]));
-                          return types.size > 1;
-                      },
-                  }">
+                  x-data="{ checked: [] }">
                 @csrf
 
                 <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden mb-6">
@@ -201,9 +194,6 @@
                         <h2 class="text-base font-bold text-slate-800">注文書 発行設定</h2>
                         <span class="text-sm text-blue-700 font-semibold">選択: <span x-text="checked.length"></span> 件</span>
                     </div>
-                    <div x-show="mixedSelection" x-cloak class="mb-4 p-3 rounded-lg bg-red-50 border border-red-100 text-red-700 text-xs font-semibold">
-                        仮登録と確定済みのレコードは同じ注文書にまとめて選択できません。どちらか一方だけ選択してください。
-                    </div>
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-6 text-xs">
                         <div class="space-y-3">
                             <div>
@@ -221,7 +211,7 @@
                         </div>
                     </div>
                     <div class="mt-6 flex justify-end border-t border-slate-100 pt-4">
-                        <button type="submit" x-bind:disabled="checked.length === 0 || mixedSelection" class="bg-emerald-600 disabled:opacity-40 text-white px-10 py-3 rounded-lg font-bold shadow hover:bg-emerald-700 transition text-sm">
+                        <button type="submit" x-bind:disabled="checked.length === 0" class="bg-emerald-600 disabled:opacity-40 text-white px-10 py-3 rounded-lg font-bold shadow hover:bg-emerald-700 transition text-sm">
                             注文書を発行(印刷)
                         </button>
                     </div>

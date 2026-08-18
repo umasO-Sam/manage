@@ -747,7 +747,7 @@ class PurchasingModuleTest extends TestCase
             ->assertSee('M-100');
     }
 
-    /** №はこの注文書の中での通番。3桁でゼロ埋めし、明細の並び順のまま振る。 */
+    /** №はこの注文書の中での通番。明細の並び順のまま振る(上の桁のゼロは出さない)。 */
     public function test_order_print_numbers_each_line_within_the_sheet(): void
     {
         $manager = Staff::factory()->procurementManager()->create();
@@ -766,7 +766,49 @@ class PurchasingModuleTest extends TestCase
 
         $response->assertOk()
             ->assertSee('№')
-            ->assertSeeInOrder(['001', '先頭の品', '002', '2番目の品', '003', '3番目の品'], false);
+            ->assertSeeInOrder(['>1<', '先頭の品', '>2<', '2番目の品', '>3<', '3番目の品'], false)
+            ->assertDontSee('>001<', false);
+    }
+
+    /**
+     * 仮登録と確定済みは同じ注文書に混ぜてよい(2026-08-18)。金額を載せなくなり、
+     * 仮かどうかで書面の中身が変わらなくなったため。
+     */
+    public function test_order_print_accepts_provisional_and_confirmed_records_together(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        $provisional = PurchaseDetail::create([
+            'item_code' => 'A1', 'supplier_name' => '大津屋', 'item_name' => '仮登録品',
+            'order_qty' => 1, 'unit_price' => 100, 'is_provisional' => true,
+        ]);
+        $confirmed = PurchaseDetail::create([
+            'item_code' => 'A2', 'supplier_name' => '大津屋', 'item_name' => '確定品',
+            'order_qty' => 1, 'unit_price' => 100, 'is_provisional' => false,
+        ]);
+
+        $response = $this->actingAs($manager)->post(route('purchasing.orders.print'), [
+            'target_ids' => [$provisional->id, $confirmed->id],
+            'staff_name' => '瀧上',
+        ]);
+
+        $response->assertOk()->assertSessionHasNoErrors()
+            ->assertSee('仮登録品')->assertSee('確定品')
+            ->assertDontSee('（仮）');      // 混在なので表題に仮は付けない
+    }
+
+    /** 全件が仮登録のときだけ、表題に「(仮)」を付けて社内で見分けられるようにする。 */
+    public function test_order_print_marks_the_title_only_when_every_record_is_provisional(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        $detail = PurchaseDetail::create([
+            'item_code' => 'A1', 'supplier_name' => '大津屋', 'item_name' => '仮登録品',
+            'order_qty' => 1, 'unit_price' => 100, 'is_provisional' => true,
+        ]);
+
+        $this->actingAs($manager)->post(route('purchasing.orders.print'), [
+            'target_ids' => [$detail->id],
+            'staff_name' => '瀧上',
+        ])->assertOk()->assertSee('（仮）');
     }
 
     /**
