@@ -57,12 +57,9 @@ class PurchaseOrderController extends Controller
         $details = PurchaseDetail::whereIn('id', $data['target_ids'])->get();
 
         // 仮登録と確定済みは同じ注文書に混ぜてよい(2026-08-18)。金額を載せなくなり、
-        // 仮かどうかで書面の中身が変わらなくなったため。表題の「(仮)」は全件が仮のときだけ出す。
-        $isProvisional = $details->isNotEmpty() && $details->every(fn (PurchaseDetail $d) => (bool) $d->is_provisional);
-
+        // 仮かどうかで書面の中身が変わらなくなったため。書面にも仮の印は出さない。
         return view('purchasing.orders.print', [
             'details' => $details,
-            'isProvisional' => $isProvisional,
             'staffName' => $data['staff_name'],
             'staffPhone' => $data['staff_phone'] ?? '',
             'remarks' => $data['remarks'] ?? '',

@@ -95,7 +95,7 @@
     {{-- 1枚目の見出し。宛先と自社情報を出す。 --}}
     <template id="tpl-head-first">
         <div>
-            <div class="doc-title">注 文 書@if ($isProvisional)（仮）@endif</div>
+            <div class="doc-title">注 文 書</div>
             <div class="issuer">
                 発行日: {{ now()->format('Y年m月d日') }}　担当: {{ $staffName }}@if ($staffPhone)（{{ $staffPhone }}）@endif<br>
                 株式会社サイトウ工研　〒512-1113 三重県四日市市鹿間町1100<br>
@@ -108,7 +108,7 @@
 
     {{-- 2枚目以降の見出し。どこの誰宛かだけ分かればよいので1行に収める。 --}}
     <template id="tpl-head-cont">
-        <div class="doc-title-cont">注 文 書@if ($isProvisional)（仮）@endif（続き）　{{ $details->first()?->supplier_name }} 御中</div>
+        <div class="doc-title-cont">注 文 書（続き）　{{ $details->first()?->supplier_name }} 御中</div>
     </template>
 
     <template id="tpl-table">

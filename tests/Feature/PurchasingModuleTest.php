@@ -793,11 +793,11 @@ class PurchasingModuleTest extends TestCase
 
         $response->assertOk()->assertSessionHasNoErrors()
             ->assertSee('仮登録品')->assertSee('確定品')
-            ->assertDontSee('（仮）');      // 混在なので表題に仮は付けない
+            ->assertDontSee('（仮）');      // 書面に仮の印は出さない
     }
 
-    /** 全件が仮登録のときだけ、表題に「(仮)」を付けて社内で見分けられるようにする。 */
-    public function test_order_print_marks_the_title_only_when_every_record_is_provisional(): void
+    /** 仮登録でも書面に印は出さない。客先に送る書類なので社内の状態は載せない。 */
+    public function test_order_print_never_marks_the_sheet_as_provisional(): void
     {
         $manager = Staff::factory()->procurementManager()->create();
         $detail = PurchaseDetail::create([
@@ -808,7 +808,7 @@ class PurchasingModuleTest extends TestCase
         $this->actingAs($manager)->post(route('purchasing.orders.print'), [
             'target_ids' => [$detail->id],
             'staff_name' => '瀧上',
-        ])->assertOk()->assertSee('（仮）');
+        ])->assertOk()->assertSee('仮登録品')->assertDontSee('（仮）');
     }
 
     /**
