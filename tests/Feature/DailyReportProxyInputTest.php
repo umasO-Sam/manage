@@ -76,6 +76,24 @@ class DailyReportProxyInputTest extends TestCase
             ->assertSee('対象次郎さんの日報を代理で入力しています');
     }
 
+    /**
+     * 一時保存(下書き)はこの端末のlocalStorageに置く。キーを対象者と作業日で分けないと、
+     * 代理入力で開いた他人の日報に自分の下書きが出てしまう。
+     */
+    public function test_the_draft_key_is_scoped_to_the_target_staff_and_date(): void
+    {
+        $manager = $this->attendanceManager();
+        $target = Staff::factory()->create();
+
+        $this->actingAs($manager)->get(route('daily-reports.show', ['date' => '2026-08-03', 'staff_id' => $target->id]))
+            ->assertOk()
+            ->assertSee("daily-report-draft:{$target->id}:2026-08-03", false);
+
+        $this->actingAs($manager)->get(route('daily-reports.show', ['date' => '2026-08-03']))
+            ->assertOk()
+            ->assertSee("daily-report-draft:{$manager->id}:2026-08-03", false);
+    }
+
     /** 権限が無い人が staff_id を付けても、黙って自分の日報になる。 */
     public function test_ordinary_staff_cannot_open_someone_elses_report(): void
     {

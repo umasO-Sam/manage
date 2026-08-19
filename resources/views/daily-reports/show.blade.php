@@ -28,6 +28,11 @@
             monthOtherMinutes: {{ \Illuminate\Support\Js::from($monthOtherMinutes) }},
             monthOtherOvertimeMinutes: {{ \Illuminate\Support\Js::from($monthOtherOvertimeMinutes) }},
             isRestDay: {{ \Illuminate\Support\Js::from($isRestDay) }},
+            // 一時保存(下書き)はこの端末のブラウザ(localStorage)にだけ置く。サーバーには送らない。
+            // 対象者と作業日でキーを分け、代理入力で他人の下書きを拾わないようにする。
+            draftKey: {{ \Illuminate\Support\Js::from('daily-report-draft:'.$targetStaff->id.':'.$workDate) }},
+            initialRemarks: {{ \Illuminate\Support\Js::from(old('remarks', $report->remarks) ?? '') }},
+            justSubmitted: {{ \Illuminate\Support\Js::from(in_array(session('status'), ['daily-report-submitted', 'daily-report-proxy-submitted'], true)) }},
         })">
         <div class="max-w-4xl mx-auto sm:px-6 lg:px-8 space-y-6">
 
@@ -40,6 +45,20 @@
                     差し戻された場合は本人ではなく<strong>あなた</strong>に返ります。
                 </div>
             @endif
+            {{-- 前回この端末で入力途中だった内容が残っているとき。勝手に差し替えると
+                 提出済みの内容を上書きしてしまうため、戻すかどうかは本人に選ばせる。 --}}
+            <template x-if="draftAvailable">
+                <div class="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-sm flex flex-wrap items-center gap-2">
+                    <span>
+                        この端末に<strong>提出していない入力</strong>が残っています（<span x-text="draftSavedLabel"></span> に一時保存）。
+                    </span>
+                    <button type="button" @click="restoreDraft()"
+                            class="px-3 py-1 rounded-lg bg-amber-600 text-white text-xs font-bold hover:bg-amber-700">入力を戻す</button>
+                    <button type="button" @click="discardDraft()"
+                            class="px-3 py-1 rounded-lg border border-amber-300 text-amber-800 text-xs font-bold hover:bg-amber-100">破棄する</button>
+                </div>
+            </template>
+
             @if ($report->exists && $report->isRejected())
                 <div class="p-3 rounded-xl bg-red-50 border border-red-100 text-red-800 text-sm">
                     <p class="font-bold">この日報は差し戻されました。内容を修正のうえ、再度提出してください。</p>
@@ -412,8 +431,8 @@
 
                 <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
                     <label class="block mb-1 text-xs font-bold text-slate-700">備考</label>
-                    <textarea name="remarks" rows="3" placeholder="連絡事項など自由に記入してください"
-                              class="w-full border rounded-lg p-2 border-slate-300 text-sm">{{ old('remarks', $report->remarks) }}</textarea>
+                    <textarea name="remarks" x-model="remarks" rows="3" placeholder="連絡事項など自由に記入してください"
+                              class="w-full border rounded-lg p-2 border-slate-300 text-sm"></textarea>
                 </div>
 
                 <template x-for="(entry, idx) in validEntries()" :key="'hidden-' + entry.id">
@@ -431,7 +450,10 @@
                 </template>
 
                 @php($isResubmit = $report->exists && $report->isSubmitted())
-                <div class="flex justify-end gap-2">
+                <div class="flex justify-end items-center gap-3 flex-wrap">
+                    <span class="text-[11px] text-slate-400" x-show="draftStatus" x-cloak x-text="draftStatus"></span>
+                    <button type="button" x-show="draftStatus" x-cloak @click="discardDraft()"
+                            class="text-[11px] font-bold text-slate-500 hover:text-slate-700">一時保存を破棄</button>
                     <button type="submit"
                             @click="if (! confirm('{{ $isResubmit ? '修正内容を提出します。よろしいですか？' : '作業日報を提出します。よろしいですか？' }}')) { $event.preventDefault(); }"
                             class="px-5 py-2.5 rounded-lg font-bold text-sm bg-blue-600 text-white hover:bg-blue-700">{{ $isResubmit ? '修正提出' : '提出' }}</button>
@@ -451,6 +473,7 @@
                 hiddenOrderNumbers: config.hiddenOrderNumbers,
                 showHiddenOrderNumbers: false,
                 entries: config.initialEntries,
+                remarks: config.initialRemarks,
                 nextId: Math.max(0, ...config.initialEntries.map((e) => e.id)) + 1,
                 weekOtherMinutes: config.weekOtherMinutes,
                 monthOtherMinutes: config.monthOtherMinutes,
@@ -504,6 +527,15 @@
                 ],
                 selection: { type: 'category', categoryId: null, freeText: '', orderNo: '', leaveType: null },
 
+                // 一時保存(下書き)。この端末のlocalStorageにだけ置き、提出するまでサーバーには送らない。
+                draftKey: config.draftKey,
+                draftBaseline: '[]',        // 「ただ画面を開いただけ」の状態。これと同じ内容は保存しない
+                draftTimer: null,
+                draftAvailable: false,      // 復元を勧めるバナーを出すか
+                draftSavedLabel: '',
+                draftStatus: '',
+                pendingDraft: null,
+
                 init() {
                     if (this.entries.length === 0) {
                         this.entries = [
@@ -528,6 +560,117 @@
                     // 入力が7:00より前・20:00より後に広がるとプレビューの範囲自体が変わるため、
                     // 反映のたびに既定の表示位置(7:00)へスクロールを合わせ直す。
                     this.$watch('entries', () => this.$nextTick(() => this.syncPreviewScroll()));
+                    this.initDraft();
+                },
+
+                /**
+                 * 一時保存の初期化。提出直後なら下書きを消し、残っていれば復元を勧める。
+                 * 保存できない環境(シークレットモード・容量超過)では黙って諦め、
+                 * 入力そのものは今までどおり使えるようにする。
+                 */
+                initDraft() {
+                    this.draftBaseline = this.draftSnapshot();
+
+                    if (config.justSubmitted) {
+                        this.discardDraft();
+                    }
+
+                    this.purgeOldDrafts();
+
+                    const draft = this.readDraft();
+                    if (draft && JSON.stringify({ entries: draft.entries, remarks: draft.remarks ?? '' }) !== this.draftBaseline) {
+                        this.pendingDraft = draft;
+                        this.draftSavedLabel = this.formatSavedAt(draft.savedAt);
+                        this.draftAvailable = true;
+                    }
+
+                    // 入力のたびに保存する。連打で書き込みが増えないよう少し待ってからにする。
+                    ['entries', 'remarks'].forEach((prop) => this.$watch(prop, () => {
+                        clearTimeout(this.draftTimer);
+                        this.draftTimer = setTimeout(() => this.saveDraft(), 800);
+                    }));
+                },
+
+                /** 下書きとして持ち回る内容(時間帯の入力と備考)。 */
+                draftSnapshot() {
+                    return JSON.stringify({ entries: this.entries, remarks: this.remarks });
+                },
+
+                readDraft() {
+                    try {
+                        return JSON.parse(window.localStorage.getItem(this.draftKey) ?? 'null');
+                    } catch (e) {
+                        return null;
+                    }
+                },
+
+                saveDraft() {
+                    // 画面を開いただけの状態(既定の休憩だけ)は保存しない。
+                    // これを保存すると、翌日以降に毎回「入力が残っています」が出てしまう。
+                    if (this.draftSnapshot() === this.draftBaseline) {
+                        this.discardDraft();
+
+                        return;
+                    }
+
+                    const savedAt = new Date().toISOString();
+                    try {
+                        window.localStorage.setItem(this.draftKey, JSON.stringify({ savedAt, entries: this.entries, remarks: this.remarks }));
+                        this.draftStatus = `この端末に一時保存しました（${this.formatSavedAt(savedAt)}）。提出するまでサーバーには送られません`;
+                    } catch (e) {
+                        this.draftStatus = '';
+                    }
+                },
+
+                restoreDraft() {
+                    if (! this.pendingDraft) {
+                        return;
+                    }
+
+                    this.entries = this.pendingDraft.entries;
+                    this.remarks = this.pendingDraft.remarks ?? '';
+                    this.nextId = Math.max(0, ...this.entries.map((e) => e.id ?? 0)) + 1;
+                    this.pendingDraft = null;
+                    this.draftAvailable = false;
+                },
+
+                discardDraft() {
+                    try {
+                        window.localStorage.removeItem(this.draftKey);
+                    } catch (e) {
+                        // 消せなくても実害は無い
+                    }
+                    this.pendingDraft = null;
+                    this.draftAvailable = false;
+                    this.draftStatus = '';
+                },
+
+                /** 30日より古い下書きを片付ける(提出済みの日のものが残り続けないように)。 */
+                purgeOldDrafts() {
+                    const limit = Date.now() - 30 * 24 * 60 * 60 * 1000;
+                    try {
+                        Object.keys(window.localStorage)
+                            .filter((key) => key.startsWith('daily-report-draft:'))
+                            .forEach((key) => {
+                                const saved = Date.parse(JSON.parse(window.localStorage.getItem(key) ?? '{}').savedAt ?? '');
+                                if (! saved || saved < limit) {
+                                    window.localStorage.removeItem(key);
+                                }
+                            });
+                    } catch (e) {
+                        // 読めない値が混ざっていても、片付けは次回に回せばよい
+                    }
+                },
+
+                formatSavedAt(iso) {
+                    const at = new Date(iso);
+                    if (Number.isNaN(at.getTime())) {
+                        return '';
+                    }
+
+                    const pad = (n) => String(n).padStart(2, '0');
+
+                    return `${at.getMonth() + 1}/${at.getDate()} ${pad(at.getHours())}:${pad(at.getMinutes())}`;
                 },
 
                 // 表示枠の先頭に置く行(7:00)。
