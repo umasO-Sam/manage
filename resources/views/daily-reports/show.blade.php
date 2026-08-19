@@ -242,14 +242,20 @@
                         <p class="text-[11px] font-bold text-blue-700" x-show="tapAnchor !== null" x-cloak>
                             終わりの時間帯をタップしてください（同じところをもう一度タップすると取り消します）。この行だけでよければ「反映」を押します。
                         </p>
-                        <p class="text-[11px] text-slate-400">
-                            「終日」は8:00〜17:10を選択中の内容で埋めます。作業内容を反映するときは、休憩をまたいでも休憩部分は上書きされません（休憩はそのまま残ります）。<br>
-                            休憩を消したいときは「削除」を選んでからなぞってください。下部（本日の入力内容）の「×」でも消せます。<br>
-                            10分未満の作業登録は「時刻入力」から行ってください。<br>
-                            パソコンは、なぞって選択します。Ctrlキーを押しながらなぞると、離れた時間帯を追加で選択できます。<br>
-                            スマホ・タブレットは、始めの時間帯をタップしてから終わりの時間帯をタップすると、その間が選択されます（途中でスクロールしてかまいません）。<br>
-                            「＋追加」を押しておくと、離れた時間帯を続けて選択できます（Ctrlキーと同じ働きです）。
-                        </p>
+                        {{-- 使い方は毎日見るものではないため通常は畳んでおき、必要なときだけ開く。 --}}
+                        <div x-data="{ showTips: false }">
+                            <button type="button" @click="showTips = !showTips"
+                                    class="text-[11px] font-bold text-slate-500 hover:text-slate-700"
+                                    x-text="showTips ? '使い方を隠す ▲' : '使い方を見る ▼'"></button>
+                            <p class="text-[11px] text-slate-400 mt-1" x-show="showTips" x-cloak>
+                                「終日」は8:00〜17:10を選択中の内容で埋めます。作業内容を反映するときは、休憩をまたいでも休憩部分は上書きされません（休憩はそのまま残ります）。<br>
+                                休憩を消したいときは「削除」を選んでからなぞってください。下部（本日の入力内容）の「×」でも消せます。<br>
+                                10分未満の作業登録は「時刻入力」から行ってください。<br>
+                                パソコンは、なぞって選択します。Ctrlキーを押しながらなぞると、離れた時間帯を追加で選択できます。<br>
+                                スマホ・タブレットは、始めの時間帯をタップしてから終わりの時間帯をタップすると、その間が選択されます（途中でスクロールしてかまいません）。<br>
+                                「＋追加」を押しておくと、離れた時間帯を続けて選択できます（Ctrlキーと同じ働きです）。
+                            </p>
+                        </div>
                         <div x-ref="grid" class="border border-slate-200 rounded-lg overflow-hidden select-none max-h-[60vh] overflow-y-auto"
                              :style="`height: ${gridHeight()}px`"
                              @mouseup.window="endDrag()" @mouseleave="endDrag()">
