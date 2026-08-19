@@ -29,6 +29,10 @@ class CardController extends Controller
 
     /**
      * カンバンボード表示（ワークフロー種別ごと）
+     *
+     * 枠ごとに並び順を変える。新規依頼は依頼された順（古いものが上）で、
+     * 手配中・入荷などその先の枠は「その枠に入った日時」の新しいものを上にする。
+     * 動きのあったカードが目に入る位置に来るようにするため。
      */
     public function index(Request $request, WorkflowType $workflow): View|RedirectResponse
     {
@@ -46,6 +50,14 @@ class CardController extends Controller
         $orderNo = trim((string) $request->query('order_no', ''));
 
         $cardsQuery = $workflow->cards()
+            ->select('cards.*')
+            // カードが今の枠に入った日時。差し戻しで戻ってきた場合も「入った」と数えるため、
+            // 現在の枠に対する履歴のうち最も新しいものを見る（削除の記録は並び順に関係しない）。
+            ->addSelect(['stage_entered_at' => CardStageLog::selectRaw('max(moved_at)')
+                ->whereColumn('card_id', 'cards.id')
+                ->whereColumn('stage_index', 'cards.current_stage')
+                ->where('is_deletion', false),
+            ])
             ->with([
                 'orderNumber', 'creator', 'stageLogs.actor', 'attachments',
                 'comments:id,card_id,created_at',
@@ -60,7 +72,14 @@ class CardController extends Controller
             $cardsQuery->whereHas('orderNumber', fn ($q) => $q->where('code', 'like', "%{$orderNo}%"));
         }
 
-        $cards = $cardsQuery->orderBy('due_date')->get()->groupBy('current_stage');
+        $cards = $cardsQuery
+            ->orderBy('current_stage')
+            // 枠ごとに並び順が違うため、先に枠でまとめてから枠内の順序を決める。
+            // 枠が揃っているので、CASEがNULLになる行は枠内に混ざらない。
+            ->orderByRaw('case when cards.current_stage = 0 then cards.created_at end asc')
+            ->orderByRaw('case when cards.current_stage > 0 then stage_entered_at end desc')
+            ->get()
+            ->groupBy('current_stage');
 
         return view('cards.index', [
             'workflowType' => $workflow,
