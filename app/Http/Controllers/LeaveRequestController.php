@@ -7,6 +7,7 @@ use App\Models\LeaveRequest;
 use App\Models\OperationLog;
 use App\Models\OrderNumber;
 use App\Models\Staff;
+use App\Support\LeaveDays;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -233,14 +234,14 @@ class LeaveRequestController extends Controller
         $dayCount = match ($data['granularity']) {
             'full_day' => 1.0,
             'half_day' => 0.5,
-            'hours' => 0.25, // 所定労働時間8時間・2時間単位付与のため 2/8
+            'hours' => LeaveDays::UNIT, // 所定労働時間8時間・2時間単位付与のため 2/8
             default => null,
         };
 
         $remaining = $applicant->paidLeaveBalance()['remainingTotal'];
         if ($dayCount > $remaining) {
             throw ValidationException::withMessages([
-                'granularity' => "有給休暇の残日数が不足しています（残り{$remaining}日）。",
+                'granularity' => '有給休暇の残日数が不足しています（残り'.LeaveDays::format($remaining).'日）。',
             ]);
         }
 

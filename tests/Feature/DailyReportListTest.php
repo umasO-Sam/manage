@@ -319,6 +319,30 @@ class DailyReportListTest extends TestCase
         $this->actingAs($sales)->get(route('daily-reports.list.index'))->assertForbidden();
     }
 
+    /**
+     * 有休は1日・半日・2時間(0.25日)単位で数えるため、小数第1位に丸めて
+     * 0.25が0.3になってはいけない(2026-08-19の不具合)。
+     */
+    public function test_paid_leave_column_shows_quarter_days_without_rounding(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        $staff = Staff::factory()->create([
+            'name' => '有休太郎',
+            'paid_leave_granted_current_year' => 14.25,
+        ]);
+
+        $this->approvedLeave($staff, [
+            'type' => 'paid_leave', 'granularity' => 'hours', 'half_day_period' => 'am',
+            'start_date' => '2026-08-03', 'end_date' => '2026-08-03', 'day_count' => 0.25,
+        ]);
+
+        $response = $this->actingAs($manager)->get(route('daily-reports.list.index'));
+
+        $response->assertOk();
+        $response->assertSee('0.25/14', false);
+        $response->assertDontSee('0.3/14.3', false);
+    }
+
     public function test_staff_are_grouped_by_department(): void
     {
         $manager = Staff::factory()->procurementManager()->create(['department' => '役員']);

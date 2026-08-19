@@ -11,7 +11,7 @@
 | 事由 | {{ $leaveRequest->reason_detail }} |
 @endif
 @if ($leaveRequest->day_count !== null)
-| 日数 | {{ $leaveRequest->day_count }}日 |
+| 日数 | @days($leaveRequest->day_count)日 |
 @endif
 @if ($leaveRequest->hours !== null)
 | 時間数 | {{ $leaveRequest->hours }}時間 |

@@ -201,6 +201,50 @@ class StaffManagementTest extends TestCase
         $this->assertSame(3.0, (float) $fresh->paid_leave_granted_last_year);
     }
 
+    /**
+     * 2時間有休が0.25日のため、付与日数も0.25刻みで保存できる必要がある。
+     * decimal(4,1)で作っていた頃は14.25日がMySQL側で14.3日に丸められていた。
+     */
+    public function test_paid_leave_grants_keep_quarter_day_precision(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        $target = Staff::factory()->create();
+
+        $this->actingAs($manager)->put(route('staff.update', $target), [
+            'name' => $target->name,
+            'department' => $target->department,
+            'login_id' => $target->login_id,
+            'email' => $target->email,
+            'role' => $target->role,
+            'paid_leave_granted_current_year' => '14.25',
+            'paid_leave_granted_last_year' => '3.75',
+        ])->assertRedirect(route('staff.index'));
+
+        $fresh = $target->fresh();
+        $this->assertSame(14.25, (float) $fresh->paid_leave_granted_current_year);
+        $this->assertSame(3.75, (float) $fresh->paid_leave_granted_last_year);
+
+        // 一覧では末尾の0を落として0.25刻みのまま出す。
+        $this->actingAs($manager)->get(route('staff.index'))->assertSee('14.25', false);
+    }
+
+    public function test_paid_leave_grants_reject_values_that_are_not_quarter_days(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        $target = Staff::factory()->create(['paid_leave_granted_current_year' => 10]);
+
+        $this->actingAs($manager)->put(route('staff.update', $target), [
+            'name' => $target->name,
+            'department' => $target->department,
+            'login_id' => $target->login_id,
+            'email' => $target->email,
+            'role' => $target->role,
+            'paid_leave_granted_current_year' => '14.3',
+        ])->assertSessionHasErrors('paid_leave_granted_current_year');
+
+        $this->assertSame(10.0, (float) $target->fresh()->paid_leave_granted_current_year);
+    }
+
     public function test_manager_can_update_and_clear_sid(): void
     {
         $manager = Staff::factory()->procurementManager()->create();

@@ -179,7 +179,7 @@
                                         {{ $c && $c['worstAverage'] ? $fmt($c['worstAverage']['averageMinutes']).'('.$c['worstAverage']['months'].'か月)' : '' }}
                                     </td>
                                     <td class="px-1 py-px text-right whitespace-nowrap font-mono text-slate-500 {{ $groupBorder }}">
-                                        {{ $c ? rtrim(rtrim(number_format($c['paidLeaveConsumed'], 1), '0'), '.').'/'.rtrim(rtrim(number_format($c['paidLeaveRemaining'], 1), '0'), '.') : '' }}
+                                        @if ($c)@days($c['paidLeaveConsumed'])/@days($c['paidLeaveRemaining'])@endif
                                     </td>
                                 </tr>
                             @endforeach

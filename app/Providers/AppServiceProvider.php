@@ -5,6 +5,7 @@ namespace App\Providers;
 use App\Models\DailyReport;
 use App\Models\LaborCost;
 use App\Models\Staff;
+use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
@@ -29,6 +30,10 @@ class AppServiceProvider extends ServiceProvider
         // パスワードマネージャーによる自動生成が記号を含まない場合が多く運用上の摩擦になるため、
         // 長さを重視するNIST 800-63Bの考え方に倣い記号必須は課さない方針にした。
         Password::defaults(fn () => Password::min(20)->mixedCase()->numbers());
+
+        // 有給休暇の日数は1日・半日(0.5)・2時間(0.25)単位。小数第1位に丸めると
+        // 0.25が0.3になってしまうため、日数の表示は必ず @days() を通す(2026-08-19)。
+        Blade::directive('days', fn (string $expression) => "<?php echo e(\App\Support\LeaveDays::format({$expression})); ?>");
 
         View::composer('layouts.navigation', function ($view) {
             /** @var Staff|null $staff */

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Staff;
 use App\Rules\NotSimilarToLoginId;
+use App\Rules\QuarterDayIncrement;
 use Illuminate\Database\QueryException;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\RedirectResponse;
@@ -126,8 +127,8 @@ class StaffController extends Controller
             'is_executive' => ['nullable', 'boolean'],
             'is_fund_manager' => ['nullable', 'boolean'],
             'is_administrator' => ['nullable', 'boolean'],
-            'paid_leave_granted_current_year' => ['nullable', 'numeric', 'min:0', 'max:99.9'],
-            'paid_leave_granted_last_year' => ['nullable', 'numeric', 'min:0', 'max:99.9'],
+            'paid_leave_granted_current_year' => ['nullable', 'numeric', 'min:0', 'max:99.99', new QuarterDayIncrement],
+            'paid_leave_granted_last_year' => ['nullable', 'numeric', 'min:0', 'max:99.99', new QuarterDayIncrement],
         ]);
 
         // アプリ側のunique検証後に別リクエストが割り込む競合状態に備え、
@@ -171,8 +172,8 @@ class StaffController extends Controller
             'is_executive' => ['nullable', 'boolean'],
             'is_fund_manager' => ['nullable', 'boolean'],
             'is_administrator' => ['nullable', 'boolean'],
-            'paid_leave_granted_current_year' => ['nullable', 'numeric', 'min:0', 'max:99.9'],
-            'paid_leave_granted_last_year' => ['nullable', 'numeric', 'min:0', 'max:99.9'],
+            'paid_leave_granted_current_year' => ['nullable', 'numeric', 'min:0', 'max:99.99', new QuarterDayIncrement],
+            'paid_leave_granted_last_year' => ['nullable', 'numeric', 'min:0', 'max:99.99', new QuarterDayIncrement],
         ]);
 
         /** @var Staff $actor */
@@ -277,8 +278,8 @@ class StaffController extends Controller
                 'is_executive' => ['nullable', 'boolean'],
                 'is_fund_manager' => ['nullable', 'boolean'],
                 'is_administrator' => ['nullable', 'boolean'],
-                'paid_leave_granted_current_year' => ['nullable', 'numeric', 'min:0', 'max:99.9'],
-                'paid_leave_granted_last_year' => ['nullable', 'numeric', 'min:0', 'max:99.9'],
+                'paid_leave_granted_current_year' => ['nullable', 'numeric', 'min:0', 'max:99.99', new QuarterDayIncrement],
+                'paid_leave_granted_last_year' => ['nullable', 'numeric', 'min:0', 'max:99.99', new QuarterDayIncrement],
             ]);
 
             if ($validator->fails()) {

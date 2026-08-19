@@ -82,7 +82,7 @@
                         </div>
                     @endif
                     @if ($leaveRequest->day_count !== null)
-                        <div class="py-2 flex justify-between"><dt class="text-slate-500">日数</dt><dd>{{ $leaveRequest->day_count }}日</dd></div>
+                        <div class="py-2 flex justify-between"><dt class="text-slate-500">日数</dt><dd>@days($leaveRequest->day_count)日</dd></div>
                     @endif
                     @if ($leaveRequest->halfDayPeriodLabel())
                         <div class="py-2 flex justify-between"><dt class="text-slate-500">午前/午後</dt><dd>{{ $leaveRequest->halfDayPeriodLabel() }}</dd></div>
