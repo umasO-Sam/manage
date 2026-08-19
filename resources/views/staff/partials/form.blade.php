@@ -75,6 +75,13 @@
                 <span class="block text-xs text-slate-500">購入部品手配ボード・見積依頼ボード・履歴にアクセスできる</span>
             </span>
         </label>
+        <label class="flex items-start gap-2 p-3 border rounded-lg cursor-pointer {{ $currentRole === \App\Models\Staff::ROLE_VIEWER ? 'border-blue-400 bg-blue-50' : 'border-slate-200' }}">
+            <input type="radio" name="role" value="{{ \App\Models\Staff::ROLE_VIEWER }}" class="mt-0.5 text-blue-600 focus:ring-blue-500" @checked($currentRole === \App\Models\Staff::ROLE_VIEWER)>
+            <span>
+                <span class="block text-sm font-semibold text-slate-800">参照ユーザ</span>
+                <span class="block text-xs text-slate-500">購入手配ボードの参照（新規依頼の作成・コメントは不可）と勤務状況一覧の閲覧のみ。上長・役員などのフラグは付けられない</span>
+            </span>
+        </label>
     </div>
     <x-input-error class="mt-2" :messages="$errors->get('role')" />
 </div>

@@ -58,7 +58,7 @@ class StaffController extends Controller
             return filter_var($input[$key], FILTER_VALIDATE_BOOLEAN);
         };
 
-        return [
+        $flags = [
             'is_supervisor' => $resolve('is_supervisor', true),
             // 日報管理者も上長フラグと同じ扱い(担当者管理を開ける人なら設定できる)。
             'is_daily_report_reviewer' => $resolve('is_daily_report_reviewer', true),
@@ -70,6 +70,19 @@ class StaffController extends Controller
             'is_fund_manager' => $resolve('is_fund_manager', $actor->canGrantFundManager()),
             'is_administrator' => $resolve('is_administrator', $actor->canGrantAdministrator()),
         ];
+
+        // 参照ユーザは購入手配ボードの参照と勤務状況一覧しか使えない。上長・役員などの
+        // フラグを併せ持つと権限の判定がロールとフラグで食い違うため、まとめて落とす。
+        // 名簿からの除外だけは権限ではなく表示上の設定なので、そのまま残す。
+        if (($input['role'] ?? $target?->role) === Staff::ROLE_VIEWER) {
+            foreach ($flags as $key => $value) {
+                if ($key !== 'excluded_from_rosters') {
+                    $flags[$key] = false;
+                }
+            }
+        }
+
+        return $flags;
     }
 
     /**

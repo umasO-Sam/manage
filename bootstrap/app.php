@@ -11,6 +11,7 @@ use App\Http\Middleware\EnsureQuoteNumberUser;
 use App\Http\Middleware\EnsureStaffManager;
 use App\Http\Middleware\EnsureSupervisorOrManager;
 use App\Http\Middleware\RequirePasswordChange;
+use App\Http\Middleware\RestrictReferenceViewer;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -41,6 +42,8 @@ return Application::configure(basePath: dirname(__DIR__))
             // 次のリクエストで無効にする(ログイン中のスマホがそのまま使えてしまうのを防ぐ)。
             AuthenticateSession::class,
             RequirePasswordChange::class,
+            // 参照ユーザは開ける画面を許可制で絞る(許可リストはミドルウェア側)。
+            RestrictReferenceViewer::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

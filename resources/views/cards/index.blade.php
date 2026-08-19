@@ -11,10 +11,12 @@
                 </h1>
                 <p class="text-xs text-slate-500 mt-1">社内の{{ $workflowType->name }}プロセスを一括して可視化・管理するカンバンボードです</p>
             </div>
-            <a href="{{ route('cards.create', $workflowType) }}" class="{{ $accent['button'] }} text-white font-medium py-2 px-4 rounded-xl shadow-sm hover:shadow flex items-center gap-2 text-sm transition-all">
-                <i data-lucide="plus-circle" class="w-4 h-4"></i>
-                <span>新規依頼を作成</span>
-            </a>
+            @can('create', App\Models\Card::class)
+                <a href="{{ route('cards.create', $workflowType) }}" class="{{ $accent['button'] }} text-white font-medium py-2 px-4 rounded-xl shadow-sm hover:shadow flex items-center gap-2 text-sm transition-all">
+                    <i data-lucide="plus-circle" class="w-4 h-4"></i>
+                    <span>新規依頼を作成</span>
+                </a>
+            @endcan
         </div>
     </x-slot>
 
@@ -85,7 +87,7 @@
 
                 {{-- 自分の依頼以外の未読をまとめて片付け、自分宛の新着だけを残せるようにする。
                      未読が無いときはボタン自体を出さない。 --}}
-                @if ($othersUnreadCount > 0)
+                @if ($othersUnreadCount > 0 && ! Auth::user()->isReferenceViewer())
                     <form method="POST" action="{{ route('cards.markOthersRead', $workflowType) }}"
                           onsubmit="return confirm('自分の依頼ではないカード{{ $othersUnreadCount }}件を既読にします。よろしいですか？');">
                         @csrf
@@ -149,7 +151,7 @@
                             </div>
                             @if ($index === $workflowType->lastStageIndex())
                                 <span class="text-[10px] text-slate-500 bg-white px-2 py-0.5 rounded-full border border-slate-200">{{ $workflowType->retention_days }}日で非表示</span>
-                            @elseif ($index === 0)
+                            @elseif ($index === 0 && Auth::user()->can('create', App\Models\Card::class))
                                 <a href="{{ route('cards.create', $workflowType) }}" class="inline-flex items-center gap-1 text-[10px] font-bold {{ $accent['badge_soft_text'] }} {{ $accent['badge_soft_bg'] }} border {{ $accent['badge_soft_border'] }} px-2 py-0.5 rounded-full hover:opacity-80 transition-colors">
                                     <i data-lucide="plus" class="w-3 h-3"></i>
                                     新規依頼を作成

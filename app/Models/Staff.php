@@ -24,11 +24,18 @@ class Staff extends Authenticatable
 
     public const ROLE_GENERAL = 'general';
 
+    /**
+     * 参照ユーザ。購入手配ボードの参照と勤務状況一覧の閲覧だけができる。
+     * 新規依頼の作成・コメント投稿はできず、他の画面はすべて403になる。
+     */
+    public const ROLE_VIEWER = 'viewer';
+
     /** @var array<string, string> ロール値 => 表示ラベル */
     public const ROLE_LABELS = [
         self::ROLE_PROCUREMENT_MANAGER => '経理資材担当',
         self::ROLE_SALES => '営業担当',
         self::ROLE_GENERAL => '一般社員',
+        self::ROLE_VIEWER => '参照ユーザ',
     ];
 
     /**
@@ -251,6 +258,23 @@ class Staff extends Authenticatable
             || (bool) $this->is_executive
             || (bool) $this->is_fund_manager
             || $this->role === self::ROLE_SALES;
+    }
+
+    /**
+     * 参照ユーザかどうか。参照ユーザには権限フラグ(上長・役員など)を付けられないため、
+     * ロールだけで判定してよい(StaffControllerの保存時に落としている)。
+     */
+    public function isReferenceViewer(): bool
+    {
+        return $this->role === self::ROLE_VIEWER;
+    }
+
+    /**
+     * そのボードを開けるかどうか。参照ユーザは購入手配ボードだけを見られる。
+     */
+    public function canViewBoard(WorkflowType $workflow): bool
+    {
+        return ! $this->isReferenceViewer() || $workflow->slug === WorkflowType::SLUG_PURCHASE;
     }
 
     public function roleLabel(): string

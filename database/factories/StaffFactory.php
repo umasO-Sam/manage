@@ -54,4 +54,12 @@ class StaffFactory extends Factory
             'role' => Staff::ROLE_SALES,
         ]);
     }
+
+    /** 参照ユーザ。購入手配ボードの参照と勤務状況一覧の閲覧だけができる。 */
+    public function viewer(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'role' => Staff::ROLE_VIEWER,
+        ]);
+    }
 }

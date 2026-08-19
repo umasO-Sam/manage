@@ -259,6 +259,8 @@
 
                 @if ($card->trashed())
                     <p class="mt-4 pt-4 border-t border-slate-100 text-xs text-slate-400">アーカイブ済みのカードにはコメントを追加できません。</p>
+                @elseif (Auth::user()->cannot('comment', $card))
+                    {{-- 参照ユーザはコメントを読めるだけ。入力欄自体を出さない。 --}}
                 @else
                     <form method="POST" action="{{ route('cards.comments.store', $card) }}" class="mt-4 pt-4 border-t border-slate-100 space-y-2">
                         @csrf

@@ -33,6 +33,9 @@
                         $isGeneral = $viewer->role === \App\Models\Staff::ROLE_GENERAL
                             && ! $viewer->is_supervisor
                             && ! $viewer->hasElevatedFlag();
+                        // 参照ユーザは購入手配ボードと勤務状況一覧しか開けないため、
+                        // メニューもこの2つだけにする(他を出しても403になるだけ)。
+                        $isViewer = $viewer->isReferenceViewer();
 
                         // 調達ボード(購入手配・見積依頼)だけを扱う。物件管理は物件管理メニュー側。
                         $procurementBoards = \App\Models\WorkflowType::procurementBoards()->get();
@@ -45,6 +48,18 @@
                         $attendancePending = $pendingApprovalsCount + $pendingDailyReportReviewCount;
                     @endphp
 
+                    @if ($isViewer)
+                        <a href="{{ route('cards.index', 'purchase') }}"
+                           class="px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 shrink-0 whitespace-nowrap transition-colors {{ request()->routeIs('cards.*') ? 'bg-slate-200 text-slate-800' : 'text-slate-600 hover:bg-slate-50' }}">
+                            <i data-lucide="shopping-cart" class="w-4 h-4"></i>
+                            <span>購入手配ボード</span>
+                        </a>
+                        <a href="{{ route('work-status.index') }}"
+                           class="px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 shrink-0 whitespace-nowrap transition-colors {{ request()->routeIs('work-status.*') ? 'bg-slate-200 text-slate-800' : 'text-slate-600 hover:bg-slate-50' }}">
+                            <i data-lucide="users-round" class="w-4 h-4"></i>
+                            <span>勤務状況一覧</span>
+                        </a>
+                    @else
                     {{-- 調達ボード: 一般社員は各ボードを直接表示し、それ以外はドロップダウンにまとめる --}}
                     @if ($isGeneral)
                         @php
@@ -297,6 +312,7 @@
                             </x-slot>
                         </x-dropdown>
                     @endif
+                    @endif
                 </div>
             </div>
 
@@ -357,6 +373,14 @@
     <div :class="{'block': open, 'hidden': ! open}"
          class="hidden lg:hidden border-t border-slate-200 max-h-[calc(100vh-4rem)] overflow-y-auto overscroll-contain">
         <div class="pt-2 pb-3 space-y-1 px-2">
+            @if ($isViewer)
+                <a href="{{ route('cards.index', 'purchase') }}" class="block px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap {{ request()->routeIs('cards.*') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
+                    購入手配ボード
+                </a>
+                <a href="{{ route('work-status.index') }}" class="block px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap {{ request()->routeIs('work-status.*') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
+                    勤務状況一覧
+                </a>
+            @else
             {{-- 調達ボード: 一般社員は各ボードを直接表示し、それ以外は見出し付きでまとめる --}}
             @if ($isGeneral)
                 @php
@@ -539,6 +563,7 @@
                         注番管理
                     </a>
                 @endif
+            @endif
             @endif
         </div>
 

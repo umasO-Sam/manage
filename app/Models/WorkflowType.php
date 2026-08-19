@@ -28,6 +28,9 @@ class WorkflowType extends Model
     /** 物件管理ボードのslug。専用画面(projects.*)を持つため、調達ボードとしては扱わない。 */
     public const SLUG_PROJECT = 'project';
 
+    /** 購入手配ボードのslug。参照ユーザに見せる唯一のボード。 */
+    public const SLUG_PURCHASE = 'purchase';
+
     public function cards(): HasMany
     {
         return $this->hasMany(Card::class);

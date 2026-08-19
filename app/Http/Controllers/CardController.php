@@ -38,6 +38,13 @@ class CardController extends Controller
     {
         $this->authorize('viewAny', Card::class);
 
+        // 参照ユーザは購入手配ボードだけを見られる。
+        abort_unless(
+            $request->user()->canViewBoard($workflow),
+            403,
+            '参照ユーザが開けるのは購入手配ボードだけです。'
+        );
+
         // 物件管理は同じカード基盤を使うが専用画面がある。汎用ボードで開くと
         // 受注ヘッダの項目が出ない二重の画面になるため、物件ボードへ送る。
         if ($workflow->isProjectBoard()) {

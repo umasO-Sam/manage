@@ -15,17 +15,20 @@ class CardPolicy
         return true;
     }
 
+    /**
+     * 参照ユーザは購入手配ボードのカードだけを開ける(添付の閲覧もこの判定を通る)。
+     */
     public function view(Staff $staff, Card $card): bool
     {
-        return true;
+        return $staff->canViewBoard($card->workflowType);
     }
 
     /**
-     * Every staff member may raise a new request.
+     * Every staff member may raise a new request — 参照ユーザを除く。
      */
     public function create(Staff $staff): bool
     {
-        return true;
+        return ! $staff->isReferenceViewer();
     }
 
     /**
@@ -77,9 +80,10 @@ class CardPolicy
 
     /**
      * Every staff member may comment — same visibility as viewing the card.
+     * 参照ユーザだけは読むことしかできない。
      */
     public function comment(Staff $staff, Card $card): bool
     {
-        return true;
+        return ! $staff->isReferenceViewer();
     }
 }
