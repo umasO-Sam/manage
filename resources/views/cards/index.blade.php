@@ -142,6 +142,10 @@
                                 <span class="w-2.5 h-2.5 rounded-full {{ $laneDots[$index] ?? 'bg-slate-400' }}"></span>
                                 <h2 class="font-bold text-slate-800 text-sm">{{ $stage['label'] }}</h2>
                                 <span class="bg-slate-200 text-slate-700 text-xs px-2 py-0.5 rounded-full font-bold">{{ count($cardsInLane) }}</span>
+                                {{-- どの枠に未読が溜まっているかを枠の見出しで分かるようにする。 --}}
+                                @if (($unreadCountsByStage[$index] ?? 0) > 0)
+                                    <span class="bg-red-100 text-red-800 text-xs px-2 py-0.5 rounded-full font-bold" title="この枠の未読（未確認・新着コメント）">未読{{ $unreadCountsByStage[$index] }}</span>
+                                @endif
                             </div>
                             @if ($index === $workflowType->lastStageIndex())
                                 <span class="text-[10px] text-slate-500 bg-white px-2 py-0.5 rounded-full border border-slate-200">{{ $workflowType->retention_days }}日で非表示</span>
@@ -156,13 +160,20 @@
                         <div class="flex-grow flex flex-col space-y-3 overflow-y-auto max-h-[600px]">
                             @php($canAdvance = Auth::user()->is_procurement_manager && $index < $workflowType->lastStageIndex())
                             @foreach ($cardsInLane as $card)
+                                @php($unread = $card->unreadStatusFor(Auth::user()))
+                                {{-- 未読は枠の色と太さで示す。件数が増えるとバッジだけでは
+                                     どのカードが未読か追いにくいため、カード全体を目立たせる。 --}}
+                                @php($cardBorder = match ($unread) {
+                                    'unconfirmed' => 'border-2 border-red-800',
+                                    'new_comment' => 'border-2 border-blue-600',
+                                    default => $index === $workflowType->lastStageIndex() ? 'border border-emerald-100' : 'border border-slate-200',
+                                })
                                 <div
-                                    class="rounded-xl shadow-sm border p-4 hover:shadow-md transition-all relative {{ $index === $workflowType->lastStageIndex() ? 'bg-emerald-50/50 border-emerald-100' : 'bg-white border-slate-200' }}"
+                                    class="rounded-xl shadow-sm p-4 hover:shadow-md transition-all relative {{ $cardBorder }} {{ $index === $workflowType->lastStageIndex() ? 'bg-emerald-50/50' : 'bg-white' }}"
                                     @if ($canAdvance) draggable="true" style="cursor: grab;" @endif
                                     @dragstart="draggedCardId = {{ $card->id }}; draggedFromStage = {{ $card->current_stage }}"
                                     @dragend="draggedCardId = null; draggedFromStage = null; dragOverStage = null"
                                 >
-                                    @php($unread = $card->unreadStatusFor(Auth::user()))
 
                                     {{-- 簡易表示: 注番+未確認バッジ / 品名 / 作成日時+依頼者 の3行だけを出す --}}
                                     <a href="{{ route('cards.show', $card) }}" class="block space-y-1" draggable="false" x-show="compact" x-cloak>

@@ -84,6 +84,12 @@ class CardController extends Controller
         return view('cards.index', [
             'workflowType' => $workflow,
             'cardsByStage' => $cards,
+            // 枠ごとの未読件数。件数が増えると未読カードを探すのが大変なため、
+            // 枠の見出しにも出す。カードの枠線の色分けと数が合うよう、
+            // 表示しているカード（絞り込み後）だけを数える。
+            'unreadCountsByStage' => $cards
+                ->map(fn ($lane) => $lane->filter(fn (Card $card) => $card->unreadStatusFor($staff) !== null)->count())
+                ->all(),
             'onlyMine' => $onlyMine,
             'orderNo' => $orderNo,
             'othersUnreadCount' => $this->othersUnreadCards($workflow, $staff)->count(),

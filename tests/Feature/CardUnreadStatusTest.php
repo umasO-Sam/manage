@@ -123,6 +123,62 @@ class CardUnreadStatusTest extends TestCase
     }
 
     /**
+     * カードが増えるとバッジだけではどの枠に未読があるか分からないため、
+     * 枠の見出しにもその枠の未読件数を出す。
+     */
+    public function test_lane_headers_carry_the_unread_count_of_that_lane(): void
+    {
+        $workflowType = $this->purchaseWorkflow();
+        $staff = Staff::factory()->create();
+        $commenter = Staff::factory()->create();
+
+        $this->makeCard($workflowType, $staff);                 // 新規依頼: 未確認
+        $read = $this->makeCard($workflowType, $staff);         // 新規依頼: 確認済み
+        $this->makeCard($workflowType, $staff)->update(['current_stage' => 1]);  // 手配中: 未確認
+
+        $commented = $this->makeCard($workflowType, $staff);    // 手配中: 新着コメント
+        $commented->update(['current_stage' => 1]);
+
+        foreach ([$read, $commented] as $card) {
+            $this->actingAs($staff)->get(route('cards.show', $card))->assertOk();
+        }
+
+        $this->travel(1)->minutes();
+        $this->actingAs($commenter)->post(route('cards.comments.store', $commented), ['body' => '確認お願いします']);
+
+        $response = $this->actingAs($staff)->get(route('cards.index', $workflowType));
+
+        $response->assertOk();
+        $this->assertSame([0 => 1, 1 => 2], $response->viewData('unreadCountsByStage'));
+    }
+
+    /**
+     * 未読は枠線でも示す。未確認は赤茶、新着コメントは青の少し太い枠。
+     */
+    public function test_unread_cards_are_outlined_on_the_board(): void
+    {
+        $workflowType = $this->purchaseWorkflow();
+        $staff = Staff::factory()->create();
+        $commenter = Staff::factory()->create();
+
+        $this->makeCard($workflowType, $staff);
+        $read = $this->makeCard($workflowType, $staff);
+        $commented = $this->makeCard($workflowType, $staff);
+
+        foreach ([$read, $commented] as $card) {
+            $this->actingAs($staff)->get(route('cards.show', $card))->assertOk();
+        }
+
+        $this->travel(1)->minutes();
+        $this->actingAs($commenter)->post(route('cards.comments.store', $commented), ['body' => '見てください']);
+
+        $content = $this->actingAs($staff)->get(route('cards.index', $workflowType))->assertOk()->getContent();
+
+        $this->assertSame(1, substr_count($content, 'border-2 border-red-800'), '未確認カードだけが赤茶の枠');
+        $this->assertSame(1, substr_count($content, 'border-2 border-blue-600'), '新着コメントのカードだけが青の枠');
+    }
+
+    /**
      * ボードの「自分の依頼以外を既読にする」。他人の依頼の未読を片付けて、
      * 自分宛の新着だけを残せるようにする操作。
      */
