@@ -9,7 +9,25 @@
         </p>
     </x-slot>
 
-    <div class="py-8" x-data="{ editMode: false, saving: false, showPaste: false }">
+    <div class="py-8" x-data="{
+            editMode: false,
+            saving: false,
+            showPaste: false,
+            /**
+             * 表の高さを、下端がちょうど画面の下に来るように毎回決める。
+             * 固定の高さ(70vh等)にすると、直接編集で行が高くなったときに
+             * 表の下端＝横スクロールバーが画面の外に出てしまうため。
+             */
+            fitTableHeight() {
+                const grid = this.$refs.grid;
+                if (! grid) return;
+                const top = grid.getBoundingClientRect().top;
+                grid.style.maxHeight = Math.max(240, window.innerHeight - top - 24) + 'px';
+            },
+        }"
+        x-init="$nextTick(() => fitTableHeight()); $watch('editMode', () => $nextTick(() => fitTableHeight())); $watch('showPaste', () => $nextTick(() => fitTableHeight()))"
+        @resize.window="fitTableHeight()"
+        @scroll.window="fitTableHeight()">
         <div class="max-w-[1800px] mx-auto sm:px-6 lg:px-8 space-y-4">
 
             <p class="text-xs text-slate-500">
@@ -101,7 +119,7 @@
                 @csrf
                 @method('PUT')
                 {{-- 処理方法・備考が長いため、表は横スクロールで読む。 --}}
-                <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-x-auto max-h-[70vh] overflow-y-auto">
+                <div x-ref="grid" class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-x-auto overflow-y-auto">
                     <table class="w-full text-left border-collapse text-xs whitespace-nowrap">
                         <thead>
                             <tr class="bg-slate-50 border-b border-slate-200 font-semibold text-slate-600">
