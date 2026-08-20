@@ -23,3 +23,9 @@
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteRule ^ index.php [L]
 </IfModule>
+
+# アプリとしてインストールしたときのアイコン定義。拡張子が未登録のままだと
+# text/plain で返り、ブラウザがマニフェストとして読まないことがある。
+<IfModule mod_mime.c>
+    AddType application/manifest+json .webmanifest
+</IfModule>

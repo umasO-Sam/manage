@@ -251,8 +251,18 @@ $img = render($px, $side, 180, 0.04, [255, 255, 255]);
 file_put_contents("$outDir/apple-touch-icon.png", pngBytes($img));
 echo "apple-touch-icon.png (180x180, 白背景)\n";
 
+// --- maskable(アプリとしてインストールしたときのアイコン) ---
+// OSが角を丸めたり円形に切り抜いたりするため、外周にsafe zoneの余白を取り、
+// 透明部分が黒で埋まらないよう白背景にする。
+$img = render($px, $side, 512, 0.10, [255, 255, 255]);
+file_put_contents("$outDir/icon-maskable-512.png", pngBytes($img));
+echo "icon-maskable-512.png (512x512, 白背景・余白10%)
+";
+
 // --- favicon.ico は 16/32/48 のPNGを収めた形式(既存と同じ) ---
-$icoSizes = [16, 32, 48];
+// Windowsはショートカットやタスクバーで48pxより大きいアイコンを使う。
+// 16/32/48しか持たせないと拡大されてぼやけるため、256まで入れる。
+$icoSizes = [16, 32, 48, 64, 128, 256];
 $entries = [];
 foreach ($icoSizes as $size) {
     $entries[$size] = pngBytes(render($px, $side, $size, 0.0, null));
@@ -262,7 +272,9 @@ $count = count($entries);
 $ico = pack('vvv', 0, 1, $count);
 $offset = 6 + 16 * $count;
 foreach ($entries as $size => $data) {
-    $ico .= pack('CCCCvvVV', $size, $size, 0, 0, 1, 32, strlen($data), $offset);
+    // ICOの幅・高さは1バイト。256は0で表す決まりになっている。
+    $dim = $size >= 256 ? 0 : $size;
+    $ico .= pack('CCCCvvVV', $dim, $dim, 0, 0, 1, 32, strlen($data), $offset);
     $offset += strlen($data);
 }
 foreach ($entries as $data) {
