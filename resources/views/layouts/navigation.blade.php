@@ -2,20 +2,20 @@
 <nav x-data="{ open: false }" class="{{ app()->isProduction() ? 'bg-white' : 'bg-yellow-100' }} border-b border-slate-200 sticky top-0 z-40 shadow-sm">
     <!-- Primary Navigation Menu -->
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="flex justify-between h-16 items-center">
+        <div data-compact="nav" class="flex justify-between h-16 items-center">
             <div class="flex items-center">
                 <!-- Logo -->
                 <a href="{{ route('cards.index', 'purchase') }}" class="flex items-center gap-3 shrink-0">
-                    <div class="p-2 bg-blue-600 rounded-lg text-white">
+                    <div data-compact="nav-logo" class="p-2 bg-blue-600 rounded-lg text-white">
                         <i data-lucide="package" class="w-5 h-5"></i>
                     </div>
-                    <span class="font-bold text-lg tracking-tight text-slate-900 hidden sm:inline">{{ config('app.name') }}</span>
+                    <span data-compact="nav-title" class="font-bold text-lg tracking-tight text-slate-900 hidden sm:inline">{{ config('app.name') }}</span>
                 </a>
 
                 {{-- 横並びメニューはlg(1024px)以上でのみ表示する。md(768px)まで粘ると
                      メニュー項目が右端で見切れるため、見切れる前にバーガーへ切り替える。 --}}
                 <!-- Navigation Links -->
-                <div class="hidden lg:flex space-x-1 ml-8">
+                <div data-compact="nav-links" class="hidden lg:flex space-x-1 ml-8">
                     @php
                         $viewer = Auth::user();
                         // 権限区分。上長(is_supervisor)はロールとは独立したフラグで、
@@ -317,10 +317,21 @@
             </div>
 
             <!-- Settings Dropdown -->
-            <div class="hidden sm:flex sm:items-center sm:ms-6">
+            <div class="hidden sm:flex sm:items-center sm:ms-6 gap-2">
+                {{-- 省スペース表示の切替。上部メニューとページ見出しを縮めて、表を1画面に多く出す
+                     (プロジェクタ投影で使う)。選んだ状態はこのブラウザに憶える。
+                     アイコンは切替時に描き直さずに済むよう両方置き、CSSで出し分ける
+                     (lucideは読み込み時に<i>を<svg>へ置き換えるため、<span>側に目印を付ける)。 --}}
+                <button type="button" onclick="window.toggleCompactChrome()"
+                        data-compact="nav-toggle"
+                        class="inline-flex items-center justify-center w-9 h-9 shrink-0 border border-slate-200 rounded-lg text-slate-500 bg-white hover:bg-slate-50 focus:outline-none transition ease-in-out duration-150"
+                        title="省スペース表示の切替" aria-label="省スペース表示の切替">
+                    <span data-compact-hide class="inline-flex"><i data-lucide="chevrons-down-up" class="w-4 h-4"></i></span>
+                    <span data-compact-show><i data-lucide="chevrons-up-down" class="w-4 h-4"></i></span>
+                </button>
                 <x-dropdown align="right" width="48">
                     <x-slot name="trigger">
-                        <button class="inline-flex items-center gap-1.5 px-3 py-1.5 border border-slate-200 text-sm font-medium rounded-lg text-slate-700 bg-white hover:bg-slate-50 focus:outline-none transition ease-in-out duration-150">
+                        <button data-compact="nav-user" class="inline-flex items-center gap-1.5 px-3 py-1.5 border border-slate-200 text-sm font-medium rounded-lg text-slate-700 bg-white hover:bg-slate-50 focus:outline-none transition ease-in-out duration-150">
                             <i data-lucide="user-circle" class="w-4 h-4 text-slate-400"></i>
                             <div>{{ Auth::user()->name }}</div>
                             <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-slate-400"></i>
@@ -371,6 +382,7 @@
          届かない状態を解消するため)。overscroll-containで背後への伝播も止める。 --}}
     <!-- Responsive Navigation Menu -->
     <div :class="{'block': open, 'hidden': ! open}"
+         data-compact="nav-mobile"
          class="hidden lg:hidden border-t border-slate-200 max-h-[calc(100vh-4rem)] overflow-y-auto overscroll-contain">
         <div class="pt-2 pb-3 space-y-1 px-2">
             @if ($isViewer)

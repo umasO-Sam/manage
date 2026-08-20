@@ -5,3 +5,70 @@
 [x-cloak] {
     display: none !important;
 }
+
+/* 省スペース表示。上部メニュー右のボタンで切り替え、状態はブラウザに憶える
+   (切替と復元は layouts/app.blade.php のスクリプト)。プロジェクタ投影のように
+   1画面へ多くの行を出したいときに使う。縮めるのは上部メニュー(64px→36px)と
+   ページ見出しの帯(約68px→32px)だけで、本文のレイアウトには手を入れない。 */
+.compact-chrome [data-compact='nav'] {
+    height: 2.25rem;
+}
+
+.compact-chrome [data-compact='nav-logo'] {
+    padding: 0.25rem;
+}
+
+.compact-chrome [data-compact='nav-logo'] svg {
+    width: 1rem;
+    height: 1rem;
+}
+
+.compact-chrome [data-compact='nav-title'] {
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+}
+
+/* メニュー項目・利用者名・切替ボタンは、縮めた高さ(36px)に収まるまで詰める。 */
+.compact-chrome [data-compact='nav-links'] a,
+.compact-chrome [data-compact='nav-links'] button,
+.compact-chrome [data-compact='nav-user'] {
+    padding-top: 0.125rem;
+    padding-bottom: 0.125rem;
+}
+
+.compact-chrome [data-compact='nav-toggle'] {
+    width: 1.75rem;
+    height: 1.75rem;
+}
+
+.compact-chrome [data-compact='nav-mobile'] {
+    max-height: calc(100vh - 2.25rem);
+}
+
+.compact-chrome [data-compact='page-header'] {
+    padding-top: 0.25rem;
+    padding-bottom: 0.25rem;
+}
+
+.compact-chrome [data-compact='page-header'] h2 {
+    font-size: 1rem;
+    line-height: 1.5rem;
+}
+
+.compact-chrome [data-compact='page-header'] h2 svg {
+    width: 1rem;
+    height: 1rem;
+}
+
+/* 切替ボタンのアイコン(通常表示では「縮める」、省スペース表示では「戻す」)。 */
+[data-compact-show] {
+    display: none;
+}
+
+.compact-chrome [data-compact-show] {
+    display: inline-flex;
+}
+
+.compact-chrome [data-compact-hide] {
+    display: none;
+}
