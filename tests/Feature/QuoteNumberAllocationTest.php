@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\CustomerCode;
+use App\Models\BusinessPartner;
 use App\Models\QuoteNumber;
 use App\Models\Staff;
 use App\Services\QuoteNumberAllocator;
@@ -269,6 +270,42 @@ class QuoteNumberAllocationTest extends TestCase
         $this->actingAs($staff)->getJson(route('quote-numbers.lookup', ['no' => 'DH015-N01']))
             ->assertOk()
             ->assertJson(['found' => true, 'order_no' => 'DH015-N01', 'project_name' => '桁違いの物件']);
+    }
+
+    /**
+     * 物件管理の受注登録から使う注番の検索。番号を覚えていなくても件名や
+     * 客先番号で引けるよう、完全一致のlookupとは別に候補を返す。
+     */
+    public function test_the_search_returns_candidates_by_number_or_project_name(): void
+    {
+        $staff = Staff::factory()->create(['role' => Staff::ROLE_SALES]);
+        BusinessPartner::create(['name' => '見積先㈱', 'customer_code' => 'DH', 'is_provisional' => false]);
+        QuoteNumber::create([
+            'full_no' => 'DH777-N01', 'customer_code' => 'DH', 'unit_no' => '777', 'suffix' => 'N01',
+            'quote_type' => 'N', 'quote_seq' => '01', 'project_name' => '搬送コンベア',
+            'delivery_dest' => '第二工場', 'staff_id' => $staff->id, 'source' => 'manage',
+        ]);
+        QuoteNumber::create([
+            'full_no' => 'ZZ001-N01', 'customer_code' => 'ZZ', 'unit_no' => '001', 'suffix' => 'N01',
+            'quote_type' => 'N', 'quote_seq' => '01', 'project_name' => '別の物件', 'source' => 'manage',
+        ]);
+
+        $this->actingAs($staff)->getJson(route('quote-numbers.search', ['q' => 'dh777']))
+            ->assertOk()
+            ->assertJsonCount(1, 'quotes')
+            ->assertJsonPath('quotes.0.order_no', 'DH777-N01')
+            ->assertJsonPath('quotes.0.recipient', '見積先㈱')
+            ->assertJsonPath('quotes.0.delivery_dest', '第二工場');
+
+        // 件名でも引ける
+        $this->actingAs($staff)->getJson(route('quote-numbers.search', ['q' => 'コンベア']))
+            ->assertOk()
+            ->assertJsonPath('quotes.0.project_name', '搬送コンベア');
+
+        // 空の検索語では候補を出さない(全件返すと選べないため)
+        $this->actingAs($staff)->getJson(route('quote-numbers.search', ['q' => '']))
+            ->assertOk()
+            ->assertJsonCount(0, 'quotes');
     }
 
     public function test_taking_a_number_records_it_with_the_selected_staff(): void

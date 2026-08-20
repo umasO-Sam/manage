@@ -237,6 +237,46 @@ class QuoteNumberController extends Controller
     /**
      * 注番の完全一致検索。注番管理の新規登録・受注登録の「検索」ボタンから使う。
      */
+    /** 注番の検索で一度に返す候補の数。多すぎると選ぶのが大変になるため絞る。 */
+    private const SEARCH_LIMIT = 30;
+
+    /**
+     * 見積番号台帳を注番・件名で探す。物件管理の受注登録で、採番済みの注番を
+     * 一覧から選べるようにするための候補を返す(完全一致のlookupとは別)。
+     */
+    public function search(Request $request): JsonResponse
+    {
+        $query = trim((string) $request->query('q', ''));
+
+        if ($query === '') {
+            return response()->json(['quotes' => []]);
+        }
+
+        $upper = mb_strtoupper($query);
+
+        $quotes = QuoteNumber::with('staff')
+            ->where(function ($builder) use ($upper, $query) {
+                $builder->where('full_no', 'like', "%{$upper}%")
+                    ->orWhere('customer_code', 'like', "%{$upper}%")
+                    ->orWhere('project_name', 'like', "%{$query}%");
+            })
+            // 採番したての注番から探すことが多いため新しい順。
+            ->orderByDesc('id')
+            ->limit(self::SEARCH_LIMIT)
+            ->get();
+
+        return response()->json([
+            'quotes' => $quotes->map(fn (QuoteNumber $quote) => [
+                'order_no' => $quote->canonicalNo(),
+                'project_name' => $quote->project_name,
+                'recipient' => $this->resolveCompanyName($quote->customer_code),
+                'delivery_dest' => $quote->delivery_dest,
+                'staff_id' => $quote->staff_id,
+                'staff_name' => $quote->staff?->name,
+            ])->values(),
+        ]);
+    }
+
     public function lookup(Request $request, QuoteNumberAllocator $allocator): JsonResponse
     {
         $no = strtoupper(trim((string) $request->query('no', '')));

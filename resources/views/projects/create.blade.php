@@ -22,6 +22,18 @@
                        注番を取得した社内担当者を引っ張ってくる。 --}}
                   x-data="{
                       isNewPartner: {{ old('is_new_partner') ? 'true' : 'false' }},
+                      // 受注先プルダウン。関連注番と社名で絞り込めるようにするため、
+                      // option を固定で書かずにこの配列から組み立てる。
+                      partners: {{ \Illuminate\Support\Js::from($partners->map(fn ($p) => [
+                          'id' => $p->id,
+                          'name' => $p->name,
+                          'label' => $p->displayLabel(),
+                          'order_nos' => $p->relatedOrderNoList(),
+                      ])) }},
+                      partnerId: '{{ old('business_partner_id') }}',
+                      partnerFilterNo: '',
+                      partnerNameQuery: '',
+                      partnerFilterNotice: null,
                       bypassFormat: {{ old('bypass_order_no_format') ? 'true' : 'false' }},
                       showAllStaff: {{ old('show_all_staff') ? 'true' : 'false' }},
                       lookupMessage: null,
@@ -68,15 +80,81 @@
                       },
                       // 受注先名から取引先を選ぶ。選択肢になければ新規取引先として名前を入れる。
                       applyRecipient(name) {
-                          const select = this.$refs.partnerSelect;
-                          const option = Array.from(select.options).find((o) => o.dataset.name === name);
-                          if (option) {
+                          const partner = this.partners.find((p) => p.name === name)
+                              ?? this.partners.find((p) => this.normalizeName(p.name) === this.normalizeName(name));
+                          if (partner) {
                               this.isNewPartner = false;
-                              select.value = option.value;
+                              this.partnerId = String(partner.id);
                           } else {
                               this.isNewPartner = true;
                               this.$nextTick(() => { this.$refs.newPartnerName.value = name; });
                           }
+                      },
+                      // 「㈱」「株式会社」「(株)」や空白の違いを無視して社名を比べる(あいまい検索用)。
+                      normalizeName(value) {
+                          return (value ?? '')
+                              .replace(/[Ａ-Ｚａ-ｚ０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
+                              .toUpperCase()
+                              .replace(/株式会社|有限会社|㈱|㈲|\(株\)|\(有\)|（株）|（有）/g, '')
+                              .replace(/[\s　・.,、。]/g, '');
+                      },
+                      // 注番で絞り込む。関連注番に入っている取引先だけを残し、
+                      // 1件も当たらないときは全件のまま出す(選べなくなるのを避ける)。
+                      applyPartnerFilter(orderNo) {
+                          const no = (orderNo ?? '').trim().toUpperCase();
+                          this.partnerFilterNo = no;
+                          if (no === '') {
+                              this.partnerFilterNotice = null;
+                              return;
+                          }
+                          const hit = this.partners.filter((p) => p.order_nos.some((o) => o.includes(no) || no.includes(o)));
+                          this.partnerFilterNotice = hit.length
+                              ? { ok: true, text: '関連注番「' + no + '」の取引先' + hit.length + '件に絞り込みました。' }
+                              : { ok: false, text: '関連注番「' + no + '」に一致する取引先がないため、全件を表示しています。' };
+                      },
+                      clearPartnerFilter() {
+                          this.partnerFilterNo = '';
+                          this.partnerNameQuery = '';
+                          this.partnerFilterNotice = null;
+                      },
+                      get filteredPartners() {
+                          let list = this.partners;
+
+                          if (this.partnerFilterNo !== '') {
+                              const hit = list.filter((p) => p.order_nos.some((o) => o.includes(this.partnerFilterNo) || this.partnerFilterNo.includes(o)));
+                              if (hit.length) list = hit;
+                          }
+
+                          const query = this.normalizeName(this.partnerNameQuery);
+                          if (query !== '') {
+                              const hit = list.filter((p) => this.normalizeName(p.name).includes(query));
+                              if (hit.length) list = hit;
+                          }
+
+                          return list;
+                      },
+                      // 見積番号台帳の検索。採番済みの注番を一覧から選べるようにする。
+                      quoteResults: [],
+                      quoteMessage: null,
+                      async searchQuotes() {
+                          const q = this.$refs.quoteQuery.value.trim();
+                          if (! q) {
+                              this.quoteResults = [];
+                              this.quoteMessage = '注番・客先番号・件名のいずれかを入力してください。';
+                              return;
+                          }
+                          const response = await fetch('{{ route('quote-numbers.search') }}?q=' + encodeURIComponent(q), {
+                              headers: { 'Accept': 'application/json' },
+                          });
+                          const data = await response.json();
+                          this.quoteResults = data.quotes;
+                          this.quoteMessage = data.quotes.length ? null : '見積番号台帳に一致する注番がありません。';
+                      },
+                      pickQuote(quote) {
+                          this.quoteResults = [];
+                          this.quoteMessage = null;
+                          this.$refs.orderNo.value = quote.order_no;
+                          this.applyFromQuote(quote, quote.order_no);
                       },
                       async lookup() {
                           const no = this.$refs.orderNo.value.trim();
@@ -90,18 +168,26 @@
                               return;
                           }
 
-                          if (data.project_name) this.$refs.productName.value = data.project_name;
-                          if (data.delivery_dest) this.$refs.deliveryDest.value = data.delivery_dest;
+                          this.applyFromQuote(data, no);
+                      },
+                      /**
+                       * 見積番号台帳の1件を各欄に反映する。件名・納入先は自由入力のままなので
+                       * 上書きした後も直せる。受注先は関連注番での絞り込みにも使う。
+                       */
+                      applyFromQuote(quote, no) {
+                          if (quote.project_name) this.$refs.productName.value = quote.project_name;
+                          if (quote.delivery_dest) this.$refs.deliveryDest.value = quote.delivery_dest;
 
-                          if (data.recipient) this.applyRecipient(data.recipient);
+                          this.applyPartnerFilter(no);
+                          if (quote.recipient) this.applyRecipient(quote.recipient);
 
                           // 担当者は全員の一覧に切り替えてから選ぶ(役員・営業担当以外のこともあるため)。
-                          if (data.staff_id) {
+                          if (quote.staff_id) {
                               this.showAllStaff = true;
-                              this.$nextTick(() => { this.$refs.staffSelect.value = String(data.staff_id); });
+                              this.$nextTick(() => { this.$refs.staffSelect.value = String(quote.staff_id); });
                           }
 
-                          this.lookupMessage = { ok: true, text: '「' + (data.project_name || no) + '」を反映しました。' };
+                          this.lookupMessage = { ok: true, text: '「' + (quote.project_name || no) + '」を反映しました。' };
                       },
                   }">
                 @csrf
@@ -183,14 +269,56 @@
                     <x-input-error class="mt-1" :messages="$errors->get('business_order_id')" />
                 </div>
 
+                {{-- 見積番号の採番で取得済みの注番から選ぶ。番号を覚えていなくても
+                     件名や客先番号で引けるようにする。 --}}
+                <div class="p-3 rounded-lg bg-slate-50 border border-slate-200" x-show="! pickedOrder" x-cloak>
+                    <p class="text-sm font-bold text-slate-700">採番済みの注番から選ぶ</p>
+                    <p class="mt-0.5 text-[11px] text-slate-500">
+                        見積番号台帳を注番・客先番号・件名で検索します。選ぶと件名・受注先・納入先・社内担当者が入ります（あとから直せます）。
+                    </p>
+                    <div class="mt-2 flex gap-2">
+                        <input type="text" x-ref="quoteQuery" @keydown.enter.prevent="searchQuotes()"
+                               placeholder="例: DH013 / 搬送コンベア"
+                               class="block w-full rounded-lg border-slate-300 text-sm">
+                        <button type="button" @click="searchQuotes()"
+                                class="shrink-0 px-4 py-2 rounded-lg border border-slate-300 text-slate-700 text-sm font-bold">
+                            検索
+                        </button>
+                    </div>
+                    <template x-if="quoteMessage">
+                        <p class="mt-1 text-[11px] font-bold text-amber-600" x-text="quoteMessage"></p>
+                    </template>
+                    <template x-if="quoteResults.length">
+                        <div class="mt-2 max-h-72 overflow-y-auto">
+                            <template x-for="quote in quoteResults" :key="quote.order_no">
+                                <button type="button" @click="pickQuote(quote)"
+                                        class="w-full text-left px-3 py-2 mt-1 rounded border border-slate-200 bg-white cursor-pointer hover:bg-slate-50">
+                                    <span class="font-mono text-xs text-slate-500" x-text="quote.order_no"></span>
+                                    <span class="block text-sm text-slate-800" x-text="quote.project_name || '（件名なし）'"></span>
+                                    <span class="block text-[11px] text-slate-500">
+                                        <span x-text="quote.recipient || '受注先なし'"></span>
+                                        ／
+                                        <span x-text="quote.delivery_dest || '納入先なし'"></span>
+                                        <template x-if="quote.staff_name">
+                                            <span x-text="'／' + quote.staff_name"></span>
+                                        </template>
+                                    </span>
+                                </button>
+                            </template>
+                        </div>
+                    </template>
+                </div>
+
                 <div>
                     <x-input-label for="order_no" value="注番（必須）" />
                     <div class="mt-1 flex gap-2">
                         {{-- 形式チェックを解除しているときは日本語もそのまま登録するので大文字化しない。 --}}
+                        {{-- 手で注番を入れた場合も、その注番で受注先プルダウンを絞る。 --}}
                         <x-text-input id="order_no" name="order_no" type="text" class="block w-full font-mono"
                                       x-ref="orderNo" :value="old('order_no')" required
                                       x-bind:class="bypassFormat ? '' : 'uppercase'"
-                                      x-bind:readonly="pickedOrder !== null" />
+                                      x-bind:readonly="pickedOrder !== null"
+                                      @change="applyPartnerFilter($event.target.value)" />
                         <button type="button" @click="lookup()" x-show="! pickedOrder"
                                 class="shrink-0 px-4 py-2 rounded-lg border border-slate-300 text-slate-700 text-sm font-bold hover:bg-slate-50">
                             検索
@@ -230,13 +358,27 @@
                         新規取引先（選択肢にない場合）
                     </label>
 
-                    {{-- data-name は検索で引いた受注先名と突き合わせるための素の会社名。 --}}
-                    <select name="business_partner_id" x-ref="partnerSelect" x-show="! isNewPartner" :disabled="isNewPartner"
+                    {{-- 取引先が多いため、注番(関連注番)と社名で選択肢を絞れるようにする。
+                         どちらも当たらないときは絞らずに全件を出す。 --}}
+                    <div x-show="! isNewPartner" x-cloak class="mt-1 flex flex-wrap items-center gap-2">
+                        <input type="text" x-model="partnerNameQuery" placeholder="社名で絞り込み（㈱・空白は無視）"
+                               class="w-56 rounded-lg border-slate-300 text-xs py-1.5">
+                        <template x-if="partnerFilterNo !== '' || partnerNameQuery !== ''">
+                            <button type="button" @click="clearPartnerFilter()"
+                                    class="text-xs font-bold px-3 py-1.5 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-50">絞り込み解除</button>
+                        </template>
+                        <span class="text-[11px] text-slate-400" x-text="filteredPartners.length + '件'"></span>
+                    </div>
+                    <template x-if="partnerFilterNotice && ! isNewPartner">
+                        <p class="mt-1 text-[11px] font-bold" :class="partnerFilterNotice.ok ? 'text-emerald-700' : 'text-amber-600'" x-text="partnerFilterNotice.text"></p>
+                    </template>
+
+                    <select name="business_partner_id" x-ref="partnerSelect" x-model="partnerId" x-show="! isNewPartner" :disabled="isNewPartner"
                             class="mt-1 block w-full rounded-lg border-slate-300 text-sm">
                         <option value="">選択してください</option>
-                        @foreach ($partners as $partner)
-                            <option value="{{ $partner->id }}" data-name="{{ $partner->name }}" @selected(old('business_partner_id') == $partner->id)>{{ $partner->displayLabel() }}</option>
-                        @endforeach
+                        <template x-for="partner in filteredPartners" :key="partner.id">
+                            <option :value="partner.id" x-text="partner.label"></option>
+                        </template>
                     </select>
 
                     <input type="text" name="new_partner_name" x-ref="newPartnerName" x-show="isNewPartner" x-cloak :disabled="! isNewPartner"

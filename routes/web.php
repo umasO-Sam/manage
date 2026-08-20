@@ -115,6 +115,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/quote-numbers', [QuoteNumberController::class, 'index'])->name('quote-numbers.index');
         Route::post('/quote-numbers', [QuoteNumberController::class, 'store'])->name('quote-numbers.store');
         Route::get('/quote-numbers/lookup', [QuoteNumberController::class, 'lookup'])->name('quote-numbers.lookup');
+        Route::get('/quote-numbers/search', [QuoteNumberController::class, 'search'])->name('quote-numbers.search');
         // 取得ログはadministrator専用(コントローラ側で判定)。
         Route::get('/quote-numbers/logs', [QuoteNumberController::class, 'logs'])->name('quote-numbers.logs');
         Route::put('/quote-numbers/{quoteNumber}', [QuoteNumberController::class, 'update'])->name('quote-numbers.update');
