@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\StoreCardAttachmentsRequest;
 use App\Http\Requests\StoreCardRequest;
 use App\Http\Requests\UpdateCardRequest;
 use App\Mail\CardNotificationMail;
@@ -552,6 +553,43 @@ class CardController extends Controller
         });
 
         return redirect()->route('cards.index', $workflowType)->with('status', 'card-deleted');
+    }
+
+    /**
+     * カード詳細からの添付追加。修正画面を開かずに、取得した見積などを
+     * その場で足せるようにする(見積依頼中→回答受領の流れで使う)。
+     * 内容の書き換えではないため、コメントと同じ範囲の人が行える。
+     */
+    public function storeAttachments(StoreCardAttachmentsRequest $request, Card $card): RedirectResponse
+    {
+        $this->authorize('attach', $card);
+
+        /** @var Staff $staff */
+        $staff = $request->user();
+
+        DB::transaction(function () use ($card, $request, $staff) {
+            $names = [];
+
+            foreach ($request->file('attachments', []) as $file) {
+                Attachment::create([
+                    'card_id' => $card->id,
+                    'file_name' => $file->getClientOriginalName(),
+                    'path' => Storage::disk('local')->putFile("attachments/{$card->id}", $file),
+                    'size_bytes' => $file->getSize(),
+                    'uploaded_by' => $staff->id,
+                ]);
+                $names[] = $file->getClientOriginalName();
+            }
+
+            // 修正画面から足したときと同じ形で履歴に残す。
+            CardEditLog::create([
+                'card_id' => $card->id,
+                'editor_id' => $staff->id,
+                'changes' => ['添付資料の追加' => ['old' => '—', 'new' => implode(', ', $names)]],
+            ]);
+        });
+
+        return back()->with('status', 'card-attachment-added');
     }
 
     public function downloadAttachment(Attachment $attachment): mixed

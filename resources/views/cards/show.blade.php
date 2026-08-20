@@ -30,6 +30,9 @@
             @if (session('status') === 'card-moved')
                 <div class="p-3 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-800 text-sm">カードを移動しました。</div>
             @endif
+            @if (session('status') === 'card-attachment-added')
+                <div class="p-3 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-800 text-sm">添付資料を追加しました。</div>
+            @endif
             @if (session('status') === 'card-reverted')
                 <div class="p-3 rounded-xl bg-amber-50 border border-amber-100 text-amber-800 text-sm">カードを1段階前に差し戻しました。</div>
             @endif
@@ -140,6 +143,39 @@
                 @endif
             </div>
 
+            {{-- ボードを開き直さずに、この画面のままステージを動かせるようにする。
+                 簡易表示にしているとボード上のボタンは隠れるため、こちらが主な導線になる。 --}}
+            @php($nextStage = $card->current_stage + 1)
+            @if (! $card->trashed() && (Auth::user()->can('revert', $card) || Auth::user()->can('advance', $card)))
+                <div class="bg-white shadow-sm border border-slate-200 rounded-2xl p-6 flex flex-wrap items-center justify-between gap-3">
+                    <div class="text-xs text-slate-500">
+                        現在: <span class="font-bold text-slate-800">{{ $card->currentStageLabel() }}</span>
+                    </div>
+                    <div class="flex flex-wrap gap-2">
+                        @if ($card->current_stage > 0 && Auth::user()->can('revert', $card))
+                            <form method="POST" action="{{ route('cards.revert', $card) }}"
+                                  onsubmit="return confirm('「{{ $card->workflowType->stageLabel($card->current_stage - 1) }}」に戻します。よろしいですか？');">
+                                @csrf
+                                <button type="submit" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg border border-slate-300 text-slate-600 text-sm font-bold hover:bg-slate-50">
+                                    <i data-lucide="undo-2" class="w-4 h-4"></i>
+                                    {{ $card->workflowType->stageLabel($card->current_stage - 1) }}に戻す
+                                </button>
+                            </form>
+                        @endif
+                        @if ($nextStage <= $card->workflowType->lastStageIndex() && Auth::user()->can('advance', $card))
+                            <form method="POST" action="{{ route('cards.move', $card) }}"
+                                  onsubmit="return confirm('「{{ $card->workflowType->stageLabel($nextStage) }}」へ進めます。よろしいですか？');">
+                                @csrf
+                                <button type="submit" class="inline-flex items-center gap-1.5 px-4 py-2 {{ $accent['button'] }} border border-transparent rounded-lg text-sm font-bold text-white shadow-sm hover:shadow transition-all">
+                                    {{ $card->workflowType->stageLabel($nextStage) }}へ進める
+                                    <i data-lucide="arrow-right" class="w-4 h-4"></i>
+                                </button>
+                            </form>
+                        @endif
+                    </div>
+                </div>
+            @endif
+
             <div class="bg-white shadow-sm border border-slate-200 rounded-2xl p-6">
                 <span class="text-xs font-semibold text-slate-400 block mb-2">添付資料</span>
                 <div class="space-y-1.5">
@@ -165,6 +201,23 @@
                         <span class="text-xs text-slate-400 italic">添付資料はありません</span>
                     @endforelse
                 </div>
+
+                {{-- 修正画面を開かずに足せるようにする(取得した見積をその場で貼るため)。
+                     消すときは今までどおり「修正」から。 --}}
+                @can('attach', $card)
+                    <form method="POST" action="{{ route('cards.attachments.store', $card) }}" enctype="multipart/form-data"
+                          class="mt-4 pt-4 border-t border-slate-100 space-y-2">
+                        @csrf
+                        <x-attachment-picker label="添付資料を追加（1ファイル10MBまで）"
+                                             hint="取得した見積PDF、外観画像など" />
+                        <div class="flex justify-end">
+                            <button type="submit" class="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg border border-slate-300 text-slate-600 text-xs font-bold hover:bg-slate-50">
+                                <i data-lucide="paperclip" class="w-3.5 h-3.5"></i>
+                                添付する
+                            </button>
+                        </div>
+                    </form>
+                @endcan
             </div>
 
             <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-3">

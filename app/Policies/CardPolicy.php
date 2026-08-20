@@ -79,6 +79,16 @@ class CardPolicy
     }
 
     /**
+     * 添付資料の追加。修正(update)は経理資材担当に限っているが、添付は
+     * 「取得した見積を貼る」ような共同作業なので、コメントと同じ範囲に開く。
+     * 添付の削除は今までどおり修正画面から経理資材担当だけが行う。
+     */
+    public function attach(Staff $staff, Card $card): bool
+    {
+        return ! $staff->isReferenceViewer() && ! $card->trashed();
+    }
+
+    /**
      * Every staff member may comment — same visibility as viewing the card.
      * 参照ユーザだけは読むことしかできない。
      */

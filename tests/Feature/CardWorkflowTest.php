@@ -3,11 +3,14 @@
 namespace Tests\Feature;
 
 use App\Models\Card;
+use App\Models\CardEditLog;
 use App\Models\OrderNumber;
 use App\Models\Staff;
 use App\Models\WorkflowType;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class CardWorkflowTest extends TestCase
@@ -53,6 +56,23 @@ class CardWorkflowTest extends TestCase
         return OrderNumber::create(['code' => $code, 'is_protected' => false]);
     }
 
+    /** テスト用のカードを1枚作る(登録画面を通すのと同じ形にする)。 */
+    private function makeCard(WorkflowType $workflowType, Staff $creator, int $stage = 0): Card
+    {
+        $card = $workflowType->cards()->create([
+            'order_number_id' => $this->orderNumber('ZZ'.str_pad((string) (Card::count() + 1), 3, '0', STR_PAD_LEFT).'-N01T01')->id,
+            'item_name' => 'テスト部品',
+            'model_number' => 'ABC-123',
+            'quantity' => 1,
+            'unit' => '個',
+            'due_date_type' => 'asap',
+            'created_by' => $creator->id,
+            'current_stage' => $stage,
+        ]);
+
+        return $card;
+    }
+
     public function test_any_staff_member_can_create_a_card(): void
     {
         $workflowType = $this->purchaseWorkflow();
@@ -86,6 +106,76 @@ class CardWorkflowTest extends TestCase
      * 「2026/08/20」のスラッシュ区切りになる。従来のハイフン区切りと
      * 同じように保存できることを担保する。
      */
+    /**
+     * カード詳細からステージを動かせるようにする。ボード上のボタンは
+     * 簡易表示にすると隠れるため、詳細画面が主な導線になる。
+     */
+    public function test_the_detail_screen_offers_the_next_and_previous_stage(): void
+    {
+        $workflowType = $this->purchaseWorkflow();
+        $manager = Staff::factory()->procurementManager()->create();
+        $card = $this->makeCard($workflowType, $manager);
+
+        $html = $this->actingAs($manager)->get(route('cards.show', $card))->assertOk()->getContent();
+        $this->assertStringContainsString('手配中へ進める', $html);
+        // 新規依頼のカードには戻す先が無い。
+        $this->assertStringNotContainsString('に戻す', $html);
+
+        $this->actingAs($manager)->post(route('cards.move', $card))->assertRedirect();
+        $this->assertSame(1, $card->fresh()->current_stage);
+
+        $html = $this->actingAs($manager)->get(route('cards.show', $card))->assertOk()->getContent();
+        $this->assertStringContainsString('新規依頼に戻す', $html);
+        $this->assertStringContainsString('入荷へ進める', $html);
+    }
+
+    /** ステージを動かすボタンは経理資材担当だけに出す(ボード上と同じ)。 */
+    public function test_a_general_staff_member_is_not_offered_the_stage_buttons(): void
+    {
+        $workflowType = $this->purchaseWorkflow();
+        $staff = Staff::factory()->create();
+        $card = $this->makeCard($workflowType, $staff);
+
+        $html = $this->actingAs($staff)->get(route('cards.show', $card))->assertOk()->getContent();
+
+        $this->assertStringNotContainsString('へ進める', $html);
+    }
+
+    /**
+     * 取得した見積などを、修正画面を開かずにカード詳細からそのまま添付できる。
+     * 見積依頼中→回答受領の流れで使う。
+     */
+    public function test_attachments_can_be_added_from_the_detail_screen(): void
+    {
+        Storage::fake('local');
+        $workflowType = $this->estimateWorkflow();
+        $staff = Staff::factory()->create();
+        $card = $this->makeCard($workflowType, $staff, 1);
+
+        // 修正の権限が無い一般社員でも、添付だけはできる。
+        $this->actingAs($staff)->post(route('cards.attachments.store', $card), [
+            'attachments' => [UploadedFile::fake()->create('見積書.pdf', 100, 'application/pdf')],
+        ])->assertRedirect();
+
+        $this->assertSame(1, $card->fresh()->attachments()->count());
+        $this->assertSame('見積書.pdf', $card->fresh()->attachments()->first()->file_name);
+
+        // 誰がいつ足したかは修正履歴に残る。
+        $log = CardEditLog::where('card_id', $card->id)->latest('id')->first();
+        $this->assertSame($staff->id, $log->editor_id);
+        $this->assertArrayHasKey('添付資料の追加', $log->changes);
+    }
+
+    public function test_the_attachment_form_needs_a_file(): void
+    {
+        $workflowType = $this->estimateWorkflow();
+        $staff = Staff::factory()->create();
+        $card = $this->makeCard($workflowType, $staff);
+
+        $this->actingAs($staff)->post(route('cards.attachments.store', $card), [])
+            ->assertSessionHasErrors('attachments');
+    }
+
     public function test_due_date_is_accepted_in_slash_format(): void
     {
         $workflowType = $this->purchaseWorkflow();
