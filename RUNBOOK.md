@@ -210,8 +210,8 @@ ssh -i ~/.ssh/xserver_manage -p 10022 saitokoken@saitokoken.xsrv.jp 'cd ~/manage
 
 - **テストアカウント（test）・管理アカウント（admin）の「名簿に表示しない」が未設定**。
   既存レコードの変更のため、指示待ち
-- **新サーバー簡単移行**（Xserverの案内分）。休日出勤のない日に別途計画する。
-  現環境は sv8637。**手順とチェックリストは12章**
+- **新サーバー簡単移行**（Xserverの案内分）。**書き込みの無い休日にまとめて実施する**。
+  現環境は sv8637（ホーム20GB／DB100MB）。**手順とチェックリストは12章**（2026-08-20に更新）
 - ログの日次ローテーション未設定
 - **有給休暇の0.25日単位の修正が本番未反映**（コミット `a32970f`、2026-08-19）。
   マイグレーションで `staff.paid_leave_granted_*` を decimal(4,1)→decimal(5,2) に広げ、
@@ -395,7 +395,11 @@ ssh -i ~/.ssh/xserver_manage -p 10022 saitokoken@saitokoken.xsrv.jp 'cd ~/manage
 
 ## 12. 新サーバー簡単移行（Xserver）
 
-現環境 `sv8637.xserver.jp`。**移行はサーバー単位**なので、下の3ドメインと manage が同時に移る。
+現環境 `sv8637.xserver.jp`。**移行はサーバー単位**なので、下の4サイトが同時に移る。
+公式手順は3ステップ（**データコピー → 確認 → 移行**）。
+参考: [概要](https://www.xserver.ne.jp/manual/man_order_servertransfer_intro.php) /
+[ご利用手順](https://www.xserver.ne.jp/manual/man_order_servertransfer_flow.php) /
+[仕様詳細](https://www.xserver.ne.jp/manual/man_order_servertransfer_detail.php)
 
 | 対象 | 構成 | 壊れやすさ |
 |---|---|---|
@@ -404,9 +408,26 @@ ssh -i ~/.ssh/xserver_manage -p 10022 saitokoken@saitokoken.xsrv.jp 'cd ~/manage
 | hakubosha.com | 静的HTML中心 | ほぼ無し |
 | saitokoken.xsrv.jp | PHP＋DB接続 | 低（自動修正の対象） |
 
+### 現況（2026-08-20 実測）
+
+| 項目 | 値 |
+|---|---|
+| ホスト | `sv8637.xserver.jp`（旧サーバー環境＝移行対象） |
+| ホーム全体 | **20GB**（うち saito-koken.co.jp 16GB、hakubosha 1.1GB、manage 130MB） |
+| manage のDB | **100.2MB / 31テーブル**（仕入明細24.2万件・人工11.2万件） |
+| 添付ファイル | `manage/storage/app` 64MB |
+| PHP | `/usr/bin/php8.3` = 8.3.30（`php` と打つと **5.4.16**。パス直指定が必須） |
+| cron | `*/5 * * * * /usr/bin/php8.3 ~/manage/artisan schedule:run` |
+| DB接続 | `DB_HOST=mysql8064.xserver.jp` |
+| メール | `MAIL_HOST=sv8637.xserver.jp` / PORT 465 / SMTP認証あり |
+
+**コピーは20GBぶん**になるため数時間かかる。`~/backups`(529MB) と `~/backup`(402MB) は
+過去のDBダンプなので、**要らないものは事前に消しておくと短くなる**。
+
 ### 最重要: `.env` は自動修正されない
 
-Xserverが自動で書き換えるのは **`.php` / `.cgi` / `.pl` / `.yml` / `.ini`**。
+Xserverが自動で書き換えるのは、各ドメインフォルダ以下の
+**`.php` / `.cgi` / `.pl` / `.yml` / `.ini`** に含まれる **MySQLホスト名**だけ。
 **`.env` は拡張子が無く対象外**なので、切り替え後に手で直す。
 
 ```
@@ -420,36 +441,71 @@ MAIL_HOST=sv8637.xserver.jp    ← 変わると申請の通知メールが止ま
 会社HPのフォーム（`recruit/mail.php` 等）は PHP の `mail()` を使いホスト名を
 持たないので、この問題は起きない。WordPress の `wp-config.php` は `.php` なので自動修正される。
 
+### 最大の論点: コピーしたあとに増えたデータ
+
+**データコピーは「その時点の複製」**で、コピー後に旧サーバーで増えた分が
+自動で追いつく仕組みは公式マニュアルに記載が無い。manage は日々書き込みがあるため、
+**切り替えの直前に manage を止めて、DBを取り直して入れ直す**のが確実。
+
+そのため、**書き込みの無い時間帯（休日・夜間）にまとめて実施する**。
+
 ### 事前準備（切り替え前日まで）
 
+- [ ] 対象外条件に当たらないか確認（**独自SSLの発行申請中でない／独自IPありのSSL設定が無い／
+      サーバー利用期限まで1ヶ月以上ある／新サーバーで使えないPHPバージョンを選んでいない**）
+- [ ] `~/backups` `~/backup` の古いダンプを整理（コピー時間の短縮）
 - [ ] DBバックアップ（3章のコマンド）をローカルへ取得
-- [ ] `.env` の控えを取る
+- [ ] `.env` の控えを取る（`scp` でローカルへ）
 - [ ] 現在値をメモ: ホスト名 `sv8637`、`DB_HOST=mysql8064.xserver.jp`、cron、SSH公開鍵
 - [ ] **メールソフトの設定を先にドメイン名へ変える**（`sv86xx.xserver.jp` 直指定をやめ
       `mail.saito-koken.co.jp` 等にしておけば、移行後の設定変更が不要になる）
 - [ ] `api_proxy.php` のGemini APIキーの置き場所を確認（移行対象外の場所にあると動かなくなる）
+- [ ] 利用者への周知（作業中は manage が止まる旨）
 
-### 手順
+### 当日の手順
 
-1. **データコピー申請** — XServerアカウント →「新サーバー簡単移行」→ 対象サーバー選択。
-   データ量が大きい（仕入明細24万件・DB75MB）ため数時間かかる。
-   **開始からコピー完了までキャンセル不可**。この間、現サーバーは通常どおり動く
-2. **動作確認（切り替え前）** — hostsに新サーバーのIPを書いて確認する。
-   ファイルマネージャ・phpMyAdmin も使える。**データコピー実行ログでエラーを見る**
-3. **サーバー切り替え** — Webの参照先とメールの配送先が新サーバーになる。
-   **移行後14日間は元に戻せる**
+**STEP1 データコピー**（数時間）
+
+1. Xserverアカウント →「新サーバー簡単移行」→ データコピー申請
+2. **開始からコピー完了までキャンセル不可**。この間、現サーバーは通常どおり動く
+3. 完了したら**データコピー実行ログでエラーを確認**
+
+**STEP2 確認（切り替え前）**
+
+4. hostsに新サーバーのIPを書いて、`https://manage.saito-koken.co.jp` を新サーバー側で開く
+   （ファイルマネージャ・phpMyAdmin も使える）
+5. この時点の新サーバー側 `.env` は旧ホストを指しているため、**新サーバー側の `.env` を先に直して**
+   動作を見る（`DB_HOST` / `MAIL_HOST`）。直したら `php artisan config:cache`
+6. 会社HP・WordPress・hakubosha も hosts 経由で表示を確認
+
+**STEP3 切り替え**
+
+7. **旧サーバーの manage を止める**（これ以降の書き込みを作らない）
+   ```bash
+   ssh -i ~/.ssh/xserver_manage -p 10022 saitokoken@saitokoken.xsrv.jp \
+     'cd ~/manage && /usr/bin/php8.3 artisan down --render="errors::503"'
+   ```
+8. **旧DBを取り直す**（3章のバックアップコマンド）
+9. 「サーバー切り替え」を実行。Webの参照先とメールの配送先が新サーバーになる
+10. **新サーバーのDBへ 8. のダンプを取り込む**（コピー後に増えた分を反映）
+11. 新サーバーで `.env` を確認・修正 → `config:cache` → `artisan up`
 
 ### 切り替え直後のチェック（壊れやすい順）
 
 ```bash
 ssh -i ~/.ssh/xserver_manage -p 10022 saitokoken@saitokoken.xsrv.jp \
-  'hostname; grep -E "^(DB_HOST|MAIL_HOST)=" ~/manage/.env; crontab -l | grep -v "^#"; composer --version'
+  'hostname; grep -E "^(DB_HOST|MAIL_HOST)=" ~/manage/.env; crontab -l | grep -v "^#"; \
+   ls -l /usr/bin/php8.3; composer --version'
 ```
 
 - [ ] **`.env` の `MAIL_HOST` を新ホスト名に更新**（`DB_HOST` も変わっていれば更新）
 - [ ] `php artisan config:cache` で再キャッシュ（`.env` を変えたら必須）
-- [ ] **cron** — コマンドパス `/usr/bin/php8.3` が変わる可能性。`schedule:run` が動くか
+- [ ] **cron** — `/usr/bin/php8.3` のパスが変わっていないか。`schedule:run` が動くか
 - [ ] **SSH公開鍵** — 引き継がれない場合は再登録（デプロイが止まる）
+- [ ] **データの件数照合**（移行漏れの検知）
+      `cards` / `purchase_details` / `labor_costs` / `daily_reports` / `leave_requests` を
+      切り替え前後で数えて一致を見る
+- [ ] **添付ファイル**（`storage/app`）が開けるか。カード詳細からダウンロードして確認
 - [ ] **採用フォームのテスト送信** — `mail()` は失敗しても画面上は成功に見える。
       応募が届かない事故が一番痛いので必ず実際に送る
 - [ ] manage: ログイン→調達ボード表示（＝DB接続）→申請登録→**通知メール受信**
@@ -457,20 +513,32 @@ ssh -i ~/.ssh/xserver_manage -p 10022 saitokoken@saitokoken.xsrv.jp \
 - [ ] WordPress（`koichi2`）の表示
 - [ ] 1章の健康チェック
 
+### メールについて
+
+- 新仕様サーバーは**メール送信に SMTP認証（SMTP-AUTH）が必須**（POP before SMTP は非対応）。
+  manage は既に SMTP認証で送っているため、ホスト名を直せばそのまま動く
+- 切り替え完了から**24時間程度は旧サーバーへメールが届くことがある**。
+  この間は**両方で受信できる状態**にしておく（公式案内）
+
+### 切り戻し
+
+- **移行後14日間は元のサーバー環境に戻せる**。それ以降は戻せない
+- 移行期限を超過すると移行先サーバーのデータが削除される。
+  コピーしたら**早めに確認して切り替える**
+
+### 移行されないもの
+
+- アクセスログ・エラーログ
+- 自動バックアップで取得したバックアップデータ
+- パーミッションでユーザーが読めないファイル
+- 動作確認用URLはデータコピー時点で移行元から削除される
+- DNSレコード内の移行元IP・ホスト名は、切り替え時に自動修正される
+
 ### ついでに確認すると良いこと
 
 本番の composer は 1.9.1 と古く `composer install` を実行できない（3章）。
 新環境では更新されている可能性があり、**依存を変更できるようになるかもしれない**。
-
-### メールについて
-
-- 新仕様サーバーは**メール送信に SMTP認証（SMTP-AUTH）が必須**
-- 切り替え後 数時間〜24時間は新旧どちらのサーバーで受信されるか読めない。
-  この間は**両方で受信できる状態**にしておく（公式案内）
-- 移行対象外: アクセスログ・エラーログ・自動バックアップデータ
-
-参考: [ご利用手順](https://www.xserver.ne.jp/manual/man_order_servertransfer_flow.php) /
-[仕様詳細](https://www.xserver.ne.jp/manual/man_order_servertransfer_detail.php)
+`php` と打ったときの既定が 5.4.16 のままかも見ておく。
 
 ---
 
