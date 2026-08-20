@@ -12,7 +12,12 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * 取引先(受注先)。物件管理ボードのカード作成で受注先名だけの仮登録として作られ、
  * 資金管理者が取引条件を入力して確定すると本登録になる。
  */
-#[Fillable(['name', 'bank', 'transaction_type', 'closing_day', 'payment_terms', 'is_provisional', 'confirmed_at', 'confirmed_by'])]
+#[Fillable([
+    'name', 'customer_code', 'kana_group', 'bank', 'transaction_type', 'closing_day', 'payment_terms',
+    'postal_code', 'address', 'tel', 'fax', 'handling_method', 'yayoi_sub_account', 'dust_bag',
+    'display_order', 'remarks', 'subcontract_note', 'related_order_nos',
+    'is_provisional', 'confirmed_at', 'confirmed_by',
+])]
 class BusinessPartner extends Model
 {
     use HasFactory;
@@ -54,6 +59,19 @@ class BusinessPartner extends Model
         }
 
         return true;
+    }
+
+    /**
+     * 関連注番。改行・読点・カンマ・空白のどれで区切っても1件ずつ取り出せるようにする
+     * (Excelから移してきた欄で、区切り方が揃っていないため)。
+     *
+     * @return array<int, string>
+     */
+    public function relatedOrderNoList(): array
+    {
+        $parts = preg_split('/[\s,、，\/／]+/u', (string) $this->related_order_nos, -1, PREG_SPLIT_NO_EMPTY);
+
+        return array_values(array_unique(array_map('mb_strtoupper', $parts ?: [])));
     }
 
     /** 受注先プルダウンでの表示。仮登録は調整中であることが分かるようにする。 */

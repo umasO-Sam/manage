@@ -139,6 +139,8 @@ Route::middleware('auth')->group(function () {
     // 取引先一覧(銀行・取引区分・締め日・支払条件)は資金管理者限定。
     Route::middleware('fund.manager')->group(function () {
         Route::get('/business-partners', [BusinessPartnerController::class, 'index'])->name('business-partners.index');
+        Route::put('/business-partners/bulk-update', [BusinessPartnerController::class, 'bulkUpdate'])->name('business-partners.bulk-update');
+        Route::post('/business-partners/bulk-paste', [BusinessPartnerController::class, 'storeBulkPaste'])->name('business-partners.bulk-paste');
         Route::put('/business-partners/{businessPartner}', [BusinessPartnerController::class, 'update'])->name('business-partners.update');
         Route::post('/business-partners/{businessPartner}/confirm', [BusinessPartnerController::class, 'confirm'])->name('business-partners.confirm');
     });
