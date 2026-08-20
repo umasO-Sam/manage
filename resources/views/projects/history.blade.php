@@ -77,30 +77,103 @@
                 <div>{{ $orders->links() }}</div>
             @endif
 
-            {{-- 削除された物件。レコードは残らないので、削除時に書き起こした控えを出す。 --}}
+            {{-- 削除された物件。レコードは残らないので、削除時に書き起こした控えを
+                 上の一覧と同じ形で出す。ふだんは畳んでおく。 --}}
             @if ($deletions->isNotEmpty())
-                <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-4 space-y-3">
-                    <div>
-                        <h3 class="text-sm font-bold text-slate-800">削除された物件（直近{{ $deletions->count() }}件）</h3>
-                        <p class="text-[11px] text-slate-500 mt-0.5">
-                            間違って登録したものとして削除された物件です。レコードは残らないため、削除した時点の内容と
-                            それまでの物件履歴をここに控えています。
+                <div class="bg-white rounded-xl border border-slate-200 shadow-sm" x-data="{ open: false }">
+                    <button type="button" @click="open = ! open"
+                            class="w-full flex items-center justify-between gap-2 px-4 py-3 text-left">
+                        <span class="text-sm font-bold text-slate-800">
+                            削除された物件
+                            <span class="ml-1 text-xs font-normal text-slate-500">{{ $deletions->count() }}件</span>
+                        </span>
+                        <span class="text-xs font-bold text-slate-500" x-text="open ? '閉じる ▲' : '開く ▼'"></span>
+                    </button>
+
+                    <div x-show="open" x-cloak class="border-t border-slate-200">
+                        <p class="px-4 py-2 text-[11px] text-slate-500">
+                            間違って登録したものとして削除された物件です。レコードは残らないため、削除した時点の内容を控えています。
+                            「履歴」を押すと、それまでの物件履歴が出ます。
                         </p>
-                    </div>
-                    <div class="divide-y divide-slate-100">
-                        @foreach ($deletions as $deletion)
-                            <div class="py-2 text-xs">
-                                <div class="flex flex-wrap items-center gap-2 text-slate-500">
-                                    <span class="font-mono">{{ $deletion->created_at->format('Y/m/d H:i') }}</span>
-                                    <span class="font-bold px-1.5 py-0.5 rounded bg-red-100 text-red-800">削除</span>
-                                    <span>{{ $deletion->staff?->name ?? '—' }}</span>
-                                </div>
-                                <pre class="mt-1 whitespace-pre-wrap font-sans text-slate-700">{{ $deletion->description }}</pre>
-                            </div>
-                        @endforeach
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left border-collapse text-xs whitespace-nowrap">
+                                <thead>
+                                    <tr class="bg-slate-50 border-y border-slate-200 font-semibold text-slate-600">
+                                        <th class="px-2 py-2 w-px">注番</th>
+                                        <th class="px-2 py-2 w-full">件名</th>
+                                        <th class="px-2 py-2 w-px">受注先</th>
+                                        <th class="px-2 py-2 w-px">受注日</th>
+                                        <th class="px-2 py-2 w-px text-right">受注金額</th>
+                                        <th class="px-2 py-2 w-px">売上日</th>
+                                        <th class="px-2 py-2 w-px">担当</th>
+                                        <th class="px-2 py-2 w-px">状態</th>
+                                        <th class="px-2 py-2 w-px">削除</th>
+                                        <th class="px-2 py-2 w-px"></th>
+                                    </tr>
+                                </thead>
+                                {{-- 履歴の開閉は2行(本体と履歴)にまたがるため、
+                                     1件ごとにtbodyで囲んでそこに状態を持たせる。 --}}
+                                @foreach ($deletions as $deletion)
+                                    @php($fields = $deletion['fields'])
+                                    <tbody class="divide-y divide-slate-100" x-data="{ showHistory: false }">
+                                        {{-- この控えの形式にする前に削除されたものは項目に分けられない。
+                                             読めた内容をそのまま1行で出す。 --}}
+                                        @if ($fields['order_no'] === '')
+                                            <tr class="bg-slate-50/60">
+                                                <td colspan="8" class="px-2 py-1 text-slate-600">{{ $deletion['raw'] }}</td>
+                                                <td class="px-2 py-1 w-px text-slate-500">
+                                                    <span class="font-mono">{{ $deletion['log']->created_at->format('Y/m/d H:i') }}</span>
+                                                    <span>{{ $deletion['log']->staff?->name ?? '—' }}</span>
+                                                </td>
+                                                <td class="px-2 py-1 w-px"></td>
+                                            </tr>
+                                        @else
+                                        <tr class="bg-slate-50/60">
+                                            <td class="px-2 py-1 w-px font-mono text-slate-500">{{ $fields['order_no'] }}</td>
+                                            <td class="px-2 py-1 w-full font-semibold text-slate-600">{{ $fields['product_name'] }}</td>
+                                            <td class="px-2 py-1 w-px">{{ $fields['recipient'] }}</td>
+                                            <td class="px-2 py-1 w-px font-mono">{{ $fields['order_received_date'] }}</td>
+                                            <td class="px-2 py-1 w-px font-mono text-right">{{ $fields['order_amount'] }}</td>
+                                            <td class="px-2 py-1 w-px font-mono">{{ $fields['sales_date'] }}</td>
+                                            <td class="px-2 py-1 w-px">{{ $fields['staff_name'] }}</td>
+                                            <td class="px-2 py-1 w-px">
+                                                <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-red-100 text-red-800">削除</span>
+                                                <span class="text-[10px] text-slate-500">{{ $fields['stage'] }}</span>
+                                            </td>
+                                            <td class="px-2 py-1 w-px text-slate-500">
+                                                <span class="font-mono">{{ $deletion['log']->created_at->format('Y/m/d H:i') }}</span>
+                                                <span>{{ $deletion['log']->staff?->name ?? '—' }}</span>
+                                            </td>
+                                            <td class="px-2 py-1 w-px">
+                                                @if ($deletion['history'] !== [])
+                                                    <button type="button" @click="showHistory = ! showHistory"
+                                                            class="text-[11px] font-bold text-blue-700 hover:text-blue-900"
+                                                            x-text="showHistory ? '履歴を閉じる' : '履歴'"></button>
+                                                @endif
+                                            </td>
+                                        </tr>
+                                        @if ($deletion['history'] !== [])
+                                            <tr x-show="showHistory" x-cloak class="bg-slate-50/60">
+                                                <td colspan="10" class="px-4 py-2">
+                                                    <div class="text-[11px] text-slate-600 space-y-0.5">
+                                                        <div class="font-bold text-slate-500">それまでの物件履歴</div>
+                                                        @foreach ($deletion['history'] as $line)
+                                                            <div>{{ $line }}</div>
+                                                        @endforeach
+                                                        <div class="text-slate-400">納入先: {{ $fields['delivery_dest'] }}</div>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        @endif
+                                        @endif
+                                    </tbody>
+                                @endforeach
+                            </table>
+                        </div>
                     </div>
                 </div>
             @endif
+
         </div>
     </div>
 </x-app-layout>

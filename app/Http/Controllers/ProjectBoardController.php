@@ -13,6 +13,7 @@ use App\Models\PurchaseDetail;
 use App\Models\Staff;
 use App\Models\WorkflowType;
 use App\Services\ProjectStageGate;
+use App\Support\DeletedProjectRecord;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -85,7 +86,12 @@ class ProjectBoardController extends Controller
             ->when($keyword !== '', fn ($q) => $q->where('description', 'like', "%{$keyword}%"))
             ->orderByDesc('id')
             ->limit(50)
-            ->get();
+            ->get()
+            // 控えの文章を項目に分けて、上の一覧と同じ表の形で出せるようにする。
+            ->map(fn (OperationLog $log) => [
+                'log' => $log,
+                ...DeletedProjectRecord::fromText($log->description),
+            ]);
 
         return view('projects.history', [
             'orders' => $orders,
@@ -637,33 +643,24 @@ class ProjectBoardController extends Controller
      */
     private function deletionSummary(Card $card, ?BusinessOrder $order): string
     {
-        $lines = [
-            "注番: {$order?->order_no}",
-            "件名: {$order?->product_name}",
-            "受注先: {$order?->recipient}",
-            "納入先: {$order?->delivery_dest}",
-            '受注日: '.($order?->order_received_date?->format('Y/m/d') ?? '—'),
-            '受注金額: ¥'.number_format((float) $order?->order_amount),
-            '売上日: '.($order?->sales_date?->format('Y/m/d') ?? '—'),
-            '社内担当者: '.($order?->staff?->name ?? '—'),
-            '削除時のステージ: '.$card->currentStageLabel(),
-        ];
+        $history = ($order?->logs()->with('staff')->orderBy('id')->get() ?? collect())
+            ->map(fn (BusinessOrderLog $log) => $log->created_at->format('Y/m/d H:i')
+                .' '.$log->actionLabel()
+                .($log->description !== null ? '：'.$log->description : '')
+                .'（'.($log->staff?->name ?? '—').'）')
+            ->all();
 
-        $logs = $order?->logs()->with('staff')->orderBy('id')->get() ?? collect();
-
-        if ($logs->isNotEmpty()) {
-            $lines[] = '--- それまでの物件履歴 ---';
-
-            foreach ($logs as $log) {
-                $lines[] = $log->created_at->format('Y/m/d H:i')
-                    .' '.$log->actionLabel()
-                    .($log->description !== null ? '：'.$log->description : '')
-                    .'（'.($log->staff?->name ?? '—').'）';
-            }
-        }
-
-        return implode("
-", $lines);
+        return DeletedProjectRecord::toText([
+            'order_no' => (string) $order?->order_no,
+            'product_name' => (string) $order?->product_name,
+            'recipient' => (string) $order?->recipient,
+            'delivery_dest' => (string) $order?->delivery_dest,
+            'order_received_date' => $order?->order_received_date?->format('Y/m/d') ?? '—',
+            'order_amount' => '¥'.number_format((float) $order?->order_amount),
+            'sales_date' => $order?->sales_date?->format('Y/m/d') ?? '—',
+            'staff_name' => $order?->staff?->name ?? '—',
+            'stage' => $card->currentStageLabel(),
+        ], $history);
     }
 
     private function workflowType(): WorkflowType
