@@ -10,13 +10,24 @@
     </x-slot>
 
     <div class="py-8">
-        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-6">
+        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-6"
+             {{-- 送信ボタンに tab を持たせているため、検索・集計の後もそのタブが開いたままになる。 --}}
+             x-data="{ tab: '{{ request('tab') === 'summary' ? 'summary' : 'reference' }}' }">
+
+            <div class="flex gap-1 border-b border-slate-200">
+                @foreach ([['reference', '参考価格検索'], ['summary', '注番で集計']] as [$tabKey, $tabLabel])
+                    <button type="button" @click="tab = '{{ $tabKey }}'"
+                            :class="tab === '{{ $tabKey }}'
+                                ? 'border-slate-800 text-slate-900'
+                                : 'border-transparent text-slate-500 hover:text-slate-700'"
+                            class="px-4 py-2 -mb-px border-b-2 text-sm font-bold transition-colors">{{ $tabLabel }}</button>
+                @endforeach
+            </div>
 
             <form method="GET" action="{{ route('purchasing.estimate.index') }}" class="space-y-6">
 
                 {{-- 注番集計 --}}
-                <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4">
-                    <h3 class="text-sm font-bold text-slate-700">注番で集計</h3>
+                <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4" x-show="tab === 'summary'" x-cloak>
 
                     <div class="flex flex-wrap items-end gap-4">
                         <div class="w-full md:w-64">
@@ -57,7 +68,7 @@
                             </div>
                         @endif
 
-                        <button type="submit" class="bg-indigo-600 text-white px-8 py-2.5 rounded-lg font-bold shadow hover:bg-indigo-700 transition">集計実行</button>
+                        <button type="submit" name="tab" value="summary" class="bg-indigo-600 text-white px-8 py-2.5 rounded-lg font-bold shadow hover:bg-indigo-700 transition">集計実行</button>
                     </div>
 
                     <div class="border-t border-slate-100 pt-3 grid grid-cols-2 md:grid-cols-5 gap-3">
@@ -200,8 +211,8 @@
                 </div>
 
                 {{-- 参考価格検索 --}}
-                <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4">
-                    <h3 class="text-sm font-bold text-slate-700">参考価格検索（注番・メーカー・品名・形式/寸法・商社から過去の類似取引を探す）</h3>
+                <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4" x-show="tab === 'reference'" x-cloak>
+                    <p class="text-xs text-slate-500">注番・メーカー・品名・形式/寸法・商社から、過去の類似取引を探します。</p>
 
                     <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                         @foreach ([['item_code', '注番'], ['manufacturer', 'メーカー'], ['item_name', '品名'], ['dimensions', '形式/寸法'], ['supplier_name', '商社']] as [$key, $label])
@@ -232,7 +243,7 @@
                     </div>
 
                     <div class="flex justify-end">
-                        <button type="submit" class="bg-slate-800 hover:bg-slate-900 text-white px-8 py-2.5 rounded-lg font-bold shadow transition">参考価格を検索</button>
+                        <button type="submit" name="tab" value="reference" class="bg-slate-800 hover:bg-slate-900 text-white px-8 py-2.5 rounded-lg font-bold shadow transition">参考価格を検索</button>
                     </div>
 
                     @if ($referenceTotalCount > $referenceDisplayLimit)

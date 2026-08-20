@@ -19,6 +19,25 @@ class EstimateAssistTest extends TestCase
         $this->actingAs(Staff::factory()->sales()->create())->get(route('purchasing.estimate.index'))->assertOk();
     }
 
+    /**
+     * 参考価格検索と注番で集計はタブで切り替える。最初は参考価格検索を開き、
+     * 集計を実行した後は集計タブが開いたままになる(結果が隠れてしまわないように)。
+     */
+    public function test_the_reference_price_search_tab_is_open_first(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+
+        $this->actingAs($manager)->get(route('purchasing.estimate.index'))
+            ->assertOk()->assertSee("tab: 'reference'", false);
+
+        $this->actingAs($manager)->get(route('purchasing.estimate.index', ['tab' => 'summary']))
+            ->assertOk()->assertSee("tab: 'summary'", false);
+
+        // 想定外の値でも既定(参考価格検索)に戻す。
+        $this->actingAs($manager)->get(route('purchasing.estimate.index', ['tab' => 'nonsense']))
+            ->assertOk()->assertSee("tab: 'reference'", false);
+    }
+
     public function test_general_staff_cannot_view_the_page(): void
     {
         $staff = Staff::factory()->create();
