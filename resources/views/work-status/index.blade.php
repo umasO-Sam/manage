@@ -6,38 +6,13 @@
         </h2>
     </x-slot>
 
-    <div class="py-8">
-        <div class="max-w-full mx-auto sm:px-6 lg:px-8 space-y-4">
-
-            <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between gap-3 flex-wrap">
-                <div class="flex items-center gap-2">
-                    <a href="{{ route('work-status.index', ['date' => $prevAnchor]) }}"
-                       class="px-3 py-1.5 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-50 text-xs font-bold whitespace-nowrap">
-                        ← 前の4週間
-                    </a>
-                    <a href="{{ route('work-status.index', ['date' => $nextAnchor]) }}"
-                       class="px-3 py-1.5 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-50 text-xs font-bold whitespace-nowrap">
-                        次の4週間 →
-                    </a>
-                    <a href="{{ route('work-status.index') }}"
-                       class="px-3 py-1.5 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-50 text-xs font-bold whitespace-nowrap">
-                        今日へ
-                    </a>
-                </div>
-                <div class="flex items-center gap-2">
-                    <label class="text-xs font-bold text-slate-600">基準日</label>
-                    <input type="date" value="{{ $anchor }}"
-                           onchange="location.href = '{{ route('work-status.index') }}?date=' + this.value"
-                           class="border rounded-lg p-1.5 border-slate-300 text-xs font-bold">
-                </div>
-            </div>
-
-            <p class="text-xs text-slate-500">
-                基準日（{{ \Illuminate\Support\Carbon::parse($anchor)->format('Y/m/d') }}）から前1週間・先4週間（35日分・{{ $rangeLabel }}）を表示しています。
-            </p>
+    {{-- プロジェクタ投影で遠くからも読めるよう表の文字を大きくする。代わりに表以外(操作欄・凡例)は
+         すべて表の下へ回し、画面の上端から表が始まるようにして1画面に入る行数を稼ぐ。 --}}
+    <div class="py-4">
+        <div class="max-w-full mx-auto sm:px-6 lg:px-8 space-y-3">
 
             <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-x-auto">
-                <table class="border-collapse text-xs">
+                <table class="border-collapse text-sm">
                     <thead>
                         <tr class="bg-slate-50 border-b border-slate-200 text-slate-600">
                             <th class="sticky left-0 z-10 bg-slate-50 p-1 text-center font-semibold border-r border-slate-200 whitespace-nowrap w-6">部署</th>
@@ -51,7 +26,7 @@
                                     $isDayOff = $isWeekend || in_array($holiday?->type, [\App\Models\Holiday::TYPE_PUBLIC_HOLIDAY, \App\Models\Holiday::TYPE_COMPANY_HOLIDAY], true);
                                     $isToday = $dateString === $today;
                                 @endphp
-                                <th class="p-0.5 font-semibold text-center w-16 {{ $index % 7 === 0 ? 'border-l border-slate-200' : '' }} {{ $isDayOff ? 'bg-pink-50' : '' }} {{ $isToday ? 'bg-slate-800 text-white' : '' }}"
+                                <th class="p-0.5 font-semibold text-center leading-tight w-16 {{ $index % 7 === 0 ? 'border-l border-slate-200' : '' }} {{ $isDayOff ? 'bg-pink-50' : '' }} {{ $isToday ? 'bg-slate-800 text-white' : '' }}"
                                     title="{{ $current->format('Y/m/d') }}（{{ $weekdayLabels[$current->dayOfWeek] }}）{{ $holiday?->name }}">
                                     <div class="whitespace-nowrap">{{ $current->format('n/j') }}</div>
                                     <div class="whitespace-nowrap {{ ! $isToday && $current->dayOfWeek === 0 ? 'text-red-500' : (! $isToday && $current->dayOfWeek === 6 ? 'text-blue-500' : '') }}">{{ $weekdayLabels[$current->dayOfWeek] }}</div>
@@ -78,7 +53,8 @@
                                             {{ \App\Models\Staff::departmentLabel($department) }}
                                         </td>
                                     @endif
-                                    <td class="sticky left-6 z-10 {{ $rowIndex % 2 === 0 ? 'bg-slate-50' : 'bg-white' }} py-0.5 px-1.5 font-semibold text-slate-800 whitespace-nowrap border-r border-slate-200 {{ $groupBorder }}">
+                                    {{-- 行の高さは氏名欄で決まる。氏名は一番遠くから読む列なので表の中でも一段大きくする。 --}}
+                                    <td class="sticky left-6 z-10 {{ $rowIndex % 2 === 0 ? 'bg-slate-50' : 'bg-white' }} py-px px-2 text-base leading-tight font-semibold text-slate-800 whitespace-nowrap border-r border-slate-200 {{ $groupBorder }}">
                                         {{ $staff->name }}
                                     </td>
                                     @foreach ($dates as $index => $dateString)
@@ -91,7 +67,7 @@
                                             $entries = $leaveEntriesByStaffAndDate[$staff->id][$dateString] ?? [];
                                         @endphp
                                         <td class="px-0.5 py-px text-center align-middle {{ $index % 7 === 0 ? 'border-l border-slate-100' : '' }} {{ $isDayOff ? 'bg-pink-50/60' : '' }} {{ $isToday ? 'bg-slate-100' : '' }} {{ $groupBorder }}">
-                                            <div class="flex flex-col items-center justify-center gap-px min-h-[10px]">
+                                            <div class="flex flex-col items-center justify-center gap-px min-h-[18px]">
                                                 @foreach ($entries as $entry)
                                                     @php
                                                         $leaveRequest = $entry['request'];
@@ -106,7 +82,8 @@
                                                             ? 'bg-emerald-500 text-white'
                                                             : 'bg-amber-500 text-white';
                                                     @endphp
-                                                    <span class="block w-full text-xs leading-tight font-bold px-0.5 rounded-sm whitespace-nowrap {{ $chipClass }}"
+                                                    {{-- 4文字(1日有休)が列幅16(64px)に収まる上限が text-sm。 --}}
+                                                    <span class="block w-full text-sm leading-tight font-bold px-0.5 rounded-sm whitespace-nowrap {{ $chipClass }}"
                                                           title="{{ $label }}（{{ $leaveRequest->statusLabel() }}）">{{ $label }}</span>
                                                 @endforeach
                                             </div>
@@ -119,9 +96,32 @@
                 </table>
             </div>
 
-            <div class="flex flex-wrap gap-4 text-xs text-slate-600">
-                <span class="flex items-center gap-1.5"><span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500 text-white inline-block">例</span>承認待ち</span>
-                <span class="flex items-center gap-1.5"><span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-500 text-white inline-block">例</span>承認済み</span>
+            <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between gap-3 flex-wrap">
+                <div class="flex items-center gap-2">
+                    <a href="{{ route('work-status.index', ['date' => $prevAnchor]) }}"
+                       class="px-4 py-2 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-50 text-sm font-bold whitespace-nowrap">
+                        ← 前の4週間
+                    </a>
+                    <a href="{{ route('work-status.index', ['date' => $nextAnchor]) }}"
+                       class="px-4 py-2 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-50 text-sm font-bold whitespace-nowrap">
+                        次の4週間 →
+                    </a>
+                    <a href="{{ route('work-status.index') }}"
+                       class="px-4 py-2 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-50 text-sm font-bold whitespace-nowrap">
+                        今日へ
+                    </a>
+                </div>
+                <div class="flex items-center gap-2">
+                    <label class="text-sm font-bold text-slate-600">基準日</label>
+                    <input type="date" value="{{ $anchor }}"
+                           onchange="location.href = '{{ route('work-status.index') }}?date=' + this.value"
+                           class="border rounded-lg px-2 py-1.5 border-slate-300 text-sm font-bold">
+                </div>
+            </div>
+
+            <div class="flex flex-wrap gap-4 text-sm text-slate-600">
+                <span class="flex items-center gap-1.5"><span class="text-xs font-bold px-1.5 py-0.5 rounded bg-amber-500 text-white inline-block">例</span>承認待ち</span>
+                <span class="flex items-center gap-1.5"><span class="text-xs font-bold px-1.5 py-0.5 rounded bg-emerald-500 text-white inline-block">例</span>承認済み</span>
                 <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded bg-pink-50 border border-pink-100 inline-block"></span>土日・祝日・会社休日</span>
                 <span class="text-slate-400">1日有休・2H有休・AM半休・PM半休=有給休暇／在宅=テレワーク／休出=休日勤務／振休=振替休日／代休=代休</span>
             </div>

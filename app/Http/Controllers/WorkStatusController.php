@@ -43,7 +43,6 @@ class WorkStatusController extends Controller
             'anchor' => $anchor->format('Y-m-d'),
             'prevAnchor' => $anchor->copy()->subDays(self::SHIFT_DAYS)->format('Y-m-d'),
             'nextAnchor' => $anchor->copy()->addDays(self::SHIFT_DAYS)->format('Y-m-d'),
-            'rangeLabel' => $rangeStart->format('Y/m/d').'〜'.$rangeEnd->format('Y/m/d'),
             'holidaysByDate' => $holidaysByDate,
             'staffGroups' => Staff::forRoster()->get()->groupBy('department'),
             'leaveEntriesByStaffAndDate' => $this->buildLeaveEntriesByStaffAndDate($rangeStart, $rangeEnd),
