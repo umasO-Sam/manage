@@ -116,8 +116,11 @@ class CardWorkflowTest extends TestCase
         $manager = Staff::factory()->procurementManager()->create();
         $card = $this->makeCard($workflowType, $manager);
 
+        // 購入手配の新規依頼は「手配中に進めてデータ入力する」が同じ動きをするため、
+        // 進めるボタンは重ねて出さない。
         $html = $this->actingAs($manager)->get(route('cards.show', $card))->assertOk()->getContent();
-        $this->assertStringContainsString('手配中へ進める', $html);
+        $this->assertStringContainsString('手配中に進めてデータ入力する', $html);
+        $this->assertStringNotContainsString('手配中へ進める', $html);
         // 新規依頼のカードには戻す先が無い。
         $this->assertStringNotContainsString('に戻す', $html);
 
@@ -127,6 +130,17 @@ class CardWorkflowTest extends TestCase
         $html = $this->actingAs($manager)->get(route('cards.show', $card))->assertOk()->getContent();
         $this->assertStringContainsString('新規依頼に戻す', $html);
         $this->assertStringContainsString('入荷へ進める', $html);
+    }
+
+    /** 見積依頼ボードには重複する導線が無いので、新規依頼でも進めるボタンを出す。 */
+    public function test_the_estimate_board_offers_the_next_stage_from_the_first_stage(): void
+    {
+        $workflowType = $this->estimateWorkflow();
+        $manager = Staff::factory()->procurementManager()->create();
+        $card = $this->makeCard($workflowType, $manager);
+
+        $this->actingAs($manager)->get(route('cards.show', $card))
+            ->assertOk()->assertSee('見積依頼中へ進める');
     }
 
     /** ステージを動かすボタンは経理資材担当だけに出す(ボード上と同じ)。 */
