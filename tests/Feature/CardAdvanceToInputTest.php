@@ -235,6 +235,88 @@ class CardAdvanceToInputTest extends TestCase
         $this->assertSame(1, $card->fresh()->current_stage);
     }
 
+    /**
+     * ブラウザの「戻る」で古いボードが復元されたまま操作されると、すでに進んだ
+     * カードを元の枠から動かすことになり、2つ先のステージへ飛んでしまっていた。
+     * 画面が思っていたステージと食い違うときは断る。
+     */
+    public function test_a_move_from_a_stale_board_is_refused(): void
+    {
+        Mail::fake();
+        $manager = Staff::factory()->create(['role' => Staff::ROLE_PROCUREMENT_MANAGER]);
+        $card = $this->makeCard($this->purchaseWorkflow(), Staff::factory()->create());
+
+        // 1回目(新規依頼→手配中)
+        $this->actingAs($manager)->post(route('cards.move', $card), ['from_stage' => 0])->assertRedirect();
+        $this->assertSame(1, $card->fresh()->current_stage);
+
+        // 古い画面から、また「新規依頼から」動かそうとする
+        $this->actingAs($manager)->post(route('cards.move', $card), ['from_stage' => 0])
+            ->assertSessionHasErrors('stage');
+
+        $this->assertSame(1, $card->fresh()->current_stage, '入荷まで飛ばない');
+
+        // 画面を更新してからなら進められる
+        $this->actingAs($manager)->post(route('cards.move', $card), ['from_stage' => 1])->assertRedirect();
+        $this->assertSame(2, $card->fresh()->current_stage);
+    }
+
+    /**
+     * 手配中まで進めたカードが仕入管理に登録済みかどうかを詳細画面で示し、
+     * 未登録ならその場から登録できるようにする。
+     */
+    public function test_the_detail_screen_shows_whether_the_purchase_record_exists(): void
+    {
+        Mail::fake();
+        $manager = Staff::factory()->create(['role' => Staff::ROLE_PROCUREMENT_MANAGER]);
+        $card = $this->makeCard($this->purchaseWorkflow(), Staff::factory()->create(), 1);
+
+        $html = $this->actingAs($manager)->get(route('cards.show', $card))->assertOk()->getContent();
+        $this->assertStringContainsString('未登録', $html);
+        $this->assertStringContainsString('仕入管理に登録する', $html);
+
+        PurchaseDetail::create([
+            'item_code' => 'AB123-N01', 'item_name' => 'ベアリング',
+            'order_qty' => 4, 'unit_price' => 100, 'supplier_name' => '商社A',
+        ]);
+
+        $html = $this->actingAs($manager)->get(route('cards.show', $card))->assertOk()->getContent();
+        $this->assertStringContainsString('登録済み（1件）', $html);
+    }
+
+    /** 新規依頼のうちは、まだ登録する場面ではないので出さない。 */
+    public function test_the_registration_status_is_not_shown_on_the_first_stage(): void
+    {
+        $manager = Staff::factory()->create(['role' => Staff::ROLE_PROCUREMENT_MANAGER]);
+        $card = $this->makeCard($this->purchaseWorkflow(), Staff::factory()->create());
+
+        $this->actingAs($manager)->get(route('cards.show', $card))
+            ->assertOk()->assertDontSee('仕入管理への登録');
+    }
+
+    /** 見積依頼ボードには仕入レコードの考え方が無いので出さない。 */
+    public function test_the_registration_status_is_not_shown_on_the_estimate_board(): void
+    {
+        $manager = Staff::factory()->create(['role' => Staff::ROLE_PROCUREMENT_MANAGER]);
+        $card = $this->makeCard($this->estimateWorkflow(), Staff::factory()->create(), 1, 'ZZ001-N01');
+
+        $this->actingAs($manager)->get(route('cards.show', $card))
+            ->assertOk()->assertDontSee('仕入管理への登録');
+    }
+
+    /** 詳細画面からの登録は、ステージを動かさずに入力画面へ送る。 */
+    public function test_registering_from_the_detail_screen_does_not_move_the_card(): void
+    {
+        $manager = Staff::factory()->create(['role' => Staff::ROLE_PROCUREMENT_MANAGER]);
+        $card = $this->makeCard($this->purchaseWorkflow(), Staff::factory()->create(), 1);
+
+        $response = $this->actingAs($manager)->post(route('cards.toInput', $card));
+
+        $response->assertRedirect(route('purchasing.input'));
+        $response->assertSessionHasInput('item_code', 'AB123-N01');
+        $this->assertSame(1, $card->fresh()->current_stage);
+    }
+
     /** 手配中から先や見積依頼ボードは、今までどおりその場に留まる。 */
     public function test_other_moves_stay_on_the_board(): void
     {

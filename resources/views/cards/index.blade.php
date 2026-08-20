@@ -288,6 +288,8 @@
                                             @if ($canAdvance)
                                                 <form id="move-form-{{ $card->id }}" method="POST" action="{{ route('cards.move', $card) }}" class="flex-grow">
                                                     @csrf
+                                                    {{-- 古い画面から動かされたときに気づくため、表示時点のステージを添える。 --}}
+                                                    <input type="hidden" name="from_stage" value="{{ $card->current_stage }}">
                                                     <button type="submit" class="w-full text-xs font-semibold {{ $accent['badge_soft_text'] }} {{ $accent['badge_soft_bg'] }} border {{ $accent['badge_soft_border'] }} rounded-lg py-1.5 hover:opacity-80 transition-colors flex items-center justify-center gap-1">
                                                         <span>→ {{ $workflowType->stageLabel($index + 1) }}へ進める</span>
                                                     </button>
@@ -331,4 +333,5 @@
             @endif
         </div>
     </div>
+    @include('partials.reload-on-back')
 </x-app-layout>

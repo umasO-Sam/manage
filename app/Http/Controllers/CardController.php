@@ -225,7 +225,12 @@ class CardController extends Controller
             ['viewed_at' => now()]
         );
 
-        return view('cards.show', ['card' => $card]);
+        return view('cards.show', [
+            'card' => $card,
+            // 手配中まで進んだ購入手配のカードが、仕入管理に登録済みかどうか。
+            // 進めただけで登録し忘れることがあるため、詳細画面で分かるようにする。
+            'purchaseRecordCount' => $this->purchaseRecordCountFor($card),
+        ]);
     }
 
     public function edit(Card $card): View
@@ -355,6 +360,17 @@ class CardController extends Controller
     {
         $this->authorize('advance', $card);
 
+        // 画面が古いまま操作されたときに、意図しないステージへ飛ばさないための確認。
+        // ブラウザの「戻る」で前のボードが復元されると、すでに進めたカードが
+        // 元の枠に残って見えるため、そこからもう一度動かすと2つ先へ進んでしまう。
+        $fromStage = $request->input('from_stage');
+
+        if ($fromStage !== null && (int) $fromStage !== $card->current_stage) {
+            return back()->withErrors([
+                'stage' => '画面の表示が古くなっています（このカードは「'.$card->currentStageLabel().'」に進んでいます）。画面を更新してからやり直してください。',
+            ]);
+        }
+
         /** @var Staff $staff */
         $staff = $request->user();
 
@@ -406,6 +422,39 @@ class CardController extends Controller
                 'order_qty' => $card->quantity,
                 'unit' => $card->unit,
             ]);
+    }
+
+    /**
+     * このカードの内容で登録された仕入レコードの件数。購入手配ボードで手配中まで
+     * 進んだカードだけを対象にし、それ以外はnull(判定しない)を返す。
+     *
+     * カードと仕入レコードは直接つながっていないため、注番と品名が一致するものを
+     * 数える。データ入力の時点で品名を書き換えた場合は数えられない。
+     */
+    private function purchaseRecordCountFor(Card $card): ?int
+    {
+        if ($card->workflowType->slug !== 'purchase' || $card->current_stage === 0) {
+            return null;
+        }
+
+        return PurchaseDetail::where('item_code', $card->orderNumber->code)
+            ->where('item_name', $card->item_name)
+            ->count();
+    }
+
+    /**
+     * ステージは動かさずに、カードの内容を引き継いだデータ入力画面を開く。
+     * 進めるときに登録しそびれたカードを、詳細画面から登録するための導線。
+     */
+    public function toInput(Request $request, Card $card): RedirectResponse
+    {
+        $this->authorize('advance', $card);
+
+        if ($card->workflowType->slug !== 'purchase') {
+            return back()->withErrors(['stage' => 'この操作は購入手配ボードのカードでのみ行えます。']);
+        }
+
+        return $this->redirectToPurchaseInput($card);
     }
 
     /**

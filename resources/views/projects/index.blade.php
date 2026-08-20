@@ -143,4 +143,5 @@
             </p>
         </div>
     </div>
+    @include('partials.reload-on-back')
 </x-app-layout>

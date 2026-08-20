@@ -187,6 +187,33 @@
                 @endcan
             </div>
 
+            {{-- 進めただけで仕入管理に登録し忘れることがあるため、登録済みかどうかを出す。
+                 カードと仕入レコードは直接つながっていないので、注番と品名が一致する
+                 レコードを数えている(データ入力で品名を変えた場合は拾えない)。 --}}
+            @if ($purchaseRecordCount !== null)
+                <div class="bg-white shadow-sm border border-slate-200 rounded-2xl p-6 flex flex-wrap items-center justify-between gap-3">
+                    <div class="text-sm">
+                        <span class="text-xs font-semibold text-slate-400 block mb-0.5">仕入管理への登録</span>
+                        @if ($purchaseRecordCount > 0)
+                            <span class="font-bold text-emerald-700">登録済み（{{ $purchaseRecordCount }}件）</span>
+                            <span class="text-xs text-slate-500">この注番・品名の仕入レコードがあります。</span>
+                        @else
+                            <span class="font-bold text-amber-700">未登録</span>
+                            <span class="text-xs text-slate-500">この注番・品名の仕入レコードが見つかりません。</span>
+                        @endif
+                    </div>
+                    @if (! $card->trashed() && Auth::user()->can('advance', $card))
+                        <form method="POST" action="{{ route('cards.toInput', $card) }}">
+                            @csrf
+                            <button type="submit" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg border text-sm font-bold {{ $purchaseRecordCount > 0 ? 'border-slate-300 text-slate-600 hover:bg-slate-50' : 'border-amber-300 text-amber-700 hover:bg-amber-50' }}">
+                                <i data-lucide="pencil-line" class="w-4 h-4"></i>
+                                {{ $purchaseRecordCount > 0 ? '追加で登録する' : '仕入管理に登録する' }}
+                            </button>
+                        </form>
+                    @endif
+                </div>
+            @endif
+
             {{-- ボードを開き直さずに、この画面のままステージを動かせるようにする。
                  簡易表示にしているとボード上のボタンは隠れるため、こちらが主な導線になる。
                  添付してから進める流れが多いので、添付資料の下に置く。
@@ -218,6 +245,7 @@
                             <form method="POST" action="{{ route('cards.move', $card) }}"
                                   onsubmit="return confirm('「{{ $card->workflowType->stageLabel($nextStage) }}」へ進めます。よろしいですか？');">
                                 @csrf
+                                <input type="hidden" name="from_stage" value="{{ $card->current_stage }}">
                                 <button type="submit" class="inline-flex items-center gap-1.5 px-4 py-2 {{ $accent['button'] }} border border-transparent rounded-lg text-sm font-bold text-white shadow-sm hover:shadow transition-all">
                                     {{ $card->workflowType->stageLabel($nextStage) }}へ進める
                                     <i data-lucide="arrow-right" class="w-4 h-4"></i>
