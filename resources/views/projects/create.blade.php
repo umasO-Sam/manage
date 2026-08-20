@@ -390,7 +390,7 @@
                            value="{{ old('new_partner_name') }}" placeholder="新しい受注先の名称"
                            class="mt-1 block w-full rounded-lg border-slate-300 text-sm">
                     <p class="mt-0.5 text-[11px] text-amber-600" x-show="isNewPartner" x-cloak>
-                        取引先一覧に仮登録され、資金管理者が取引条件を確定するまで「取引条件調整中」となり請求済へは進めません。
+                        取引先一覧に仮登録され、資金管理者が取引条件を確定するまで「取引条件調整中」と表示されます（物件の進行は止まりません）。
                     </p>
                     <x-input-error class="mt-1" :messages="$errors->get('business_partner_id')" />
                     <x-input-error class="mt-1" :messages="$errors->get('new_partner_name')" />

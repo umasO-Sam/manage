@@ -438,30 +438,35 @@ class ProjectBoardTest extends TestCase
         $this->assertSame(2, $card->fresh()->current_stage);
     }
 
-    public function test_moving_to_invoiced_is_blocked_while_the_partner_terms_are_pending(): void
+    /**
+     * 取引条件が調整中でも請求済へ進める(2026-08-20に制限を撤廃)。
+     * 取引条件の調整は請求業務と並行して進むことが多く、ボードの進行を
+     * 止めると実態に合わなかった。バッジは残るので調整が要ることは分かる。
+     */
+    public function test_moving_to_invoiced_is_allowed_while_the_partner_terms_are_pending(): void
     {
         Storage::fake('local');
         $manager = $this->manager();
         $card = $this->createCard($manager);
         $card->update(['current_stage' => 3]);
-        // 請求済チェックは入れておく(足りないのは取引条件だけの状態にする)
         $card->businessOrder->update(['invoice_confirmed' => true]);
 
-        $this->actingAs($manager)->post(route('projects.advance', $card))->assertSessionHasErrors('stage');
-        $this->assertSame(3, $card->fresh()->current_stage);
-
-        // 資金管理者が取引条件を確定すると進めるようになる
-        $partner = $card->businessOrder->businessPartner;
-        $this->actingAs($this->fundManager())->put(route('business-partners.update', $partner), [
-            'name' => $partner->name, 'bank' => 'A銀行', 'transaction_type' => '振込',
-            'closing_day' => '月末', 'payment_terms' => '翌月末',
-        ])->assertRedirect();
-        $this->actingAs($this->fundManager())->post(route('business-partners.confirm', $partner))->assertRedirect();
-
-        $this->assertFalse($partner->fresh()->is_provisional);
+        $this->assertTrue($card->businessOrder->fresh()->isTradeTermsPending());
 
         $this->actingAs($manager)->post(route('projects.advance', $card))->assertRedirect();
         $this->assertSame(4, $card->fresh()->current_stage);
+    }
+
+    /** 請求済に必要な条件(請求書の添付か請求済チェック)は今までどおり要る。 */
+    public function test_moving_to_invoiced_still_needs_the_invoice_attachment_or_flag(): void
+    {
+        Storage::fake('local');
+        $manager = $this->manager();
+        $card = $this->createCard($manager);
+        $card->update(['current_stage' => 3]);
+
+        $this->actingAs($manager)->post(route('projects.advance', $card))->assertSessionHasErrors('stage');
+        $this->assertSame(3, $card->fresh()->current_stage);
     }
 
     /**

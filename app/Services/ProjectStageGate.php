@@ -47,10 +47,6 @@ class ProjectStageGate
         $order = $card->businessOrder;
         $reasons = [];
 
-        if (($requires['blocked_when_pending'] ?? false) && $order?->isTradeTermsPending()) {
-            $reasons[] = '受注先の取引条件が調整中のため、このステージへは進めません。資金管理者が取引先一覧で取引条件を確定するまでお待ちください。';
-        }
-
         if ($kind = ($requires['attachment'] ?? null)) {
             if (! $this->hasAttachment($card, $kind)) {
                 $reasons[] = self::ATTACHMENT_LABELS[$kind].'を添付してください。';

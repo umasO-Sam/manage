@@ -10,7 +10,7 @@ use Illuminate\Database\Migrations\Migration;
  *   attachment          … 指定の種別の添付が必要
  *   sales_date          … 受注ヘッダの売上日が必要
  *   attachment_or_flag  … 添付、または請求済チェックのどちらか
- *   blocked_when_pending… 取引条件調整中は進めない
+ *   blocked_when_pending… 取引条件調整中は進めない(2026-08-20に撤廃。後続のマイグレーションで外している)
  *
  * retention_days は null。自動アーカイブ・5年削除の対象外で、入金済のあと
  * 資金管理者が非表示ボタンを押したときだけアーカイブする。
