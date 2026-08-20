@@ -12,6 +12,7 @@ use App\Models\CardEditLog;
 use App\Models\CardStageLog;
 use App\Models\CardView;
 use App\Models\OrderNumber;
+use App\Models\PurchaseDetail;
 use App\Models\Staff;
 use App\Models\WorkflowType;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -357,13 +358,54 @@ class CardController extends Controller
         /** @var Staff $staff */
         $staff = $request->user();
 
+        $wasFirstStageOfPurchase = $card->workflowType->slug === 'purchase' && $card->current_stage === 0;
+
         $error = $this->advanceStage($card, $staff);
 
         if ($error !== null) {
             return back()->withErrors(['stage' => $error]);
         }
 
+        // 購入手配の新規依頼→手配中は、そのまま仕入管理のデータ入力へ繋ぐ。
+        // ボタンでもドラッグ&ドロップでも同じ流れにする(進めただけで
+        // レコードが登録されていない状態を作らないため)。
+        if ($wasFirstStageOfPurchase) {
+            return $this->redirectToPurchaseInput($card);
+        }
+
         return back()->with('status', 'card-moved');
+    }
+
+    /**
+     * カードの内容を引き継いだ仕入管理のデータ入力画面へ送る。登録はここでは行わず、
+     * 作業者が分類・単価・商社名などを入れて登録する。
+     *
+     * データ入力画面の各項目はold()で値を復元するため、カードの内容を直前の入力として
+     * 渡すだけでフォームに反映される。
+     *
+     * 差し戻してからもう一度進めた場合など、同じ注番・品名の仕入レコードが既にあるときは
+     * その件数も渡して、二重登録に気づけるようにする。
+     */
+    private function redirectToPurchaseInput(Card $card): RedirectResponse
+    {
+        $alreadyRegistered = PurchaseDetail::where('item_code', $card->orderNumber->code)
+            ->where('item_name', $card->item_name)
+            ->count();
+
+        return redirect()->route('purchasing.input')
+            ->with('status', 'card-advanced-to-input')
+            ->with('advanced_card_order_no', $card->orderNumber->code)
+            ->with('advanced_card_existing_count', $alreadyRegistered)
+            ->withInput([
+                'form_type' => 'purchase',
+                'item_code' => $card->orderNumber->code,
+                'machine_no' => $card->machine_number,
+                'item_name' => $card->item_name,
+                'dimensions' => $card->model_number,
+                'manufacturer' => $card->manufacturer,
+                'order_qty' => $card->quantity,
+                'unit' => $card->unit,
+            ]);
     }
 
     /**
@@ -388,21 +430,7 @@ class CardController extends Controller
             return back()->withErrors(['stage' => $error]);
         }
 
-        // データ入力画面の各項目はold()で値を復元するため、カードの内容を直前の入力として
-        // 渡すだけでフォームに反映される（分類・単価・商社名などは作業者が入力する）。
-        return redirect()->route('purchasing.input')
-            ->with('status', 'card-advanced-to-input')
-            ->with('advanced_card_order_no', $card->orderNumber->code)
-            ->withInput([
-                'form_type' => 'purchase',
-                'item_code' => $card->orderNumber->code,
-                'machine_no' => $card->machine_number,
-                'item_name' => $card->item_name,
-                'dimensions' => $card->model_number,
-                'manufacturer' => $card->manufacturer,
-                'order_qty' => $card->quantity,
-                'unit' => $card->unit,
-            ]);
+        return $this->redirectToPurchaseInput($card);
     }
 
     /**

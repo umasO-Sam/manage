@@ -26,6 +26,16 @@
                         <span class="font-bold">まだ登録はされていません。</span>分類・単価・商社名などを入力して登録してください。
                     </span>
                 </div>
+                {{-- 差し戻してからもう一度進めた場合など、すでに登録済みのことがある。 --}}
+                @if (session('advanced_card_existing_count') > 0)
+                    <div class="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-sm flex items-start gap-2">
+                        <i data-lucide="alert-triangle" class="w-4 h-4 mt-0.5 shrink-0"></i>
+                        <span>
+                            この注番・品名の仕入レコードは<span class="font-bold">すでに{{ session('advanced_card_existing_count') }}件あります</span>。
+                            差し戻してから進め直した場合など、二重登録にご注意ください（登録済みの内容は仕入管理の検索で確認できます）。
+                        </span>
+                    </div>
+                @endif
             @endif
             @if (session('status') === 'input-created')
                 <div class="p-3 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-800 text-sm">登録しました。</div>

@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Card;
 use App\Models\CardStageLog;
 use App\Models\OrderNumber;
+use App\Models\PurchaseDetail;
 use App\Models\Staff;
 use App\Models\WorkflowType;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -52,9 +53,9 @@ class CardAdvanceToInputTest extends TestCase
         ]);
     }
 
-    private function makeCard(WorkflowType $workflow, Staff $creator, int $stage = 0): Card
+    private function makeCard(WorkflowType $workflow, Staff $creator, int $stage = 0, string $code = 'AB123-N01'): Card
     {
-        $orderNumber = OrderNumber::create(['code' => 'AB123-N01', 'is_protected' => false]);
+        $orderNumber = OrderNumber::firstOrCreate(['code' => $code], ['is_protected' => false]);
 
         return Card::create([
             'workflow_type_id' => $workflow->id,
@@ -191,15 +192,67 @@ class CardAdvanceToInputTest extends TestCase
         $this->assertSame(0, CardStageLog::where('card_id', $card->id)->count());
     }
 
-    public function test_move_still_works_after_the_shared_advance_logic_was_extracted(): void
+    /**
+     * ボードの「→ 手配中へ進める」とドラッグ&ドロップも、詳細画面のボタンと同じく
+     * データ入力へ繋ぐ。進めただけでレコードが登録されていない状態を作らないため。
+     */
+    public function test_moving_a_new_purchase_card_also_leads_to_the_input_screen(): void
     {
         Mail::fake();
         $manager = Staff::factory()->create(['role' => Staff::ROLE_PROCUREMENT_MANAGER]);
         $card = $this->makeCard($this->purchaseWorkflow(), Staff::factory()->create());
 
-        $this->actingAs($manager)->post(route('cards.move', $card))
-            ->assertSessionHas('status', 'card-moved');
+        $response = $this->actingAs($manager)->post(route('cards.move', $card));
+
+        $response->assertRedirect(route('purchasing.input'));
+        $response->assertSessionHas('status', 'card-advanced-to-input');
+        $response->assertSessionHasInput('item_code', 'AB123-N01');
 
         $this->assertSame(1, $card->fresh()->current_stage);
+        // 進めただけでは登録しない(入力画面で作業者が登録する)。
+        $this->assertDatabaseCount('purchase_details', 0);
+    }
+
+    /** 手配中から先や見積依頼ボードは、今までどおりその場に留まる。 */
+    public function test_other_moves_stay_on_the_board(): void
+    {
+        Mail::fake();
+        $manager = Staff::factory()->create(['role' => Staff::ROLE_PROCUREMENT_MANAGER]);
+
+        $purchase = $this->makeCard($this->purchaseWorkflow(), Staff::factory()->create(), 1);
+        $this->actingAs($manager)->post(route('cards.move', $purchase))
+            ->assertSessionHas('status', 'card-moved');
+
+        $estimate = $this->makeCard($this->estimateWorkflow(), Staff::factory()->create(), 0, 'ZZ001-N01');
+        $this->actingAs($manager)->post(route('cards.move', $estimate))
+            ->assertSessionHas('status', 'card-moved');
+    }
+
+    /**
+     * 差し戻してから進め直すと、同じ注番・品名の仕入レコードが既にあることがある。
+     * 二重登録に気づけるよう件数を知らせる。
+     */
+    public function test_the_input_screen_warns_when_the_same_record_already_exists(): void
+    {
+        Mail::fake();
+        $manager = Staff::factory()->create(['role' => Staff::ROLE_PROCUREMENT_MANAGER]);
+        $card = $this->makeCard($this->purchaseWorkflow(), Staff::factory()->create());
+
+        // 1回目: まだ登録が無いので知らせない
+        $this->actingAs($manager)->post(route('cards.move', $card))
+            ->assertSessionHas('advanced_card_existing_count', 0);
+
+        PurchaseDetail::create([
+            'item_code' => 'AB123-N01', 'item_name' => 'ベアリング',
+            'order_qty' => 4, 'unit_price' => 100, 'supplier_name' => '商社A',
+        ]);
+
+        // 差し戻してから進め直すと、既に登録があることを知らせる
+        $this->actingAs($manager)->post(route('cards.revert', $card))->assertRedirect();
+        $response = $this->actingAs($manager)->post(route('cards.move', $card));
+
+        $response->assertSessionHas('advanced_card_existing_count', 1);
+        $this->actingAs($manager)->get(route('purchasing.input'))
+            ->assertOk()->assertSee('すでに1件あります');
     }
 }
