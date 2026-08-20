@@ -24,6 +24,9 @@
                     <span>
                         注番 {{ session('advanced_card_order_no') }} の依頼カードを「手配中」に進め、内容を反映しました。
                         <span class="font-bold">まだ登録はされていません。</span>分類・単価・商社名などを入力して登録してください。
+                        {{-- 二重登録になる場合など、登録せずに離れてよいことを明示する。
+                             カードはすでに手配中へ進んでいるので、戻っても進行は変わらない。 --}}
+                        <a href="{{ route('cards.index', 'purchase') }}" class="font-bold underline whitespace-nowrap">登録せずにボードへ戻る</a>
                     </span>
                 </div>
                 {{-- 差し戻してからもう一度進めた場合など、すでに登録済みのことがある。 --}}

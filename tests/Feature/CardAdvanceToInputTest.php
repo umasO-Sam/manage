@@ -213,6 +213,28 @@ class CardAdvanceToInputTest extends TestCase
         $this->assertDatabaseCount('purchase_details', 0);
     }
 
+    /**
+     * 二重登録になる場合など、登録せずに離れられることを画面上に示す。
+     * カードはすでに手配中へ進んでいるので、戻っても進行は変わらない。
+     */
+    public function test_the_input_screen_offers_a_way_back_without_registering(): void
+    {
+        Mail::fake();
+        $manager = Staff::factory()->create(['role' => Staff::ROLE_PROCUREMENT_MANAGER]);
+        $card = $this->makeCard($this->purchaseWorkflow(), Staff::factory()->create());
+
+        $this->actingAs($manager)->post(route('cards.move', $card));
+
+        $this->actingAs($manager)->get(route('purchasing.input'))
+            ->assertOk()
+            ->assertSee('登録せずにボードへ戻る')
+            ->assertSee(route('cards.index', 'purchase'), false);
+
+        $this->assertDatabaseCount('purchase_details', 0);
+        // 離れてもカードは手配中のまま。
+        $this->assertSame(1, $card->fresh()->current_stage);
+    }
+
     /** 手配中から先や見積依頼ボードは、今までどおりその場に留まる。 */
     public function test_other_moves_stay_on_the_board(): void
     {
