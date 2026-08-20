@@ -7,6 +7,7 @@ use App\Models\BusinessOrderLog;
 use App\Models\BusinessPartner;
 use App\Models\Card;
 use App\Models\CardStageLog;
+use App\Models\OperationLog;
 use App\Models\OrderNumber;
 use App\Models\PurchaseDetail;
 use App\Models\Staff;
@@ -342,6 +343,10 @@ class ProjectBoardController extends Controller
         $card->load(['businessOrder.businessPartner', 'businessOrder.staff', 'businessOrder.logs.staff', 'attachments', 'orderNumber']);
         $nextStage = $card->current_stage + 1;
 
+        /** @var Staff $viewer */
+        $viewer = Auth::user();
+        $isFundManager = $viewer->canManageBusinessPartners();
+
         return view('projects.show', [
             'card' => $card,
             'order' => $card->businessOrder,
@@ -350,7 +355,10 @@ class ProjectBoardController extends Controller
             'blockers' => $card->isAtFinalStage() ? [] : $gate->blockers($card, $nextStage),
             'attachmentKind' => $card->isAtFinalStage() ? null : $gate->attachmentKindFor($card->workflowType, $nextStage),
             'needsOrderForm' => ! $card->isAtFinalStage() && $gate->needsOrderFormBefore($card, $nextStage),
-            'canHide' => Auth::user()->canManageBusinessPartners(),
+            'canHide' => $isFundManager,
+            // 間違い登録の取り消し。受注のうちは登録者本人も消せる(destroyと同じ判定)。
+            'canDeleteCard' => ! $card->trashed()
+                && ($isFundManager || ($card->current_stage === 0 && $card->created_by === $viewer->id)),
         ]);
     }
 
@@ -554,6 +562,62 @@ class ProjectBoardController extends Controller
         });
 
         return redirect()->route('projects.index')->with('status', 'project-hidden');
+    }
+
+    /**
+     * 間違って登録したカードの削除。カードと受注ヘッダをレコードごと消す。
+     *
+     * 非表示(hide)と違い、受注ヘッダも残さない。受注金額は原価計算・見積補助の
+     * 集計にカードの表示状態とは無関係に効くため、間違いを残すと売上が過大になる。
+     * 添付ファイルの実体も消す。
+     *
+     * 消せるのは、受注(最初のステージ)なら登録した本人か資金管理者、
+     * それ以降は資金管理者だけ。進んだカードは他の人の作業が乗っているため。
+     *
+     * 注番マスタ(order_numbers)はそのまま残す。他の仕入データが同じ注番を
+     * 参照していることがあり、マスタから消すと辿れなくなるため。
+     */
+    public function destroy(Request $request, Card $card): RedirectResponse
+    {
+        $this->ensureProjectCard($card);
+
+        /** @var Staff $staff */
+        $staff = $request->user();
+        $isManager = $staff->canManageBusinessPartners();
+
+        abort_unless(
+            $isManager || ($card->current_stage === 0 && $card->created_by === $staff->id),
+            403,
+            $card->current_stage === 0
+                ? 'このカードを削除できるのは登録した本人と資金管理者だけです。'
+                : '受注より先に進んだカードを削除できるのは資金管理者だけです。'
+        );
+
+        $order = $card->businessOrder;
+        $summary = "{$order?->order_no}／{$order?->product_name}／¥".number_format((float) $order?->order_amount);
+
+        DB::transaction(function () use ($card, $order, $staff, $summary) {
+            // レコードごと消すため、誰が何を消したかは操作ログに残す。
+            OperationLog::record(
+                OperationLog::ACTION_PROJECT_CARD_DELETE,
+                $card,
+                $order?->staff_id ?? $staff->id,
+                $summary
+            );
+
+            foreach ($card->attachments as $attachment) {
+                Storage::disk('local')->delete($attachment->path);
+            }
+
+            // 添付・コメント・ステージ履歴はカードに、受注ログは受注ヘッダに
+            // それぞれ cascade でぶら下がっている。
+            $card->forceDelete();
+            $order?->delete();
+        });
+
+        return redirect()->route('projects.index')
+            ->with('status', 'project-deleted')
+            ->with('deleted_project', $summary);
     }
 
     private function workflowType(): WorkflowType

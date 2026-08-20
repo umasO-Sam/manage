@@ -136,6 +136,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/projects/{card}/advance', [ProjectBoardController::class, 'advance'])->name('projects.advance');
         Route::post('/projects/{card}/revert', [ProjectBoardController::class, 'revert'])->name('projects.revert');
         Route::delete('/projects/{card}/hide', [ProjectBoardController::class, 'hide'])->name('projects.hide');
+        Route::delete('/projects/{card}', [ProjectBoardController::class, 'destroy'])->name('projects.destroy');
     });
 
     // 取引先一覧(銀行・取引区分・締め日・支払条件)は資金管理者限定。

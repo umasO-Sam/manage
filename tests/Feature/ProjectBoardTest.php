@@ -7,6 +7,7 @@ use App\Models\BusinessOrderLog;
 use App\Models\BusinessPartner;
 use App\Models\Card;
 use App\Models\CardStageLog;
+use App\Models\OperationLog;
 use App\Models\OrderNumber;
 use App\Models\PurchaseDetail;
 use App\Models\Staff;
@@ -492,6 +493,69 @@ class ProjectBoardTest extends TestCase
             BusinessOrderLog::ACTION_STAGE_REVERTED,
             BusinessOrderLog::where('business_order_id', $card->business_order_id)->latest('id')->first()->action
         );
+    }
+
+    /**
+     * 間違って登録したカードの削除。受注ヘッダも一緒に消す。
+     * カードだけ消しても受注金額は原価計算・見積補助の集計に残るため。
+     */
+    public function test_a_card_registered_by_mistake_is_deleted_with_its_order(): void
+    {
+        Storage::fake('local');
+        $manager = $this->manager();
+        $card = $this->createCard($manager);
+        $orderId = $card->business_order_id;
+
+        $this->actingAs($this->fundManager())->delete(route('projects.destroy', $card))
+            ->assertRedirect(route('projects.index'));
+
+        $this->assertNull(Card::withTrashed()->find($card->id), 'カードはレコードごと消える');
+        $this->assertNull(BusinessOrder::find($orderId), '受注ヘッダも消える');
+        // 誰が何を消したかは操作ログに残す。
+        $this->assertSame(
+            OperationLog::ACTION_PROJECT_CARD_DELETE,
+            OperationLog::latest('id')->first()->action
+        );
+        // 注番マスタは他の仕入データが参照するため残す。
+        $this->assertNotNull(OrderNumber::where('code', 'PJ001-N01')->first());
+    }
+
+    public function test_the_registrant_can_delete_their_own_card_while_it_is_still_at_the_first_stage(): void
+    {
+        Storage::fake('local');
+        $sales = Staff::factory()->sales()->create();
+        $card = $this->createCard($sales);
+
+        $this->actingAs($sales)->delete(route('projects.destroy', $card))->assertRedirect();
+        $this->assertNull(Card::withTrashed()->find($card->id));
+    }
+
+    /** 受注より先へ進んだカードは、登録した本人でも資金管理者以外は消せない。 */
+    public function test_others_cannot_delete_a_card_that_has_moved_on(): void
+    {
+        Storage::fake('local');
+        $sales = Staff::factory()->sales()->create();
+        $card = $this->createCard($sales);
+        $card->update(['current_stage' => 1]);
+
+        $this->actingAs($sales)->delete(route('projects.destroy', $card))->assertForbidden();
+        $this->assertNotNull(Card::find($card->id));
+
+        $this->actingAs($this->fundManager())->delete(route('projects.destroy', $card))->assertRedirect();
+        $this->assertNull(Card::withTrashed()->find($card->id));
+    }
+
+    /** 他人が登録したカードは、受注のうちでも資金管理者以外は消せない。 */
+    public function test_another_persons_card_cannot_be_deleted(): void
+    {
+        Storage::fake('local');
+        $card = $this->createCard(Staff::factory()->sales()->create());
+
+        $this->actingAs(Staff::factory()->sales()->create())
+            ->delete(route('projects.destroy', $card))
+            ->assertForbidden();
+
+        $this->assertNotNull(Card::find($card->id));
     }
 
     public function test_the_first_stage_cannot_be_sent_back(): void

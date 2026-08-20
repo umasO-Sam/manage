@@ -59,6 +59,20 @@
                         </form>
                     @endif
                     <a href="{{ route('projects.order.edit', $card) }}" class="text-xs font-bold px-3 py-1.5 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-50">受注内容を編集</a>
+                    {{-- 間違って登録したカードの取り消し。受注ヘッダごと消えるため、
+                         受注のうちは登録者本人、それ以降は資金管理者だけに出す。 --}}
+                    @if ($canDeleteCard)
+                        <form method="POST" action="{{ route('projects.destroy', $card) }}"
+                              onsubmit="return confirm('この物件カードと受注（{{ $order->order_no }}／{{ $order->product_name }}）を削除します。
+受注金額も原価計算・見積補助の集計から外れます。
+元に戻せません。よろしいですか？');">
+                            @csrf
+                            @method('DELETE')
+                            <button type="submit" class="text-xs font-bold px-3 py-1.5 rounded-lg border border-red-300 text-red-700 hover:bg-red-50">
+                                この登録を削除
+                            </button>
+                        </form>
+                    @endif
                 </div>
             </div>
 

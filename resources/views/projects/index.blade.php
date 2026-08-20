@@ -15,6 +15,9 @@
     <div class="py-8">
         <div class="max-w-full mx-auto sm:px-6 lg:px-8 space-y-4">
 
+            @if (session('status') === 'project-deleted')
+                <div class="p-3 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-800 text-sm">「{{ session('deleted_project') }}」を削除しました。</div>
+            @endif
             @if (session('status') === 'project-hidden')
                 <div class="p-3 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-800 text-sm">カードを非表示にしました。データは削除されていません。</div>
             @endif
