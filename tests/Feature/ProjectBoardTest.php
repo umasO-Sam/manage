@@ -6,6 +6,7 @@ use App\Models\BusinessOrder;
 use App\Models\BusinessOrderLog;
 use App\Models\BusinessPartner;
 use App\Models\Card;
+use App\Models\CardStageLog;
 use App\Models\OrderNumber;
 use App\Models\PurchaseDetail;
 use App\Models\Staff;
@@ -461,6 +462,40 @@ class ProjectBoardTest extends TestCase
 
         $this->actingAs($manager)->post(route('projects.advance', $card))->assertRedirect();
         $this->assertSame(4, $card->fresh()->current_stage);
+    }
+
+    /**
+     * 誤って進めたステージを戻せる。戻した先の条件を満たしていなくても戻せる
+     * (進むときの条件で塞ぐと、間違えて進めたカードを直せなくなるため)。
+     */
+    public function test_a_stage_moved_by_mistake_can_be_sent_back_one_step(): void
+    {
+        $manager = $this->manager();
+        $card = $this->createCard($manager);
+
+        $this->actingAs($manager)->post(route('projects.advance', $card))->assertRedirect();
+        $this->assertSame(1, $card->fresh()->current_stage);
+
+        $this->actingAs($manager)->post(route('projects.revert', $card))->assertRedirect();
+        $this->assertSame(0, $card->fresh()->current_stage);
+
+        // 戻したことも履歴に残る。
+        $log = CardStageLog::where('card_id', $card->id)->latest('id')->first();
+        $this->assertTrue($log->is_reversal);
+        $this->assertSame(0, $log->stage_index);
+        $this->assertSame(
+            BusinessOrderLog::ACTION_STAGE_REVERTED,
+            BusinessOrderLog::where('business_order_id', $card->business_order_id)->latest('id')->first()->action
+        );
+    }
+
+    public function test_the_first_stage_cannot_be_sent_back(): void
+    {
+        $manager = $this->manager();
+        $card = $this->createCard($manager);
+
+        $this->actingAs($manager)->post(route('projects.revert', $card))->assertSessionHasErrors('stage');
+        $this->assertSame(0, $card->fresh()->current_stage);
     }
 
     public function test_trade_terms_cannot_be_confirmed_until_all_four_fields_are_filled(): void

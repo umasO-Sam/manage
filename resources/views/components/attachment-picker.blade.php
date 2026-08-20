@@ -1,10 +1,19 @@
-@props(['label' => '添付資料（任意・1ファイル10MBまで）'])
+@props([
+    'label' => '添付資料（任意・1ファイル10MBまで）',
+    // 送信名。1ファイルだけ受け取る画面では name="file" / :multiple="false" で使う。
+    'name' => 'attachments[]',
+    'multiple' => true,
+    'hint' => '取得済み見積りPDF、外観画像など',
+])
 
 <div
     x-data="{
         files: [],
         dragging: false,
+        multiple: {{ $multiple ? 'true' : 'false' }},
         addFiles(fileList) {
+            // 1ファイルだけ受け取る画面では、選び直したファイルで置き換える。
+            if (! this.multiple) this.files = [];
             Array.from(fileList).forEach((file) => {
                 if (/\.fdc$/i.test(file.name)) {
                     const proceed = confirm('部品リストを通知する場合、ここに添付するのではなくBOX上の保存場所を通知してください。\nFDCファイルを添付しますか。');
@@ -37,9 +46,9 @@
     >
         <input
             x-ref="input"
-            name="attachments[]"
+            name="{{ $name }}"
             type="file"
-            multiple
+            @if ($multiple) multiple @endif
             class="absolute inset-0 opacity-0 cursor-pointer"
             @change="
                 const picked = Array.from($event.target.files);
@@ -49,7 +58,7 @@
         />
         <i data-lucide="upload-cloud" class="w-8 h-8 text-slate-400 mx-auto mb-1"></i>
         <span class="text-xs text-slate-500 block" x-text="files.length > 0 ? files.length + '件のファイルを選択中（クリックまたはドロップで追加）' : 'クリック、またはファイルをドロップして追加'"></span>
-        <span class="text-[10px] text-slate-400 block mt-0.5">取得済み見積りPDF、外観画像など</span>
+        <span class="text-[10px] text-slate-400 block mt-0.5">{{ $hint }}</span>
     </div>
 
     <button
@@ -91,4 +100,5 @@
     </ul>
     <x-input-error class="mt-2" :messages="$errors->get('attachments')" />
     <x-input-error class="mt-2" :messages="$errors->get('attachments.0')" />
+    <x-input-error class="mt-2" :messages="$errors->get('file')" />
 </div>

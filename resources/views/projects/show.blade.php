@@ -9,7 +9,7 @@
     <div class="py-8">
         <div class="max-w-3xl mx-auto sm:px-6 lg:px-8 space-y-4">
 
-            @foreach (['project-created' => '受注を登録しました。', 'project-advanced' => 'ステージを移動しました。', 'project-order-updated' => '受注内容を更新しました。', 'project-attachment-added' => '添付しました。'] as $key => $message)
+            @foreach (['project-created' => '受注を登録しました。', 'project-advanced' => 'ステージを移動しました。', 'project-order-updated' => '受注内容を更新しました。', 'project-attachment-added' => '添付しました。', 'project-reverted' => 'ひとつ前のステージに戻しました。'] as $key => $message)
                 @if (session('status') === $key)
                     <div class="p-3 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-800 text-sm">{{ $message }}</div>
                 @endif
@@ -47,7 +47,17 @@
                     <div class="py-2 flex justify-between"><dt class="text-slate-500">社内担当者</dt><dd>{{ $order->staff?->name ?: '—' }}</dd></div>
                 </dl>
 
-                <div class="flex justify-end">
+                <div class="flex justify-end gap-2">
+                    {{-- 誤って進めたときの訂正。1段階ずつ戻す。 --}}
+                    @if ($card->current_stage > 0 && ! $card->trashed())
+                        <form method="POST" action="{{ route('projects.revert', $card) }}"
+                              onsubmit="return confirm('ステージを「{{ $workflowType->stageLabel($card->current_stage - 1) }}」に戻します。よろしいですか？');">
+                            @csrf
+                            <button type="submit" class="text-xs font-bold px-3 py-1.5 rounded-lg border border-amber-300 text-amber-700 hover:bg-amber-50">
+                                ひとつ前のステージに戻す
+                            </button>
+                        </form>
+                    @endif
                     <a href="{{ route('projects.order.edit', $card) }}" class="text-xs font-bold px-3 py-1.5 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-50">受注内容を編集</a>
                 </div>
             </div>
@@ -74,13 +84,17 @@
                     @endif
 
                     @if ($attachmentKind)
-                        <form method="POST" action="{{ route('projects.attachments.store', $card) }}" enctype="multipart/form-data" class="flex items-end gap-2 flex-wrap">
+                        {{-- 調達ボードと同じ添付枠。クリックでもドラッグ&ドロップでも入れられる。 --}}
+                        <form method="POST" action="{{ route('projects.attachments.store', $card) }}" enctype="multipart/form-data" class="space-y-2">
                             @csrf
-                            <div>
-                                <label class="block text-[11px] font-bold text-slate-600 mb-0.5">{{ \App\Services\ProjectStageGate::ATTACHMENT_LABELS[$attachmentKind] }}</label>
-                                <input type="file" name="file" required class="text-xs">
+                            <x-attachment-picker
+                                name="file"
+                                :multiple="false"
+                                :label="\App\Services\ProjectStageGate::ATTACHMENT_LABELS[$attachmentKind]"
+                                hint="PDF・画像・Word・メール(msg/eml)、1ファイル10MBまで" />
+                            <div class="flex justify-end">
+                                <button type="submit" class="text-xs font-bold px-3 py-1.5 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-50">添付する</button>
                             </div>
-                            <button type="submit" class="text-xs font-bold px-3 py-1.5 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-50">添付する</button>
                         </form>
                     @endif
 

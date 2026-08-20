@@ -433,6 +433,66 @@ class ProjectBoardController extends Controller
     }
 
     /**
+     * 誤って進めたステージをひとつ前に戻す。調達ボードの差し戻しと同じ考え方で、
+     * 戻したこと自体もステージ履歴と受注ログに残す。
+     *
+     * 戻した先で条件(添付・チェック)を満たしていなくてもそのまま戻す。
+     * 「間違って進めた」ときの訂正なので、進むときの条件で塞ぐと直せなくなる。
+     */
+    public function revert(Request $request, Card $card): RedirectResponse
+    {
+        $this->ensureProjectCard($card);
+
+        if ($card->trashed()) {
+            return back()->withErrors(['stage' => '非表示のカードは戻せません。']);
+        }
+
+        $currentStage = $card->current_stage;
+
+        if ($currentStage === 0) {
+            return back()->withErrors(['stage' => 'これ以上前のステージには戻せません。']);
+        }
+
+        $targetStage = $currentStage - 1;
+        $targetLabel = $card->workflowType->stageLabel($targetStage);
+
+        // 連打や複数タブでの同時操作で二重に戻らないよう、読み取り時のステージのままの場合だけ更新する。
+        $reverted = DB::transaction(function () use ($card, $currentStage, $targetStage, $targetLabel) {
+            $updated = Card::where('id', $card->id)
+                ->where('current_stage', $currentStage)
+                ->update(['current_stage' => $targetStage]);
+
+            if ($updated === 0) {
+                return false;
+            }
+
+            CardStageLog::create([
+                'card_id' => $card->id,
+                'stage_index' => $targetStage,
+                'stage_label' => "差し戻し（{$targetLabel}へ）",
+                'actor_id' => Auth::id(),
+                'moved_at' => now(),
+                'is_reversal' => true,
+                'is_deletion' => false,
+            ]);
+
+            BusinessOrderLog::record(
+                $card->businessOrder,
+                BusinessOrderLog::ACTION_STAGE_REVERTED,
+                "{$targetLabel}へ戻す"
+            );
+
+            return true;
+        });
+
+        if (! $reverted) {
+            return back()->withErrors(['stage' => '他の操作でカードの状態が変わったため戻せませんでした。画面を更新してください。']);
+        }
+
+        return back()->with('status', 'project-reverted');
+    }
+
+    /**
      * ステージ移動の条件になっている書類を添付する。種別(kind)は次ステージの
      * requires から決まるため、画面からは受け取らずサーバー側で確定させる。
      */

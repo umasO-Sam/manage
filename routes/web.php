@@ -134,6 +134,7 @@ Route::middleware('auth')->group(function () {
         Route::put('/projects/{card}/order', [ProjectBoardController::class, 'updateOrder'])->name('projects.order.update');
         Route::post('/projects/{card}/attachments', [ProjectBoardController::class, 'storeAttachment'])->name('projects.attachments.store');
         Route::post('/projects/{card}/advance', [ProjectBoardController::class, 'advance'])->name('projects.advance');
+        Route::post('/projects/{card}/revert', [ProjectBoardController::class, 'revert'])->name('projects.revert');
         Route::delete('/projects/{card}/hide', [ProjectBoardController::class, 'hide'])->name('projects.hide');
     });
 
