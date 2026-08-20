@@ -78,8 +78,18 @@ class ProjectBoardController extends Controller
             ->paginate(50)
             ->withQueryString();
 
+        // 削除された物件はレコードが残らないため、削除時に書き起こした控えを
+        // 操作ログから拾ってこの画面にも出す(物件履歴だけを見ればよいようにする)。
+        $deletions = OperationLog::with('staff')
+            ->where('action', OperationLog::ACTION_PROJECT_CARD_DELETE)
+            ->when($keyword !== '', fn ($q) => $q->where('description', 'like', "%{$keyword}%"))
+            ->orderByDesc('id')
+            ->limit(50)
+            ->get();
+
         return view('projects.history', [
             'orders' => $orders,
+            'deletions' => $deletions,
             'filters' => ['q' => $keyword, 'hidden' => $onlyHidden],
         ]);
     }
@@ -594,10 +604,11 @@ class ProjectBoardController extends Controller
         );
 
         $order = $card->businessOrder;
-        $summary = "{$order?->order_no}／{$order?->product_name}／¥".number_format((float) $order?->order_amount);
+        $summary = $this->deletionSummary($card, $order);
 
         DB::transaction(function () use ($card, $order, $staff, $summary) {
-            // レコードごと消すため、誰が何を消したかは操作ログに残す。
+            // レコードごと消すため、受注の内容とそれまでの物件履歴を書き起こして残す。
+            // 物件履歴の「削除された物件」と操作ログの両方からこの控えを読む。
             OperationLog::record(
                 OperationLog::ACTION_PROJECT_CARD_DELETE,
                 $card,
@@ -617,7 +628,42 @@ class ProjectBoardController extends Controller
 
         return redirect()->route('projects.index')
             ->with('status', 'project-deleted')
-            ->with('deleted_project', $summary);
+            ->with('deleted_project', $card->orderNumber?->code ?? $summary);
+    }
+
+    /**
+     * 削除する物件の控え。レコードは消えてしまうため、受注の内容と
+     * それまでの物件履歴(受注ログ)を1つの文章に書き起こして残す。
+     */
+    private function deletionSummary(Card $card, ?BusinessOrder $order): string
+    {
+        $lines = [
+            "注番: {$order?->order_no}",
+            "件名: {$order?->product_name}",
+            "受注先: {$order?->recipient}",
+            "納入先: {$order?->delivery_dest}",
+            '受注日: '.($order?->order_received_date?->format('Y/m/d') ?? '—'),
+            '受注金額: ¥'.number_format((float) $order?->order_amount),
+            '売上日: '.($order?->sales_date?->format('Y/m/d') ?? '—'),
+            '社内担当者: '.($order?->staff?->name ?? '—'),
+            '削除時のステージ: '.$card->currentStageLabel(),
+        ];
+
+        $logs = $order?->logs()->with('staff')->orderBy('id')->get() ?? collect();
+
+        if ($logs->isNotEmpty()) {
+            $lines[] = '--- それまでの物件履歴 ---';
+
+            foreach ($logs as $log) {
+                $lines[] = $log->created_at->format('Y/m/d H:i')
+                    .' '.$log->actionLabel()
+                    .($log->description !== null ? '：'.$log->description : '')
+                    .'（'.($log->staff?->name ?? '—').'）';
+            }
+        }
+
+        return implode("
+", $lines);
     }
 
     private function workflowType(): WorkflowType

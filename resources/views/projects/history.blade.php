@@ -76,6 +76,31 @@
             @if ($orders->hasPages())
                 <div>{{ $orders->links() }}</div>
             @endif
+
+            {{-- 削除された物件。レコードは残らないので、削除時に書き起こした控えを出す。 --}}
+            @if ($deletions->isNotEmpty())
+                <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-4 space-y-3">
+                    <div>
+                        <h3 class="text-sm font-bold text-slate-800">削除された物件（直近{{ $deletions->count() }}件）</h3>
+                        <p class="text-[11px] text-slate-500 mt-0.5">
+                            間違って登録したものとして削除された物件です。レコードは残らないため、削除した時点の内容と
+                            それまでの物件履歴をここに控えています。
+                        </p>
+                    </div>
+                    <div class="divide-y divide-slate-100">
+                        @foreach ($deletions as $deletion)
+                            <div class="py-2 text-xs">
+                                <div class="flex flex-wrap items-center gap-2 text-slate-500">
+                                    <span class="font-mono">{{ $deletion->created_at->format('Y/m/d H:i') }}</span>
+                                    <span class="font-bold px-1.5 py-0.5 rounded bg-red-100 text-red-800">削除</span>
+                                    <span>{{ $deletion->staff?->name ?? '—' }}</span>
+                                </div>
+                                <pre class="mt-1 whitespace-pre-wrap font-sans text-slate-700">{{ $deletion->description }}</pre>
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+            @endif
         </div>
     </div>
 </x-app-layout>

@@ -520,6 +520,47 @@ class ProjectBoardTest extends TestCase
         $this->assertNotNull(OrderNumber::where('code', 'PJ001-N01')->first());
     }
 
+    /**
+     * 削除するとレコードが残らないため、そのときの内容とそれまでの物件履歴を
+     * 控えとして残し、物件履歴の画面から読めるようにする。
+     */
+    public function test_the_history_screen_shows_what_was_deleted(): void
+    {
+        Storage::fake('local');
+        $manager = $this->manager();
+        $card = $this->createCard($manager);
+
+        // 1段階進めて、物件履歴(受注ログ)が付いた状態にする
+        $this->actingAs($manager)->post(route('projects.advance', $card))->assertRedirect();
+
+        $this->actingAs($this->fundManager())->delete(route('projects.destroy', $card))->assertRedirect();
+
+        $html = $this->actingAs($manager)->get(route('projects.history'))->assertOk()->getContent();
+
+        $this->assertStringContainsString('削除された物件', $html);
+        $this->assertStringContainsString('PJ001-N01', $html);
+        $this->assertStringContainsString('搬送装置', $html);
+        // 削除前のステージと、それまでの操作も控えに残る。
+        $this->assertStringContainsString('線表反映済', $html);
+        $this->assertStringContainsString('それまでの物件履歴', $html);
+    }
+
+    /** キーワードで絞ると、削除された物件の控えも同じ条件で絞られる。 */
+    public function test_the_deleted_entries_follow_the_keyword_filter(): void
+    {
+        Storage::fake('local');
+        $manager = $this->manager();
+        $card = $this->createCard($manager);
+
+        $this->actingAs($this->fundManager())->delete(route('projects.destroy', $card))->assertRedirect();
+
+        $this->actingAs($manager)->get(route('projects.history', ['q' => '搬送装置']))
+            ->assertOk()->assertSee('搬送装置');
+
+        $this->actingAs($manager)->get(route('projects.history', ['q' => '別の物件']))
+            ->assertOk()->assertDontSee('削除された物件');
+    }
+
     public function test_the_registrant_can_delete_their_own_card_while_it_is_still_at_the_first_stage(): void
     {
         Storage::fake('local');
