@@ -62,16 +62,46 @@ class BusinessPartner extends Model
     }
 
     /**
-     * 関連注番。改行・読点・カンマ・空白のどれで区切っても1件ずつ取り出せるようにする
-     * (Excelから移してきた欄で、区切り方が揃っていないため)。
+     * 関連注番として持つのは注番の先頭の英字1〜3文字(客先番号)だけ。
+     * 「DH013-N01」と入れても「DH」として扱う。通番まで持つと装置1台ごとに
+     * 登録が要り、受注先の絞り込みには細かすぎるため。
+     *
+     * 区切りは改行・読点・カンマ・空白のいずれでもよい(Excelから移した欄で揃っていない)。
      *
      * @return array<int, string>
      */
     public function relatedOrderNoList(): array
     {
-        $parts = preg_split('/[\s,、，\/／]+/u', (string) $this->related_order_nos, -1, PREG_SPLIT_NO_EMPTY);
+        return self::normalizeOrderNoCodes($this->related_order_nos);
+    }
 
-        return array_values(array_unique(array_map('mb_strtoupper', $parts ?: [])));
+    /**
+     * 入力された関連注番を、客先番号(英字1〜3文字)の配列にそろえる。
+     *
+     * @return array<int, string>
+     */
+    public static function normalizeOrderNoCodes(?string $value): array
+    {
+        $parts = preg_split('/[\s,、，\/／]+/u', (string) $value, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+
+        $codes = [];
+        foreach ($parts as $part) {
+            if (preg_match('/^[A-Za-z]{1,3}/', $part, $m) === 1) {
+                $codes[] = mb_strtoupper($m[0]);
+            }
+        }
+
+        return array_values(array_unique($codes));
+    }
+
+    /** 入力された注番が、この取引先の関連注番(客先番号)に当てはまるか。 */
+    public function matchesOrderNo(string $orderNo): bool
+    {
+        if (preg_match('/^[A-Za-z]{1,3}/', trim($orderNo), $m) !== 1) {
+            return false;
+        }
+
+        return in_array(mb_strtoupper($m[0]), $this->relatedOrderNoList(), true);
     }
 
     /** 受注先プルダウンでの表示。仮登録は調整中であることが分かるようにする。 */

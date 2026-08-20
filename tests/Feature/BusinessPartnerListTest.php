@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\BusinessOrder;
 use App\Models\BusinessPartner;
 use App\Models\Staff;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -41,7 +42,9 @@ class BusinessPartnerListTest extends TestCase
         $first->refresh();
         $second->refresh();
         $this->assertSame('052-000-0001', $first->tel);
-        $this->assertSame(['DH013-N01', 'Q001-N02'], $first->relatedOrderNoList());
+        // 関連注番は注番の頭の英字(客先番号)だけを持つ。
+        $this->assertSame('DH Q', $first->related_order_nos);
+        $this->assertSame(['DH', 'Q'], $first->relatedOrderNoList());
         $this->assertSame('い社（改称）', $second->name);
         $this->assertSame(5, $second->display_order);
         $this->assertSame("愛知県\n名古屋市", $second->address);
@@ -97,7 +100,7 @@ class BusinessPartnerListTest extends TestCase
         $this->assertSame('あい', $partner->kana_group);
         $this->assertSame('末締め', $partner->handling_method);
         $this->assertSame(3, $partner->display_order);
-        $this->assertSame(['DH013-N01'], $partner->relatedOrderNoList());
+        $this->assertSame(['DH'], $partner->relatedOrderNoList());
         // 取引実績のある既存先として入れるので、取引条件調整中にはしない。
         $this->assertFalse($partner->is_provisional);
     }
@@ -116,6 +119,53 @@ class BusinessPartnerListTest extends TestCase
             ->assertSessionHasErrors('paste_data');
 
         $this->assertSame(1, BusinessPartner::count());
+    }
+
+    public function test_a_partner_without_projects_can_be_deleted_in_edit_mode(): void
+    {
+        $partner = BusinessPartner::create(['name' => '消せる社', 'is_provisional' => false]);
+
+        $this->actingAs($this->fundManager())
+            ->delete(route('business-partners.destroy', $partner))
+            ->assertRedirect();
+
+        $this->assertSame(0, BusinessPartner::count());
+    }
+
+    /**
+     * 物件がぶら下がっている取引先は消せない。消すと過去の受注から
+     * 受注先を辿れなくなるため、名称の間違いは直接編集で直す。
+     */
+    public function test_a_partner_with_projects_cannot_be_deleted(): void
+    {
+        $partner = BusinessPartner::create(['name' => '消せない社', 'is_provisional' => false]);
+        BusinessOrder::create([
+            'order_no' => 'BP001-N01', 'product_name' => '装置', 'recipient' => $partner->name,
+            'business_partner_id' => $partner->id, 'order_amount' => 100,
+        ]);
+
+        $this->actingAs($this->fundManager())
+            ->delete(route('business-partners.destroy', $partner))
+            ->assertSessionHasErrors('delete');
+
+        $this->assertSame(1, BusinessPartner::count());
+    }
+
+    /** 関連注番は入力の仕方によらず客先番号(英字1〜3文字)にそろえる。 */
+    public function test_related_order_numbers_are_reduced_to_the_customer_code(): void
+    {
+        $partner = BusinessPartner::create(['name' => 'コード社', 'is_provisional' => false]);
+
+        $this->actingAs($this->fundManager())->put(route('business-partners.bulk-update'), [
+            'updates' => [
+                $partner->id => ['name' => 'コード社', 'related_order_nos' => "dh013-n01、KX038-N01
+DH020"],
+            ],
+        ])->assertRedirect();
+
+        $this->assertSame(['DH', 'KX'], $partner->fresh()->relatedOrderNoList());
+        $this->assertTrue($partner->fresh()->matchesOrderNo('DH999-N01'));
+        $this->assertFalse($partner->fresh()->matchesOrderNo('ZZ001-N01'));
     }
 
     /** Excelから見出しごとコピーされた場合、その行は取り込まない。 */

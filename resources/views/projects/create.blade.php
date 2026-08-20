@@ -98,19 +98,24 @@
                               .replace(/株式会社|有限会社|㈱|㈲|\(株\)|\(有\)|（株）|（有）/g, '')
                               .replace(/[\s　・.,、。]/g, '');
                       },
-                      // 注番で絞り込む。関連注番に入っている取引先だけを残し、
+                      // 注番の頭の英字(客先番号)を取り出す。関連注番はこの単位で登録されている。
+                      customerCodeOf(orderNo) {
+                          const matched = (orderNo ?? '').trim().toUpperCase().match(/^[A-Z]{1,3}/);
+                          return matched ? matched[0] : '';
+                      },
+                      // 注番で絞り込む。同じ客先番号を関連注番に持つ取引先だけを残し、
                       // 1件も当たらないときは全件のまま出す(選べなくなるのを避ける)。
                       applyPartnerFilter(orderNo) {
-                          const no = (orderNo ?? '').trim().toUpperCase();
-                          this.partnerFilterNo = no;
-                          if (no === '') {
+                          const code = this.customerCodeOf(orderNo);
+                          this.partnerFilterNo = code;
+                          if (code === '') {
                               this.partnerFilterNotice = null;
                               return;
                           }
-                          const hit = this.partners.filter((p) => p.order_nos.some((o) => o.includes(no) || no.includes(o)));
+                          const hit = this.partners.filter((p) => p.order_nos.includes(code));
                           this.partnerFilterNotice = hit.length
-                              ? { ok: true, text: '関連注番「' + no + '」の取引先' + hit.length + '件に絞り込みました。' }
-                              : { ok: false, text: '関連注番「' + no + '」に一致する取引先がないため、全件を表示しています。' };
+                              ? { ok: true, text: '客先番号「' + code + '」の取引先' + hit.length + '件に絞り込みました。' }
+                              : { ok: false, text: '客先番号「' + code + '」に一致する取引先がないため、全件を表示しています。' };
                       },
                       clearPartnerFilter() {
                           this.partnerFilterNo = '';
@@ -121,7 +126,7 @@
                           let list = this.partners;
 
                           if (this.partnerFilterNo !== '') {
-                              const hit = list.filter((p) => p.order_nos.some((o) => o.includes(this.partnerFilterNo) || this.partnerFilterNo.includes(o)));
+                              const hit = list.filter((p) => p.order_nos.includes(this.partnerFilterNo));
                               if (hit.length) list = hit;
                           }
 

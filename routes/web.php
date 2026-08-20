@@ -145,6 +145,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/business-partners/bulk-paste', [BusinessPartnerController::class, 'storeBulkPaste'])->name('business-partners.bulk-paste');
         Route::put('/business-partners/{businessPartner}', [BusinessPartnerController::class, 'update'])->name('business-partners.update');
         Route::post('/business-partners/{businessPartner}/confirm', [BusinessPartnerController::class, 'confirm'])->name('business-partners.confirm');
+        Route::delete('/business-partners/{businessPartner}', [BusinessPartnerController::class, 'destroy'])->name('business-partners.destroy');
     });
 
     // 担当者管理(ＩＤ管理)は経理資材担当・役員・資金管理者が使う。

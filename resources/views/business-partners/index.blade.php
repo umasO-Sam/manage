@@ -16,7 +16,8 @@
                 物件管理ボードで新規取引先として登録された取引先は<strong>仮登録</strong>で並びます。
                 銀行・取引区分・締め日・支払い条件をすべて入力して「取引条件調整完了」を押すと本登録になり、
                 その取引先のカードから「取引条件調整中」が外れて請求済へ進めるようになります。
-                <strong>関連注番</strong>に入れた注番は、物件管理の受注先プルダウンの絞り込みに使われます。
+                <strong>関連注番</strong>は注番の頭の<strong>英字1〜3文字（客先番号）</strong>を登録します（「DH013-N01」と入れても「DH」として保存されます）。
+                物件管理で注番を入れたとき、この客先番号が一致する取引先だけに受注先プルダウンを絞り込みます。
             </p>
 
             @if (session('status') === 'partner-updated')
@@ -27,6 +28,9 @@
             @endif
             @if (session('status') === 'partners-bulk-created')
                 <div class="p-3 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-800 text-sm">{{ session('partners_saved') }}件の取引先を登録しました。</div>
+            @endif
+            @if (session('status') === 'partner-deleted')
+                <div class="p-3 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-800 text-sm">「{{ session('deleted_partner') }}」を削除しました。</div>
             @endif
             @if (session('status') === 'partner-confirmed')
                 <div class="p-3 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-800 text-sm">取引条件を確定しました。</div>
@@ -86,12 +90,18 @@
                 <form id="partner-confirm-{{ $partner->id }}" method="POST" action="{{ route('business-partners.confirm', $partner) }}" class="hidden">
                     @csrf
                 </form>
+                <form id="partner-destroy-{{ $partner->id }}" method="POST" action="{{ route('business-partners.destroy', $partner) }}" class="hidden"
+                      onsubmit="return confirm('取引先「{{ $partner->name }}」を削除します。よろしいですか？');">
+                    @csrf
+                    @method('DELETE')
+                </form>
             @endforeach
 
             <form id="partner-bulk-edit-form" method="POST" action="{{ route('business-partners.bulk-update') }}">
                 @csrf
                 @method('PUT')
-                <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-x-auto">
+                {{-- 処理方法・備考が長いため、表は横スクロールで読む。 --}}
+                <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-x-auto max-h-[70vh] overflow-y-auto">
                     <table class="w-full text-left border-collapse text-xs whitespace-nowrap">
                         <thead>
                             <tr class="bg-slate-50 border-b border-slate-200 font-semibold text-slate-600">
@@ -142,8 +152,8 @@
                                     <td class="p-1.5">
                                         <span x-show="! editMode" class="font-mono text-slate-600">{{ $partner->related_order_nos }}</span>
                                         <textarea x-show="editMode" x-cloak rows="2" name="{{ $name }}[related_order_nos]"
-                                                  placeholder="改行・読点区切り"
-                                                  class="w-40 text-xs border rounded px-1.5 py-1 border-slate-300 font-mono">{{ $partner->related_order_nos }}</textarea>
+                                                  placeholder="例: DH KX（空白区切り）"
+                                                  class="w-32 text-xs border rounded px-1.5 py-1 border-slate-300 font-mono">{{ $partner->related_order_nos }}</textarea>
                                     </td>
                                     @foreach ([['bank', '銀行'], ['transaction_type', '取引区分'], ['closing_day', '締め日'], ['payment_terms', '支払い条件']] as [$field, $label])
                                         <td class="p-1.5">
@@ -155,8 +165,10 @@
                                     {{-- 拠点や電話が複数ある取引先は原文に改行が入っているため、1行の入力欄では潰れる。 --}}
                                     @foreach ([['postal_code', 'w-28'], ['address', 'w-64'], ['tel', 'w-32'], ['fax', 'w-32'], ['handling_method', 'w-72']] as [$field, $width])
                                         <td class="p-1.5">
-                                            <span x-show="! editMode" class="whitespace-pre-line block max-w-xs truncate" title="{{ $partner->$field }}">{{ $partner->$field }}</span>
-                                            <textarea x-show="editMode" x-cloak rows="2" name="{{ $name }}[{{ $field }}]"
+                                            {{-- 処理方法などは何行にもなる。省略すると読めないので、
+                                                 折り返さずそのまま出して表ごと横スクロールで読む。 --}}
+                                            <span x-show="! editMode" class="whitespace-pre block">{{ $partner->$field }}</span>
+                                            <textarea x-show="editMode" x-cloak rows="4" name="{{ $name }}[{{ $field }}]"
                                                       class="{{ $width }} text-xs border rounded px-1.5 py-1 border-slate-300">{{ $partner->$field }}</textarea>
                                         </td>
                                     @endforeach
@@ -177,18 +189,24 @@
                                     </td>
                                     @foreach ([['remarks', '備考'], ['subcontract_note', '下請法メモ']] as [$field, $label])
                                         <td class="p-1.5">
-                                            <span x-show="! editMode" class="whitespace-pre-line block max-w-xs truncate" title="{{ $partner->$field }}">{{ $partner->$field }}</span>
-                                            <textarea x-show="editMode" x-cloak rows="2" name="{{ $name }}[{{ $field }}]"
-                                                      class="w-48 text-xs border rounded px-1.5 py-1 border-slate-300">{{ $partner->$field }}</textarea>
+                                            <span x-show="! editMode" class="whitespace-pre block">{{ $partner->$field }}</span>
+                                            <textarea x-show="editMode" x-cloak rows="4" name="{{ $name }}[{{ $field }}]"
+                                                      class="w-64 text-xs border rounded px-1.5 py-1 border-slate-300">{{ $partner->$field }}</textarea>
                                         </td>
                                     @endforeach
                                     <td class="p-1.5">
-                                        @if ($partner->is_provisional)
-                                            <button type="submit" form="partner-confirm-{{ $partner->id }}"
-                                                    class="text-xs font-bold px-2.5 py-1 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 whitespace-nowrap">取引条件調整完了</button>
-                                        @else
-                                            <span class="text-[11px] text-slate-400">{{ $partner->confirmed_at?->format('Y/m/d') }}</span>
-                                        @endif
+                                        <div class="flex items-center gap-2">
+                                            @if ($partner->is_provisional)
+                                                <button type="submit" form="partner-confirm-{{ $partner->id }}"
+                                                        class="text-xs font-bold px-2.5 py-1 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 whitespace-nowrap">取引条件調整完了</button>
+                                            @else
+                                                <span class="text-[11px] text-slate-400">{{ $partner->confirmed_at?->format('Y/m/d') }}</span>
+                                            @endif
+                                            {{-- 削除は編集中だけ出す。物件がぶら下がっている取引先はサーバー側で弾く。 --}}
+                                            <button type="submit" form="partner-destroy-{{ $partner->id }}" x-show="editMode" x-cloak
+                                                    @if ($partner->business_orders_count > 0) disabled title="物件が{{ $partner->business_orders_count }}件あるため削除できません" @endif
+                                                    class="text-xs font-bold text-red-700 hover:text-red-900 disabled:text-slate-300 disabled:cursor-not-allowed">削除</button>
+                                        </div>
                                     </td>
                                 </tr>
                             @empty

@@ -180,6 +180,9 @@ class BusinessPartnerController extends Controller
                 $errors[] = "{$rowNumber}行目: 「{$row['name']}」はすでに登録されています。直接編集で修正してください。";
             }
 
+            $codes = BusinessPartner::normalizeOrderNoCodes($row['related_order_nos']);
+            $row['related_order_nos'] = $codes === [] ? null : implode(' ', $codes);
+
             $names[] = $row['name'];
             $rows[] = $row;
         }
@@ -206,6 +209,27 @@ class BusinessPartnerController extends Controller
         return redirect()->route('business-partners.index')
             ->with('status', 'partners-bulk-created')
             ->with('partners_saved', count($rows));
+    }
+
+    /**
+     * 取引先の削除。物件(受注ヘッダ)が1件でも紐づいているものは消せない。
+     * 消すと過去の受注から受注先が辿れなくなるため、名称の間違いは
+     * 直接編集で直してもらう。
+     */
+    public function destroy(BusinessPartner $businessPartner): RedirectResponse
+    {
+        $count = $businessPartner->businessOrders()->count();
+
+        if ($count > 0) {
+            return back()->withErrors([
+                'delete' => "「{$businessPartner->name}」は物件が{$count}件ぶら下がっているため削除できません。",
+            ]);
+        }
+
+        $name = $businessPartner->name;
+        $businessPartner->delete();
+
+        return back()->with('status', 'partner-deleted')->with('deleted_partner', $name);
     }
 
     /**
@@ -250,6 +274,12 @@ class BusinessPartnerController extends Controller
             if (is_string($value) && trim($value) === '') {
                 $data[$key] = null;
             }
+        }
+
+        // 関連注番は客先番号(英字1〜3文字)だけを持つ。「DH013-N01」と入れられても「DH」に寄せる。
+        if (array_key_exists('related_order_nos', $data)) {
+            $codes = BusinessPartner::normalizeOrderNoCodes($data['related_order_nos']);
+            $data['related_order_nos'] = $codes === [] ? null : implode(' ', $codes);
         }
 
         return $data;
