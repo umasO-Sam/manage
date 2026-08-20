@@ -100,12 +100,14 @@
                                                             'compensatory' => '代休',
                                                             default => $leaveRequest->shortLabel(),
                                                         };
-                                                        $chipClass = $isPrivileged
-                                                            ? ($leaveRequest->isApproved() ? 'bg-emerald-500 text-white' : 'bg-amber-500 text-white')
-                                                            : 'bg-slate-200 text-slate-700';
+                                                        // 承認待ち(オレンジ)と承認済み(緑)は権限によらず全員に見せる。
+                                                        // 誰がいつ休むかは全員が予定を立てるのに使うため。
+                                                        $chipClass = $leaveRequest->isApproved()
+                                                            ? 'bg-emerald-500 text-white'
+                                                            : 'bg-amber-500 text-white';
                                                     @endphp
                                                     <span class="block w-full text-xs leading-tight font-bold px-0.5 rounded-sm whitespace-nowrap {{ $chipClass }}"
-                                                          title="{{ $label }}{{ $isPrivileged ? '（'.$leaveRequest->statusLabel().'）' : '' }}">{{ $label }}</span>
+                                                          title="{{ $label }}（{{ $leaveRequest->statusLabel() }}）">{{ $label }}</span>
                                                 @endforeach
                                             </div>
                                         </td>
@@ -118,12 +120,8 @@
             </div>
 
             <div class="flex flex-wrap gap-4 text-xs text-slate-600">
-                @if ($isPrivileged)
-                    <span class="flex items-center gap-1.5"><span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500 text-white inline-block">例</span>承認待ち</span>
-                    <span class="flex items-center gap-1.5"><span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-500 text-white inline-block">例</span>承認済み</span>
-                @else
-                    <span class="flex items-center gap-1.5"><span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-200 text-slate-700 inline-block">例</span>休暇・休日出勤の申請あり</span>
-                @endif
+                <span class="flex items-center gap-1.5"><span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500 text-white inline-block">例</span>承認待ち</span>
+                <span class="flex items-center gap-1.5"><span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-500 text-white inline-block">例</span>承認済み</span>
                 <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded bg-pink-50 border border-pink-100 inline-block"></span>土日・祝日・会社休日</span>
                 <span class="text-slate-400">1日有休・2H有休・AM半休・PM半休=有給休暇／在宅=テレワーク／休出=休日勤務／振休=振替休日／代休=代休</span>
             </div>

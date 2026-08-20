@@ -7,14 +7,13 @@ use App\Models\LeaveRequest;
 use App\Models\Staff;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 
 /**
  * 勤務状況一覧。基準日(既定は今日)から前1週間・先4週間(35日)を横軸に、全社員(部署順・表示順)を
  * 縦軸に一覧表示する。基準日は4週間(28日)単位で前後に動かせるほか、日付を直接指定して飛べる。
  * 休暇・休日出勤の種別のみを表示する(作業日報の提出・確認状況は作業日報一覧画面で確認する)。
- * 一般社員・営業担当には種別のみを、上長・経理資材担当には承認状況の色分けもあわせて表示する。
+ * 承認待ち(オレンジ)・承認済み(緑)の色分けは、権限によらず全員に見せる。
  */
 class WorkStatusController extends Controller
 {
@@ -23,10 +22,6 @@ class WorkStatusController extends Controller
 
     public function index(Request $request): View
     {
-        /** @var Staff $viewer */
-        $viewer = Auth::user();
-        $isPrivileged = $viewer->is_procurement_manager || $viewer->is_supervisor;
-
         $today = Carbon::today();
         $anchor = $this->parseDate($request->query('date')) ?? $today->copy();
 
@@ -52,7 +47,6 @@ class WorkStatusController extends Controller
             'holidaysByDate' => $holidaysByDate,
             'staffGroups' => Staff::forRoster()->get()->groupBy('department'),
             'leaveEntriesByStaffAndDate' => $this->buildLeaveEntriesByStaffAndDate($rangeStart, $rangeEnd),
-            'isPrivileged' => $isPrivileged,
         ]);
     }
 

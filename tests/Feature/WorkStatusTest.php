@@ -44,7 +44,11 @@ class WorkStatusTest extends TestCase
         });
     }
 
-    public function test_general_staff_sees_neutral_badges_without_approval_status(): void
+    /**
+     * 承認待ち(オレンジ)・承認済み(緑)の色分けは権限によらず全員に見せる。
+     * 誰がいつ休むかは、承認前であっても全員が予定を立てるのに使うため。
+     */
+    public function test_general_staff_also_sees_the_approval_status_colours(): void
     {
         $staff = Staff::factory()->create();
         $applicant = Staff::factory()->create(['name' => '申請太郎']);
@@ -54,14 +58,19 @@ class WorkStatusTest extends TestCase
             'staff_id' => $applicant->id, 'type' => 'paid_leave', 'start_date' => '2026-08-12', 'end_date' => '2026-08-12',
             'granularity' => 'full_day', 'day_count' => 1.0, 'approver_id' => $approver->id, 'status' => 'pending',
         ]);
+        LeaveRequest::create([
+            'staff_id' => $applicant->id, 'type' => 'paid_leave', 'start_date' => '2026-08-13', 'end_date' => '2026-08-13',
+            'granularity' => 'full_day', 'day_count' => 1.0, 'approver_id' => $approver->id, 'status' => 'approved',
+        ]);
 
-        $response = $this->actingAs($staff)->get(route('work-status.index'));
+        $content = $this->actingAs($staff)->get(route('work-status.index'))->assertOk()->getContent();
 
-        $response->assertOk();
-        // 一般社員には承認状況が見えないため、種別のみ表示され、承認状況の文言は出ない。
-        $response->assertSee('1日有休');
-        $response->assertDontSee('（未承認）');
-        $response->assertDontSee('（承認済み）');
+        $this->assertStringContainsString('1日有休（承認待ち）', $content);
+        $this->assertStringContainsString('1日有休（承認済み）', $content);
+        $this->assertStringContainsString('bg-amber-500 text-white', $content);
+        $this->assertStringContainsString('bg-emerald-500 text-white', $content);
+        // 権限で色分けを止めていた頃の灰色のバッジは使わない。
+        $this->assertStringNotContainsString('bg-slate-200 text-slate-700', $content);
     }
 
     public function test_supervisor_sees_approval_status(): void
