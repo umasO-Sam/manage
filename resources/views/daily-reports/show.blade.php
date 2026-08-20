@@ -33,6 +33,7 @@
             draftKey: {{ \Illuminate\Support\Js::from('daily-report-draft:'.$targetStaff->id.':'.$workDate) }},
             initialRemarks: {{ \Illuminate\Support\Js::from(old('remarks', $report->remarks) ?? '') }},
             justSubmitted: {{ \Illuminate\Support\Js::from(in_array(session('status'), ['daily-report-submitted', 'daily-report-proxy-submitted'], true)) }},
+            todayDate: {{ \Illuminate\Support\Js::from(now()->format('Y-m-d')) }},
         })">
         <div class="max-w-4xl mx-auto sm:px-6 lg:px-8 space-y-6">
 
@@ -575,7 +576,7 @@
                         this.discardDraft();
                     }
 
-                    this.purgeOldDrafts();
+                    this.purgeOtherDrafts();
 
                     const draft = this.readDraft();
                     if (draft && JSON.stringify({ entries: draft.entries, remarks: draft.remarks ?? '' }) !== this.draftBaseline) {
@@ -645,15 +646,18 @@
                     this.draftStatus = '';
                 },
 
-                /** 30日より古い下書きを片付ける(提出済みの日のものが残り続けないように)。 */
-                purgeOldDrafts() {
-                    const limit = Date.now() - 30 * 24 * 60 * 60 * 1000;
+                /**
+                 * 下書きは当日分だけ残し、他の日のものは画面を開いたときに片付ける。
+                 * 今開いている日も残すのは、差し戻された過去の日を直している最中に
+                 * その下書き自体を消してしまわないため。
+                 */
+                purgeOtherDrafts() {
+                    const keep = new Set([config.todayDate, this.workDate]);
                     try {
                         Object.keys(window.localStorage)
                             .filter((key) => key.startsWith('daily-report-draft:'))
                             .forEach((key) => {
-                                const saved = Date.parse(JSON.parse(window.localStorage.getItem(key) ?? '{}').savedAt ?? '');
-                                if (! saved || saved < limit) {
+                                if (! keep.has(key.split(':').pop())) {
                                     window.localStorage.removeItem(key);
                                 }
                             });
