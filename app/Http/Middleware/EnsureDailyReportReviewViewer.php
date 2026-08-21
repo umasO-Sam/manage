@@ -7,7 +7,8 @@ use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * 作業日報確認の閲覧を、経理資材担当・上長・役員・資金管理者(とadministrator)に限定する。
+ * 作業日報の2画面(作業日報確認・作業日報一覧)の閲覧を、日報管理者・上長・役員
+ * (とadministrator)に限定する。経理資材担当・資金管理者はロールだけでは開けない。
  * 確認・差し戻しの操作は EnsureDailyReportReviewer で日報管理者だけに絞る。
  */
 class EnsureDailyReportReviewViewer
@@ -22,7 +23,7 @@ class EnsureDailyReportReviewViewer
         abort_unless(
             $request->user()?->canViewDailyReportReviews(),
             403,
-            'この画面は経理資材担当・上長・役員・資金管理者のみ閲覧できます。'
+            'この画面は日報管理者・上長・役員のみ閲覧できます。'
         );
 
         return $next($request);

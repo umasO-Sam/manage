@@ -23,12 +23,13 @@
                         $isManager = $viewer->is_procurement_manager;
                         // ＩＤ管理は権限付与のために役員・資金管理者も使う。
                         $canManageStaff = $viewer->canManageStaff();
+                        // 操作ログ・原価一覧に使う(経理資材担当・上長)。
                         $isSupervisorOrManager = $viewer->isSupervisorOrManager();
-                        // 作業日報一覧は日報管理者にも出す(操作ログ・原価一覧は出さない)。
-                        $canViewDailyReportList = $viewer->canViewDailyReportList();
-                        // 作業日報確認は経理資材担当・上長・役員・資金管理者が閲覧でき、
+                        // 作業日報の2画面(確認・一覧)は日報管理者・上長・役員。
                         // 確認と差し戻し(と未確認バッジ)は日報管理者フラグを付けた人だけ。
                         $canViewDailyReportReviews = $viewer->canViewDailyReportReviews();
+                        // 申請承認は上長・勤怠管理者。バッジも同じ条件で出す。
+                        $canViewLeaveApprovals = $viewer->canViewLeaveApprovals();
                         // 一般社員はメニュー項目が少ないのでボードを直接並べる。上長や
                         // 役員・資金管理者・administratorは他のメニューが増えて横に収まらなくなるため、
                         // 一般社員ロールのままでもドロップダウン(調達ボード)にまとめる。
@@ -196,7 +197,7 @@
                                     @endif
                                 </x-dropdown-link>
                             @endif
-                            @if ($canViewDailyReportList)
+                            @if ($canViewDailyReportReviews)
                                 <x-dropdown-link :href="route('daily-reports.list.index')">
                                     <i data-lucide="list-checks" class="w-3.5 h-3.5 inline-block align-text-bottom mr-1"></i> 作業日報一覧
                                 </x-dropdown-link>
@@ -209,7 +210,7 @@
                             <x-dropdown-link :href="route('leave-requests.index')">
                                 <i data-lucide="calendar-check" class="w-3.5 h-3.5 inline-block align-text-bottom mr-1"></i> 休暇・休出申請
                             </x-dropdown-link>
-                            @if ($isSupervisorOrManager)
+                            @if ($canViewLeaveApprovals)
                                 <x-dropdown-link :href="route('leave-requests.approvals')">
                                     <i data-lucide="check-check" class="w-3.5 h-3.5 inline-block align-text-bottom mr-1"></i> 申請承認
                                     @if ($pendingApprovalsCount > 0)
@@ -482,7 +483,7 @@
                     @endif
                 </a>
             @endif
-            @if ($canViewDailyReportList)
+            @if ($canViewDailyReportReviews)
                 <a href="{{ route('daily-reports.list.index') }}" class="block px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap {{ request()->routeIs('daily-reports.list.*') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
                     作業日報一覧
                 </a>
@@ -495,7 +496,7 @@
             <a href="{{ route('leave-requests.index') }}" class="block px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap {{ request()->routeIs('leave-requests.index') || request()->routeIs('leave-requests.create') || request()->routeIs('leave-requests.show') || request()->routeIs('leave-requests.withdraw') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
                 休暇・休出申請
             </a>
-            @if ($isSupervisorOrManager)
+            @if ($canViewLeaveApprovals)
                 <a href="{{ route('leave-requests.approvals') }}" class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap {{ request()->routeIs('leave-requests.approvals') || request()->routeIs('leave-requests.decide') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
                     <span>申請承認</span>
                     @if ($pendingApprovalsCount > 0)

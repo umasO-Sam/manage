@@ -1,10 +1,10 @@
 <?php
 
 use App\Http\Middleware\EnsureAttendanceManager;
-use App\Http\Middleware\EnsureDailyReportListViewer;
 use App\Http\Middleware\EnsureDailyReportReviewer;
 use App\Http\Middleware\EnsureDailyReportReviewViewer;
 use App\Http\Middleware\EnsureFundManager;
+use App\Http\Middleware\EnsureLeaveApprovalViewer;
 use App\Http\Middleware\EnsureProcurementManager;
 use App\Http\Middleware\EnsureProjectBoardUser;
 use App\Http\Middleware\EnsurePurchasingViewer;
@@ -29,7 +29,6 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'attendance.manager' => EnsureAttendanceManager::class,
             'daily.report.reviewer' => EnsureDailyReportReviewer::class,
-            'daily.report.list' => EnsureDailyReportListViewer::class,
             'daily.report.viewer' => EnsureDailyReportReviewViewer::class,
             'fund.manager' => EnsureFundManager::class,
             'procurement.manager' => EnsureProcurementManager::class,
@@ -37,6 +36,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'purchasing.viewer' => EnsurePurchasingViewer::class,
             'quote.number' => EnsureQuoteNumberUser::class,
             'staff.manager' => EnsureStaffManager::class,
+            'leave.approvals' => EnsureLeaveApprovalViewer::class,
             'supervisor.or.manager' => EnsureSupervisorOrManager::class,
         ]);
         $middleware->web(append: [

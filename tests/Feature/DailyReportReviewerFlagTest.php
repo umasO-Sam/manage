@@ -30,17 +30,40 @@ class DailyReportReviewerFlagTest extends TestCase
         return [$report, $author];
     }
 
-    public function test_managers_supervisors_and_executives_can_open_the_review_screen(): void
+    public function test_reviewers_supervisors_and_executives_can_open_the_review_screen(): void
     {
         foreach ([
-            '経理資材担当' => Staff::factory()->procurementManager()->create(['is_daily_report_reviewer' => false]),
+            '日報管理者' => Staff::factory()->create(['is_daily_report_reviewer' => true]),
             '上長' => Staff::factory()->create(['is_supervisor' => true]),
             '役員' => Staff::factory()->create(['is_executive' => true]),
-            '資金管理者' => Staff::factory()->create(['is_fund_manager' => true]),
             'administrator' => Staff::factory()->create(['is_administrator' => true]),
         ] as $label => $staff) {
             $this->actingAs($staff)->get(route('daily-reports.review.index'))
                 ->assertOk("{$label}が作業日報確認を開けません。");
+            $this->actingAs($staff)->get(route('daily-reports.list.index'))
+                ->assertOk("{$label}が作業日報一覧を開けません。");
+        }
+    }
+
+    /**
+     * 経理資材担当・資金管理者はロールだけでは日報の2画面を開けない(2026-08-21)。
+     * 日報は本人の勤務内容そのもので、見るのは確認を担当する人と部下を見る立場の人だけにする。
+     */
+    public function test_procurement_and_fund_managers_need_the_flag_for_the_daily_report_screens(): void
+    {
+        foreach ([
+            '経理資材担当' => Staff::factory()->procurementManager()->create(['is_daily_report_reviewer' => false]),
+            '資金管理者' => Staff::factory()->create(['is_fund_manager' => true]),
+        ] as $label => $staff) {
+            $this->actingAs($staff)->get(route('daily-reports.review.index'))
+                ->assertForbidden("{$label}が作業日報確認を開けます。");
+            $this->actingAs($staff)->get(route('daily-reports.list.index'))
+                ->assertForbidden("{$label}が作業日報一覧を開けます。");
+
+            // メニューにも出さない。
+            $html = $this->actingAs($staff)->get(route('my-calendar.show'))->assertOk()->getContent();
+            $this->assertStringNotContainsString(route('daily-reports.review.index'), $html);
+            $this->assertStringNotContainsString(route('daily-reports.list.index'), $html);
         }
     }
 
@@ -168,10 +191,10 @@ class DailyReportReviewerFlagTest extends TestCase
             $this->actingAs($reviewer)->get(route('my-calendar.show'))->getContent()
         );
 
-        $viewer = Staff::factory()->procurementManager()->create(['is_daily_report_reviewer' => false]);
+        // 上長は画面を開けるがバッジは出さない(確認するのは日報管理者のため)。
+        $viewer = Staff::factory()->create(['is_supervisor' => true]);
         $html = $this->actingAs($viewer)->get(route('my-calendar.show'))->getContent();
         $this->assertStringNotContainsString('bg-red-500', $html);
-        // 画面自体は開けるのでメニューには残る
         $this->assertStringContainsString('作業日報確認', $html);
     }
 

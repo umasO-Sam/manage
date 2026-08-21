@@ -40,7 +40,10 @@ class AppServiceProvider extends ServiceProvider
             $staff = auth()->user();
 
             $view->with('unreadCardCountsByWorkflow', $staff?->unreadCardCountsByWorkflow() ?? []);
-            $view->with('pendingApprovalsCount', $staff?->pendingApprovalsCount() ?? 0);
+            // 申請承認のバッジは、その画面を開ける人(上長・勤怠管理者)にだけ出す。
+            $view->with('pendingApprovalsCount', $staff?->canViewLeaveApprovals()
+                ? $staff->pendingApprovalsCount()
+                : 0);
             $view->with('pendingCancelReflectionCount', $staff?->pendingCancelReflectionCount() ?? 0);
             // 未確認バッジは確認を担当する日報管理者にだけ出す。
             $view->with('pendingDailyReportReviewCount', $staff?->canReviewDailyReports()

@@ -151,25 +151,28 @@ class Staff extends Authenticatable
     }
 
     /**
-     * 作業日報一覧(誰が出した/確認されたかの一覧)を開けるかどうか。
-     * 経理資材担当・上長・資金管理者・administratorに加え、日報管理者(2026-08-21)。
-     * 同じ立ち位置の操作ログ・原価一覧は賃金や原価に触れるため広げていない。
-     */
-    public function canViewDailyReportList(): bool
-    {
-        return $this->isSupervisorOrManager() || $this->canReviewDailyReports();
-    }
-
-    /**
-     * 作業日報確認の画面を開けるかどうか
-     * (経理資材担当・上長・役員・資金管理者・administrator、および日報管理者)。
-     * 提出された日報の内容と確認済/未確認は見られるが、確定・差し戻しは日報管理者だけが行う。
+     * 作業日報の2画面(作業日報確認・作業日報一覧)を開けるかどうか。
+     * 日報管理者・上長・役員・administrator(2026-08-21〜)。
+     *
+     * 経理資材担当・資金管理者はロールだけでは開けない。日報は本人の勤務内容そのもので、
+     * 見る必要があるのは確認を担当する人と部下を見る立場の人だけ、という整理にしたため。
+     * 中身と確認済/未確認は見られるが、確定・差し戻しは日報管理者だけが行う。
      */
     public function canViewDailyReportReviews(): bool
     {
-        return $this->isSupervisorOrManager()
+        return (bool) $this->is_supervisor
             || (bool) $this->is_executive
             || $this->canReviewDailyReports();
+    }
+
+    /**
+     * 申請承認の画面を開けるかどうか(上長・勤怠管理者・administrator、2026-08-21〜)。
+     * 画面には「自分が承認者になっている申請」しか出ないため、承認を任される上長と、
+     * 勤怠全体を見る勤怠管理者に絞る。経理資材担当はロールだけでは開けない。
+     */
+    public function canViewLeaveApprovals(): bool
+    {
+        return (bool) $this->is_supervisor || $this->canManageAttendance();
     }
 
     /**

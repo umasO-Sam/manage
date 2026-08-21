@@ -547,6 +547,54 @@ class LeaveRequestTest extends TestCase
         $this->assertSame('approved', $leaveRequest->fresh()->status);
     }
 
+    /**
+     * 申請承認を開けるのは上長・勤怠管理者・administratorだけ(2026-08-21)。
+     * 画面には自分が承認者の申請しか出ないため、経理資材担当はロールだけでは開けない。
+     */
+    public function test_only_supervisors_and_attendance_managers_can_open_the_approvals_screen(): void
+    {
+        foreach ([
+            '上長' => Staff::factory()->create(['is_supervisor' => true]),
+            '勤怠管理者' => Staff::factory()->create(['is_attendance_manager' => true]),
+            'administrator' => Staff::factory()->create(['is_administrator' => true]),
+        ] as $label => $staff) {
+            $this->actingAs($staff)->get(route('leave-requests.approvals'))
+                ->assertOk("{$label}が申請承認を開けません。");
+            $this->actingAs($staff)->get(route('my-calendar.show'))
+                ->assertOk()->assertSee(route('leave-requests.approvals'), false);
+        }
+
+        foreach ([
+            '一般社員' => Staff::factory()->create(),
+            '経理資材担当' => Staff::factory()->procurementManager()->create(),
+            '資金管理者' => Staff::factory()->create(['is_fund_manager' => true]),
+            '役員' => Staff::factory()->create(['is_executive' => true]),
+        ] as $label => $staff) {
+            $this->actingAs($staff)->get(route('leave-requests.approvals'))
+                ->assertForbidden("{$label}が申請承認を開けます。");
+            $this->actingAs($staff)->get(route('my-calendar.show'))
+                ->assertOk()->assertDontSee(route('leave-requests.approvals'), false);
+        }
+    }
+
+    /** 承認待ちのバッジも、申請承認を開ける人にだけ出す。 */
+    public function test_the_pending_approval_badge_follows_the_same_permission(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        $applicant = Staff::factory()->create();
+        // 経理資材担当が承認者になっている申請があっても、画面を開けないのでバッジも出さない。
+        $this->createPendingPaidLeave($applicant, $manager);
+
+        $this->assertSame(1, $manager->pendingApprovalsCount());
+        $this->actingAs($manager)->get(route('my-calendar.show'))
+            ->assertOk()->assertDontSee('bg-red-500', false);
+
+        $supervisor = Staff::factory()->create(['is_supervisor' => true]);
+        $this->createPendingPaidLeave($applicant, $supervisor);
+        $this->actingAs($supervisor)->get(route('my-calendar.show'))
+            ->assertOk()->assertSee('bg-red-500', false);
+    }
+
     public function test_own_pending_request_appears_in_approvals_list(): void
     {
         $applicant = Staff::factory()->create(['is_supervisor' => true]);
