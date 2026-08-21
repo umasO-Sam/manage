@@ -26,7 +26,9 @@
                                     $isDayOff = $isWeekend || in_array($holiday?->type, [\App\Models\Holiday::TYPE_PUBLIC_HOLIDAY, \App\Models\Holiday::TYPE_COMPANY_HOLIDAY], true);
                                     $isToday = $dateString === $today;
                                 @endphp
-                                <th class="p-0.5 font-semibold text-center leading-tight w-16 {{ $index % 7 === 0 ? 'border-l border-slate-200' : '' }} {{ $isDayOff ? 'bg-pink-50' : '' }} {{ $isToday ? 'bg-slate-800 text-white' : '' }}"
+                                {{-- 日付の列幅は全日そろえて固定する(休みの有無で列がずれると数えにくいため)。
+                                     52pxは一番長いチップ「AM2H」の実測47px＋セルの余白4pxに1px足した値。 --}}
+                                <th class="p-0.5 font-semibold text-center leading-tight w-[52px] min-w-[52px] {{ $index % 7 === 0 ? 'border-l border-slate-200' : '' }} {{ $isDayOff ? 'bg-pink-50' : '' }} {{ $isToday ? 'bg-slate-800 text-white' : '' }}"
                                     title="{{ $current->format('Y/m/d') }}（{{ $weekdayLabels[$current->dayOfWeek] }}）{{ $holiday?->name }}">
                                     <div class="whitespace-nowrap">{{ $current->format('n/j') }}</div>
                                     <div class="whitespace-nowrap {{ ! $isToday && $current->dayOfWeek === 0 ? 'text-red-500' : (! $isToday && $current->dayOfWeek === 6 ? 'text-blue-500' : '') }}">{{ $weekdayLabels[$current->dayOfWeek] }}</div>
@@ -66,7 +68,7 @@
                                             $isToday = $dateString === $today;
                                             $entries = $leaveEntriesByStaffAndDate[$staff->id][$dateString] ?? [];
                                         @endphp
-                                        <td class="px-0.5 py-px text-center align-middle {{ $index % 7 === 0 ? 'border-l border-slate-100' : '' }} {{ $isDayOff ? 'bg-pink-50/60' : '' }} {{ $isToday ? 'bg-slate-100' : '' }} {{ $groupBorder }}">
+                                        <td class="px-0.5 py-px text-center align-middle w-[52px] min-w-[52px] {{ $index % 7 === 0 ? 'border-l border-slate-100' : '' }} {{ $isDayOff ? 'bg-pink-50/60' : '' }} {{ $isToday ? 'bg-slate-100' : '' }} {{ $groupBorder }}">
                                             <div class="flex flex-col items-center justify-center gap-px min-h-[18px]">
                                                 @foreach ($entries as $entry)
                                                     @php
