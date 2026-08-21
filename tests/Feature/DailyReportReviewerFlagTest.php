@@ -10,7 +10,8 @@ use Tests\TestCase;
 
 /**
  * 日報管理者フラグ。作業日報確認は経理資材担当・上長・役員・資金管理者が閲覧でき、
- * 確認(人工データの確定)と差し戻しはフラグを立てた担当者だけが行う。
+ * 確認(人工データの確定)と差し戻しはフラグを立てた人だけが行う。
+ * フラグはロールを問わず、これだけで画面を開いて確認・差し戻しができる(2026-08-21)。
  */
 class DailyReportReviewerFlagTest extends TestCase
 {
@@ -46,11 +47,38 @@ class DailyReportReviewerFlagTest extends TestCase
     public function test_general_and_sales_staff_cannot_open_the_review_screen(): void
     {
         foreach ([Staff::ROLE_GENERAL, Staff::ROLE_SALES] as $role) {
-            // 日報管理者フラグだけでは閲覧範囲に入らない
-            $staff = Staff::factory()->create(['role' => $role, 'is_daily_report_reviewer' => true]);
+            $staff = Staff::factory()->create(['role' => $role]);
 
             $this->actingAs($staff)->get(route('daily-reports.review.index'))->assertForbidden();
         }
+    }
+
+    /**
+     * 日報管理者フラグはロールを問わない(2026-08-21)。フラグだけで画面を開き、確認までできる。
+     * 以前は経理資材担当を兼ねていないと画面ごと開けず、フラグが何の役にも立たなかった。
+     */
+    public function test_the_reviewer_flag_alone_grants_the_review_screen_whatever_the_role(): void
+    {
+        [$report] = $this->pendingReport();
+
+        foreach ([Staff::ROLE_GENERAL, Staff::ROLE_SALES] as $role) {
+            $staff = Staff::factory()->create(['role' => $role, 'is_daily_report_reviewer' => true]);
+
+            $this->actingAs($staff)->get(route('daily-reports.review.index', ['date' => '2026-08-10']))
+                ->assertOk()
+                ->assertSee('確認する')
+                ->assertSee('差し戻す');
+
+            // メニューからも辿れること(画面に入る道が無いと結局使えないため)。
+            $this->actingAs($staff)->get(route('my-calendar.show'))
+                ->assertOk()
+                ->assertSee(route('daily-reports.review.index'), false);
+        }
+
+        $reviewer = Staff::factory()->create(['is_daily_report_reviewer' => true]);
+        $this->actingAs($reviewer)->post(route('daily-reports.review.decide', $report), ['action' => 'confirm'])
+            ->assertRedirect();
+        $this->assertFalse(LaborCost::where('daily_report_id', $report->id)->first()->is_provisional);
     }
 
     public function test_only_a_flagged_reviewer_can_confirm_or_reject(): void

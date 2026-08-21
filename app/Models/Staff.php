@@ -151,23 +151,27 @@ class Staff extends Authenticatable
     }
 
     /**
-     * 作業日報確認の画面を開けるかどうか(経理資材担当・上長・役員・資金管理者・administrator)。
+     * 作業日報確認の画面を開けるかどうか
+     * (経理資材担当・上長・役員・資金管理者・administrator、および日報管理者)。
      * 提出された日報の内容と確認済/未確認は見られるが、確定・差し戻しは日報管理者だけが行う。
      */
     public function canViewDailyReportReviews(): bool
     {
-        return $this->isSupervisorOrManager() || (bool) $this->is_executive;
+        return $this->isSupervisorOrManager()
+            || (bool) $this->is_executive
+            || $this->canReviewDailyReports();
     }
 
     /**
      * 作業日報の確認(人工データの確定・差し戻し)を担当するかどうか。
-     * 経理資材担当の全員ではなく日報管理者フラグを付けた人だけが行い、
-     * 未確認バッジもその人にしか出さない。administratorはすべての機能を使える。
+     * 未確認バッジもこの人にしか出さない。administratorはすべての機能を使える。
+     *
+     * 勤怠管理者と同じくロールは問わない(2026-08-21)。以前は経理資材担当を兼ねている
+     * ことを条件にしていたが、フラグだけを付けた人が画面ごと開けず何もできなかったため。
      */
     public function canReviewDailyReports(): bool
     {
-        return (bool) $this->is_administrator
-            || ($this->is_procurement_manager && (bool) $this->is_daily_report_reviewer);
+        return (bool) $this->is_administrator || (bool) $this->is_daily_report_reviewer;
     }
 
     /**
