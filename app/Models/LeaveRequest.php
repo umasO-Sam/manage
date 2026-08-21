@@ -228,6 +228,9 @@ class LeaveRequest extends Model
     /**
      * 勤務状況一覧など、セル内に収める短い文字ラベル。振替休日・代休は対象日での
      * 役割によって表示が変わるため、この短縮ラベルには含めず呼び出し側で切り替える。
+     *
+     * 勤務状況一覧の日付列は52px固定のため、**全角3文字(46px)までに収める**こと。
+     * 4文字だと60pxになり、隣の列へはみ出す。
      */
     public function shortLabel(): string
     {
@@ -243,7 +246,19 @@ class LeaveRequest extends Model
             $this->type === 'paid_leave' && $this->granularity === 'half_day' => '半休',
             $this->type === 'telework' => '在宅',
             $this->type === 'holiday_work' => '休出',
-            default => mb_substr($this->typeLabel(), 0, 4),
+            // 忌引きは休む日数も周囲の対応も他の慶弔と違うため、一目で分かるように分ける。
+            $this->isFuneral() => '忌引',
+            $this->type === 'ceremonial_leave' => '慶弔',
+            $this->type === 'special_leave_paid' => '特休有',
+            $this->type === 'special_leave_unpaid' => '特休無',
+            $this->type === 'juror_leave' => '裁判員',
+            $this->type === 'volunteer_leave' => 'ボラ',
+            $this->type === 'banked_paid_leave' => '積立有',
+            // 代休申請のstart_dateは「実際に勤務した日」。休む日(compensatory_date)の
+            // 「代休」は呼び出し側で付けるため、ここは勤務した側の表記になる。
+            $this->type === 'compensatory_leave' => '出勤',
+            // 種別を足したときも列幅(52px)に収まるよう3文字で切る。
+            default => mb_substr($this->typeLabel(), 0, 3),
         };
     }
 

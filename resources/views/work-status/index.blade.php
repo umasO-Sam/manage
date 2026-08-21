@@ -78,15 +78,21 @@
                                                             'compensatory' => '代休',
                                                             default => $leaveRequest->shortLabel(),
                                                         };
+                                                        // セルは短縮表記しか出せないので、マウスを乗せたときは正式名称を出す。
+                                                        $fullLabel = match ($entry['role']) {
+                                                            'substitute' => '振替休日',
+                                                            'compensatory' => '代休',
+                                                            default => $leaveRequest->typeLabel(),
+                                                        };
                                                         // 承認待ち(オレンジ)と承認済み(緑)は権限によらず全員に見せる。
                                                         // 誰がいつ休むかは全員が予定を立てるのに使うため。
                                                         $chipClass = $leaveRequest->isApproved()
                                                             ? 'bg-emerald-500 text-white'
                                                             : 'bg-amber-500 text-white';
                                                     @endphp
-                                                    {{-- 3文字(1日休)が列幅16(64px)に収まる上限が text-sm。 --}}
+                                                    {{-- 表記は全角3文字(46px)までに収める。text-smで4文字だと60pxになり列からはみ出す。 --}}
                                                     <span class="block w-full text-sm leading-tight font-bold px-0.5 rounded-sm whitespace-nowrap {{ $chipClass }}"
-                                                          title="{{ $label }}（{{ $leaveRequest->statusLabel() }}）">{{ $label }}</span>
+                                                          title="{{ $fullLabel }}（{{ $leaveRequest->statusLabel() }}）">{{ $label }}</span>
                                                 @endforeach
                                             </div>
                                         </td>
@@ -125,7 +131,8 @@
                 <span class="flex items-center gap-1.5"><span class="text-xs font-bold px-1.5 py-0.5 rounded bg-amber-500 text-white inline-block">例</span>承認待ち</span>
                 <span class="flex items-center gap-1.5"><span class="text-xs font-bold px-1.5 py-0.5 rounded bg-emerald-500 text-white inline-block">例</span>承認済み</span>
                 <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded bg-pink-50 border border-pink-100 inline-block"></span>土日・祝日・会社休日</span>
-                <span class="text-slate-400">1日休・AM半・PM半・AM2H・PM2H=有給休暇／在宅=テレワーク／休出=休日勤務／振休=振替休日／代休=代休</span>
+                {{-- セルは短縮表記のため、ここで全部の読み方を出す(マウスを乗せれば正式名称も出る)。 --}}
+                <span class="text-slate-400">1日休・AM半・PM半・AM2H・PM2H=有給休暇／在宅=テレワーク／休出=休日勤務／振休=振替休日／代休=代休（出勤=代休の元になった勤務日）／慶弔・忌引=慶弔休暇／特休有・特休無=特別休暇（有給・無給）／裁判員=裁判員休暇／ボラ=ボランティア休暇／積立有=積立有給休暇</span>
             </div>
         </div>
     </div>

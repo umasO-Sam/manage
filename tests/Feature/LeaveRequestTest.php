@@ -162,6 +162,40 @@ class LeaveRequestTest extends TestCase
         $this->assertSame('休出', $holidayWork->shortLabel());
     }
 
+    /**
+     * 勤務状況一覧の日付列は52px固定で、全角3文字(46px)までしか収まらない。
+     * 種別を足したときも既定で3文字に切られることまで含めて確かめる。
+     */
+    public function test_short_label_of_every_type_fits_the_column(): void
+    {
+        $staff = Staff::factory()->create();
+        $approver = Staff::factory()->create(['is_supervisor' => true]);
+
+        $make = fn (string $type, array $overrides = []) => LeaveRequest::create([
+            'staff_id' => $staff->id, 'type' => $type, 'start_date' => '2026-08-10', 'end_date' => '2026-08-10',
+            'approver_id' => $approver->id, 'status' => 'pending', ...$overrides,
+        ]);
+
+        $this->assertSame('忌引', $make('ceremonial_leave', ['reason_code' => 'funeral'])->shortLabel());
+        $this->assertSame('慶弔', $make('ceremonial_leave', ['reason_code' => 'marriage'])->shortLabel());
+        $this->assertSame('特休有', $make('special_leave_paid')->shortLabel());
+        $this->assertSame('特休無', $make('special_leave_unpaid')->shortLabel());
+        $this->assertSame('裁判員', $make('juror_leave')->shortLabel());
+        $this->assertSame('ボラ', $make('volunteer_leave')->shortLabel());
+        $this->assertSame('積立有', $make('banked_paid_leave')->shortLabel());
+        $this->assertSame('出勤', $make('compensatory_leave')->shortLabel());
+
+        // 全角を1・半角を0.5として、どの種別も全角3文字ぶんを超えないこと。
+        foreach (array_keys(LeaveRequest::TYPES) as $type) {
+            $label = $make($type)->shortLabel();
+            $width = array_sum(array_map(
+                fn (string $char) => mb_strlen($char, 'UTF-8') === strlen($char) ? 0.5 : 1.0,
+                mb_str_split($label)
+            ));
+            $this->assertLessThanOrEqual(3.0, $width, "{$type} の短縮表記が列幅を超える: {$label}");
+        }
+    }
+
     public function test_paid_leave_request_is_rejected_when_balance_is_insufficient(): void
     {
         $applicant = Staff::factory()->create(['paid_leave_granted_current_year' => 0.5]);
