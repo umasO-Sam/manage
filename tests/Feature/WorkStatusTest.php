@@ -65,8 +65,8 @@ class WorkStatusTest extends TestCase
 
         $content = $this->actingAs($staff)->get(route('work-status.index'))->assertOk()->getContent();
 
-        $this->assertStringContainsString('1日有休（承認待ち）', $content);
-        $this->assertStringContainsString('1日有休（承認済み）', $content);
+        $this->assertStringContainsString('1日休（承認待ち）', $content);
+        $this->assertStringContainsString('1日休（承認済み）', $content);
         $this->assertStringContainsString('bg-amber-500 text-white', $content);
         $this->assertStringContainsString('bg-emerald-500 text-white', $content);
         // 権限で色分けを止めていた頃の灰色のバッジは使わない。
@@ -87,7 +87,7 @@ class WorkStatusTest extends TestCase
         $response = $this->actingAs($supervisor)->get(route('work-status.index'));
 
         $response->assertOk();
-        $response->assertSee('1日有休（承認済み）');
+        $response->assertSee('1日休（承認済み）');
     }
 
     public function test_daily_report_status_is_not_shown(): void

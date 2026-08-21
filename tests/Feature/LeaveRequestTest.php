@@ -96,7 +96,7 @@ class LeaveRequestTest extends TestCase
         $leaveRequest = LeaveRequest::first();
         $this->assertSame('pm', $leaveRequest->half_day_period);
         $this->assertSame(0.5, (float) $leaveRequest->day_count);
-        $this->assertSame('PM半休', $leaveRequest->shortLabel());
+        $this->assertSame('PM半', $leaveRequest->shortLabel());
     }
 
     /**
@@ -140,13 +140,13 @@ class LeaveRequestTest extends TestCase
             'day_count' => 1.0, 'approver_id' => $approver->id, 'status' => 'pending', ...$overrides,
         ]);
 
-        $this->assertSame('1日有休', $make(['granularity' => 'full_day'])->shortLabel());
-        $this->assertSame('AM2H休', $make(['granularity' => 'hours', 'half_day_period' => 'am'])->shortLabel());
-        $this->assertSame('PM2H休', $make(['granularity' => 'hours', 'half_day_period' => 'pm'])->shortLabel());
+        $this->assertSame('1日休', $make(['granularity' => 'full_day'])->shortLabel());
+        $this->assertSame('AM2H', $make(['granularity' => 'hours', 'half_day_period' => 'am'])->shortLabel());
+        $this->assertSame('PM2H', $make(['granularity' => 'hours', 'half_day_period' => 'pm'])->shortLabel());
         // AM/PM必須化より前に登録された2時間有休のフォールバック
         $this->assertSame('2H休', $make(['granularity' => 'hours'])->shortLabel());
-        $this->assertSame('AM半休', $make(['granularity' => 'half_day', 'half_day_period' => 'am'])->shortLabel());
-        $this->assertSame('PM半休', $make(['granularity' => 'half_day', 'half_day_period' => 'pm'])->shortLabel());
+        $this->assertSame('AM半', $make(['granularity' => 'half_day', 'half_day_period' => 'am'])->shortLabel());
+        $this->assertSame('PM半', $make(['granularity' => 'half_day', 'half_day_period' => 'pm'])->shortLabel());
 
         $telework = LeaveRequest::create([
             'staff_id' => $staff->id, 'type' => 'telework', 'start_date' => '2026-08-10', 'end_date' => '2026-08-10',

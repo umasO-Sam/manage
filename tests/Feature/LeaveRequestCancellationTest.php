@@ -308,7 +308,7 @@ class LeaveRequestCancellationTest extends TestCase
                 $applicant->fresh()->paidLeaveBalance()['remainingTotal'],
                 "cancel_status={$cancelStatus} の間は有給が戻らないこと"
             );
-            $this->actingAs($applicant)->get(route('work-status.index'))->assertOk()->assertSee('有休');
+            $this->actingAs($applicant)->get(route('work-status.index'))->assertOk()->assertSee('1日休');
         }
 
         // 反映して初めて有給が戻る。

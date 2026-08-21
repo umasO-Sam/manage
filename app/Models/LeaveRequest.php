@@ -232,13 +232,14 @@ class LeaveRequest extends Model
     public function shortLabel(): string
     {
         return match (true) {
-            $this->type === 'paid_leave' && $this->granularity === 'full_day' => '1日有休',
-            $this->type === 'paid_leave' && $this->granularity === 'hours' && $this->half_day_period === 'am' => 'AM2H休',
-            $this->type === 'paid_leave' && $this->granularity === 'hours' && $this->half_day_period === 'pm' => 'PM2H休',
-            // 午前/午後を持たない2時間有休は、AM/PM必須化より前に登録されたもの。
+            $this->type === 'paid_leave' && $this->granularity === 'full_day' => '1日休',
+            $this->type === 'paid_leave' && $this->granularity === 'hours' && $this->half_day_period === 'am' => 'AM2H',
+            $this->type === 'paid_leave' && $this->granularity === 'hours' && $this->half_day_period === 'pm' => 'PM2H',
+            // 午前/午後を持たない2時間有休・半休は、AM/PM必須化より前に登録されたもの。
+            // AM/PMが分からないため「休」を残した表記のままにする。
             $this->type === 'paid_leave' && $this->granularity === 'hours' => '2H休',
-            $this->type === 'paid_leave' && $this->granularity === 'half_day' && $this->half_day_period === 'am' => 'AM半休',
-            $this->type === 'paid_leave' && $this->granularity === 'half_day' && $this->half_day_period === 'pm' => 'PM半休',
+            $this->type === 'paid_leave' && $this->granularity === 'half_day' && $this->half_day_period === 'am' => 'AM半',
+            $this->type === 'paid_leave' && $this->granularity === 'half_day' && $this->half_day_period === 'pm' => 'PM半',
             $this->type === 'paid_leave' && $this->granularity === 'half_day' => '半休',
             $this->type === 'telework' => '在宅',
             $this->type === 'holiday_work' => '休出',

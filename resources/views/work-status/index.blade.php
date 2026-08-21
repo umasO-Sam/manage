@@ -82,7 +82,7 @@
                                                             ? 'bg-emerald-500 text-white'
                                                             : 'bg-amber-500 text-white';
                                                     @endphp
-                                                    {{-- 4文字(1日有休)が列幅16(64px)に収まる上限が text-sm。 --}}
+                                                    {{-- 3文字(1日休)が列幅16(64px)に収まる上限が text-sm。 --}}
                                                     <span class="block w-full text-sm leading-tight font-bold px-0.5 rounded-sm whitespace-nowrap {{ $chipClass }}"
                                                           title="{{ $label }}（{{ $leaveRequest->statusLabel() }}）">{{ $label }}</span>
                                                 @endforeach
@@ -123,7 +123,7 @@
                 <span class="flex items-center gap-1.5"><span class="text-xs font-bold px-1.5 py-0.5 rounded bg-amber-500 text-white inline-block">例</span>承認待ち</span>
                 <span class="flex items-center gap-1.5"><span class="text-xs font-bold px-1.5 py-0.5 rounded bg-emerald-500 text-white inline-block">例</span>承認済み</span>
                 <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded bg-pink-50 border border-pink-100 inline-block"></span>土日・祝日・会社休日</span>
-                <span class="text-slate-400">1日有休・2H有休・AM半休・PM半休=有給休暇／在宅=テレワーク／休出=休日勤務／振休=振替休日／代休=代休</span>
+                <span class="text-slate-400">1日休・AM半・PM半・AM2H・PM2H=有給休暇／在宅=テレワーク／休出=休日勤務／振休=振替休日／代休=代休</span>
             </div>
         </div>
     </div>
