@@ -72,6 +72,14 @@ class OperationLog extends Model
     /** 分類の説明(作業日報の「選択中」に出す内訳)の変更。全員の画面に出るため記録を残す。 */
     public const ACTION_CATEGORY_ITEM_NAME_UPDATE = 'category_item_name_update';
 
+    /**
+     * 物件管理側で見るログ。勤怠管理の操作ログ画面には出さず、
+     * 物件管理の「物件履歴」に削除した時点の控えとして出す(2026-08-21)。
+     *
+     * @var array<int, string>
+     */
+    public const PROJECT_ACTIONS = [self::ACTION_PROJECT_CARD_DELETE];
+
     /** @var array<string, string> action値 => 表示名 */
     public const ACTIONS = [
         self::ACTION_PROJECT_CARD_DELETE => '物件カードを削除',

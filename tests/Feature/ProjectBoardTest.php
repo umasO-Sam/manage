@@ -521,6 +521,32 @@ class ProjectBoardTest extends TestCase
     }
 
     /**
+     * 物件カードの削除は物件管理の話なので、勤怠管理の操作ログ画面には出さない(2026-08-21)。
+     * 控えは物件履歴の「削除された物件」で読む。
+     */
+    public function test_the_deletion_log_is_shown_on_the_project_history_not_the_attendance_log(): void
+    {
+        Storage::fake('local');
+        $manager = $this->manager();
+        $card = $this->createCard($manager);
+        $orderNo = $card->businessOrder->order_no;
+
+        $this->actingAs($this->fundManager())->delete(route('projects.destroy', $card))->assertRedirect();
+
+        // 勤怠管理の操作ログには出さない。
+        $this->actingAs($manager)->get(route('operation-logs.index'))
+            ->assertOk()
+            ->assertDontSee('物件カードを削除')
+            ->assertDontSee($orderNo);
+
+        // 物件履歴には出る。
+        $this->actingAs($manager)->get(route('projects.history'))
+            ->assertOk()
+            ->assertSee('削除された物件')
+            ->assertSee($orderNo);
+    }
+
+    /**
      * 削除するとレコードが残らないため、そのときの内容とそれまでの物件履歴を
      * 控えとして残し、物件履歴の画面から読めるようにする。
      */
