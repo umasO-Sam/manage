@@ -488,6 +488,67 @@ class LeaveRequest extends Model
         return [];
     }
 
+    /**
+     * 操作ログに残す「何の申請か」の一文。種別・対象日・申請内容をこの1か所で組み立て、
+     * 申請・承認・却下・取消・変更のどのログにも同じ形で載せる。
+     *
+     * 例: 休日勤務申請 2026/09/12（注番 A-1／本社／振休 2026/09/16）
+     *     有給休暇 2026/08/25（1日・1日）
+     *     代休申請 2026/08/22（勤務8時間／代休 2026/08/26）
+     *     慶弔休暇（忌引き） 2026/08/27〜2026/08/31（3日）
+     */
+    public function logSummary(): string
+    {
+        $date = fn (?\Illuminate\Support\Carbon $d) => $d?->format('Y/m/d');
+
+        $head = $this->typeLabel().($this->reasonLabel() ? '（'.$this->reasonLabel().'）' : '');
+
+        $period = $date($this->start_date);
+        if ($this->end_date && ! $this->end_date->equalTo($this->start_date)) {
+            $period .= '〜'.$date($this->end_date);
+        }
+
+        $details = array_values(array_filter($this->logDetailParts()));
+
+        return trim($head.' '.$period).($details === [] ? '' : '（'.implode('／', $details).'）');
+    }
+
+    /**
+     * logSummary()の括弧に入れる、種別ごとの中身。
+     *
+     * @return array<int, string|null>
+     */
+    private function logDetailParts(): array
+    {
+        $date = fn (?\Illuminate\Support\Carbon $d) => $d?->format('Y/m/d');
+        $days = fn () => $this->day_count === null ? null : \App\Support\LeaveDays::format($this->day_count).'日';
+
+        return match ($this->type) {
+            'paid_leave' => [
+                match ($this->granularity) {
+                    // 日数(1日)と並ぶので、粒度は「終日」と書いて重ならないようにする。
+                    'full_day' => '終日',
+                    'half_day' => '半日',
+                    'hours' => ($this->hours !== null ? rtrim(rtrim((string) $this->hours, '0'), '.').'時間' : '時間'),
+                    default => null,
+                },
+                $this->halfDayPeriodLabel(),
+                $days(),
+            ],
+            'holiday_work' => [
+                $this->order_no ? '注番 '.$this->order_no : null,
+                $this->work_location,
+                $this->no_substitute_needed ? '振休なし' : ($this->substitute_holiday_date ? '振休 '.$date($this->substitute_holiday_date) : '振休未定'),
+            ],
+            'compensatory_leave' => [
+                $this->actual_worked_hours !== null ? '勤務'.rtrim(rtrim((string) $this->actual_worked_hours, '0'), '.').'時間' : null,
+                $this->compensatory_date ? '代休 '.$date($this->compensatory_date) : '代休未定',
+            ],
+            'telework' => [$this->work_location],
+            default => [$days(), $this->reason_detail],
+        };
+    }
+
     /** 操作ログに残す「旧→新」の一文。 */
     public function amendmentSummary(): string
     {

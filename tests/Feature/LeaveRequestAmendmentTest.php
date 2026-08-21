@@ -28,7 +28,7 @@ class LeaveRequestAmendmentTest extends TestCase
     {
         parent::setUp();
 
-        $this->applicant = Staff::factory()->create(['name' => '申請太郎']);
+        $this->applicant = Staff::factory()->create(['name' => '申請太郎', 'paid_leave_granted_current_year' => 10]);
         $this->approver = Staff::factory()->create(['is_supervisor' => true, 'name' => '上長次郎']);
         $this->attendanceManager = Staff::factory()->create(['is_attendance_manager' => true, 'name' => '勤怠三郎']);
     }
@@ -229,6 +229,67 @@ class LeaveRequestAmendmentTest extends TestCase
             ->assertSee('変更を承認（上長）')
             ->assertSee('変更を反映（勤怠管理者）')
             ->assertSee('振替休日 2026/08/24 → 2026/08/31');
+    }
+
+    /**
+     * 変更以外の申請・承認のログにも、対象日と申請内容を残す。
+     * 一覧(操作ログ画面)だけを見て「何の申請の話か」が分かるようにするため。
+     */
+    public function test_every_leave_request_log_carries_the_date_and_the_content(): void
+    {
+        // 休日勤務: 申請 → 上長承認 → 勤怠管理者承認
+        $this->actingAs($this->applicant)->post(route('leave-requests.store'), [
+            'type' => 'holiday_work', 'approver_id' => $this->approver->id,
+            'start_date' => '2026-08-22', 'order_no' => 'A-1', 'work_location' => '本社',
+            'substitute_holiday_date' => '2026-08-24',
+        ]);
+        $holidayWork = LeaveRequest::sole();
+
+        $this->actingAs($this->approver)->put(route('leave-requests.decide', $holidayWork), ['action' => 'approve']);
+        $this->actingAs($this->attendanceManager)
+            ->put(route('leave-requests.attendance.decide', $holidayWork), ['action' => 'approve']);
+
+        $expected = '休日勤務申請 2026/08/22（注番 A-1／本社／振休 2026/08/24）';
+        foreach (OperationLog::where('subject_id', $holidayWork->id)->get() as $log) {
+            $this->assertStringContainsString($expected, (string) $log->description, "{$log->actionLabel()}に対象日と内容がありません。");
+        }
+
+        // 有給休暇: 粒度・午前午後・日数まで残す
+        $this->actingAs($this->applicant)->post(route('leave-requests.store'), [
+            'type' => 'paid_leave', 'approver_id' => $this->approver->id,
+            'start_date' => '2026-08-25', 'granularity' => 'half_day', 'half_day_period' => 'pm',
+        ]);
+        $paidLeave = LeaveRequest::where('type', 'paid_leave')->sole();
+
+        $this->assertStringContainsString(
+            '有給休暇 2026/08/25（半日／午後(PM)／0.5日）',
+            (string) OperationLog::where('subject_id', $paidLeave->id)->sole()->description
+        );
+
+        // 却下の理由も、何の申請かと並べて残す
+        $this->actingAs($this->approver)->put(route('leave-requests.decide', $paidLeave), [
+            'action' => 'reject', 'rejection_reason' => 'その日は手が足りない',
+        ]);
+        $rejected = OperationLog::where('subject_id', $paidLeave->id)
+            ->where('action', OperationLog::ACTION_LEAVE_REQUEST_REJECT)->sole();
+        $this->assertStringContainsString('有給休暇 2026/08/25', (string) $rejected->description);
+        $this->assertStringContainsString('却下理由: その日は手が足りない', (string) $rejected->description);
+    }
+
+    /** 代休申請は勤務時間と代休日、取消のログにも同じ一文が付く。 */
+    public function test_the_summary_is_also_kept_on_compensatory_and_cancellation_logs(): void
+    {
+        $leaveRequest = $this->approvedCompensatoryLeave();
+
+        $this->actingAs($this->applicant)->post(route('leave-requests.cancel.request', $leaveRequest), [
+            'cancel_reason' => '出社することになったため',
+        ]);
+
+        $log = OperationLog::where('subject_id', $leaveRequest->id)
+            ->where('action', OperationLog::ACTION_LEAVE_REQUEST_CANCEL_REQUEST)->sole();
+
+        $this->assertStringContainsString('代休申請 2026/08/22（勤務8時間／代休 2026/08/26）', (string) $log->description);
+        $this->assertStringContainsString('取消理由: 出社することになったため', (string) $log->description);
     }
 
     public function test_the_work_date_and_other_types_cannot_be_amended(): void

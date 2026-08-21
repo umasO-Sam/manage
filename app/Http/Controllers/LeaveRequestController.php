@@ -152,7 +152,9 @@ class LeaveRequestController extends Controller
             $target !== null ? OperationLog::ACTION_LEAVE_REQUEST_PROXY_CREATE : OperationLog::ACTION_LEAVE_REQUEST_CREATE,
             $leaveRequest,
             $leaveRequest->staff_id,
-            $target !== null ? Auth::user()->name.'が'.$target->name.'の分を代理申請' : null
+            $target !== null
+                ? $leaveRequest->logSummary().'／'.Auth::user()->name.'が'.$target->name.'の分を代理申請'
+                : $leaveRequest->logSummary()
         );
 
         $this->sendNotification(
@@ -381,7 +383,12 @@ class LeaveRequestController extends Controller
 
         $leaveRequest->update(['status' => LeaveRequest::STATUS_WITHDRAWN]);
 
-        OperationLog::record(OperationLog::ACTION_LEAVE_REQUEST_WITHDRAW, $leaveRequest, $leaveRequest->staff_id);
+        OperationLog::record(
+            OperationLog::ACTION_LEAVE_REQUEST_WITHDRAW,
+            $leaveRequest,
+            $leaveRequest->staff_id,
+            $leaveRequest->logSummary()
+        );
 
         return redirect()->route('leave-requests.index')->with('status', 'leave-request-withdrawn');
     }
@@ -450,7 +457,7 @@ class LeaveRequestController extends Controller
                 $approved ? OperationLog::ACTION_LEAVE_REQUEST_APPROVE : OperationLog::ACTION_LEAVE_REQUEST_REJECT,
                 $leaveRequest,
                 $leaveRequest->staff_id,
-                $approved ? null : $data['rejection_reason']
+                $leaveRequest->logSummary().($approved ? '' : '／却下理由: '.$data['rejection_reason'])
             );
         });
 
@@ -566,7 +573,7 @@ class LeaveRequestController extends Controller
                 $approved ? OperationLog::ACTION_LEAVE_REQUEST_ATTENDANCE_APPROVE : OperationLog::ACTION_LEAVE_REQUEST_ATTENDANCE_REJECT,
                 $leaveRequest,
                 $leaveRequest->staff_id,
-                $approved ? null : $data['rejection_reason']
+                $leaveRequest->logSummary().($approved ? '' : '／差し戻し理由: '.$data['rejection_reason'])
             );
         });
 
@@ -629,7 +636,8 @@ class LeaveRequestController extends Controller
                 OperationLog::record(
                     OperationLog::ACTION_LEAVE_REQUEST_APPROVE,
                     $leaveRequest,
-                    $leaveRequest->staff_id
+                    $leaveRequest->staff_id,
+                    $leaveRequest->logSummary()
                 );
             }
         });
@@ -689,7 +697,7 @@ class LeaveRequestController extends Controller
                 OperationLog::ACTION_LEAVE_REQUEST_AMEND_REQUEST,
                 $leaveRequest,
                 $leaveRequest->staff_id,
-                $summary.'／理由: '.$data['amend_reason']
+                $leaveRequest->logSummary().'／'.$summary.'／変更理由: '.$data['amend_reason']
             );
         });
 
@@ -779,7 +787,8 @@ class LeaveRequestController extends Controller
                 $approved ? OperationLog::ACTION_LEAVE_REQUEST_AMEND_APPROVE : OperationLog::ACTION_LEAVE_REQUEST_AMEND_REJECT,
                 $leaveRequest,
                 $leaveRequest->staff_id,
-                $approved ? $summary : $summary.'／差し戻し理由: '.$rejectionReason
+                $leaveRequest->logSummary().'／'.$summary
+                    .($approved ? '' : '／差し戻し理由: '.$rejectionReason)
             );
         });
 
@@ -837,7 +846,8 @@ class LeaveRequestController extends Controller
                 $approved ? OperationLog::ACTION_LEAVE_REQUEST_AMEND_REFLECT : OperationLog::ACTION_LEAVE_REQUEST_AMEND_SEND_BACK,
                 $leaveRequest,
                 $leaveRequest->staff_id,
-                $approved ? $summary : $summary.'／差し戻し理由: '.$rejectionReason
+                $leaveRequest->logSummary().'／'.$summary
+                    .($approved ? '' : '／差し戻し理由: '.$rejectionReason)
             );
         });
 
@@ -880,7 +890,7 @@ class LeaveRequestController extends Controller
                 OperationLog::ACTION_LEAVE_REQUEST_CANCEL_REQUEST,
                 $leaveRequest,
                 $leaveRequest->staff_id,
-                $data['cancel_reason']
+                $leaveRequest->logSummary().'／取消理由: '.$data['cancel_reason']
             );
         });
 
@@ -919,7 +929,7 @@ class LeaveRequestController extends Controller
                 $approved ? OperationLog::ACTION_LEAVE_REQUEST_CANCEL_APPROVE : OperationLog::ACTION_LEAVE_REQUEST_CANCEL_REJECT,
                 $leaveRequest,
                 $leaveRequest->staff_id,
-                $approved ? null : $data['cancel_rejection_reason']
+                $leaveRequest->logSummary().($approved ? '' : '／差し戻し理由: '.$data['cancel_rejection_reason'])
             );
         });
 
@@ -974,7 +984,7 @@ class LeaveRequestController extends Controller
                 $reflected ? OperationLog::ACTION_LEAVE_REQUEST_CANCEL_REFLECT : OperationLog::ACTION_LEAVE_REQUEST_CANCEL_SEND_BACK,
                 $leaveRequest,
                 $leaveRequest->staff_id,
-                $reflected ? null : $data['cancel_rejection_reason']
+                $leaveRequest->logSummary().($reflected ? '' : '／差し戻し理由: '.$data['cancel_rejection_reason'])
             );
         });
 

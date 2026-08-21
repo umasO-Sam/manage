@@ -240,7 +240,9 @@ class LeaveRequestProxyTest extends TestCase
 
         $log = OperationLog::where('action', OperationLog::ACTION_LEAVE_REQUEST_PROXY_CREATE)->first();
         $this->assertNotNull($log);
-        $this->assertSame('勤怠花子が対象太郎の分を代理申請', $log->description);
+        $this->assertStringContainsString('勤怠花子が対象太郎の分を代理申請', $log->description);
+        // 何の申請かも残す(対象日と内容)。
+        $this->assertStringContainsString('有給休暇 2026/08/20', $log->description);
         // 申請の持ち主は対象者。操作した人は勤怠管理者。
         $this->assertSame($target->id, $log->owner_staff_id);
         $this->assertSame($manager->id, $log->staff_id);
