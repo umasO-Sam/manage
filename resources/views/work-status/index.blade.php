@@ -96,6 +96,10 @@
                                                                 .$leaveRequest->typeLabel().'（'.$leaveRequest->statusLabel().'）',
                                                             default => $leaveRequest->typeLabel().'（'.$leaveRequest->statusLabel().'）',
                                                         };
+                                                        // 休出・振休・出勤・代休は2日で1組。相方の日付を続けて出す
+                                                        // (まとめた表示のときは、組を持つ休出側の日付を見る)。
+                                                        $pairedDate = ($base ?? $leaveRequest)->pairedDateNote($entry['role'] === 'combined' ? 'main' : $entry['role']);
+                                                        $title .= $pairedDate ? '／'.$pairedDate : '';
                                                         // 承認待ち(オレンジ)と承認済み(緑)は権限によらず全員に見せる。
                                                         // 誰がいつ休むかは全員が予定を立てるのに使うため。
                                                         // まとめた表示は2件とも承認済みのときだけ緑にする(片方が未決なら未確定)。
@@ -110,7 +114,7 @@
                                                     @if ($canOpen)
                                                         <a href="{{ route('leave-requests.show', $leaveRequest) }}"
                                                            class="block w-full text-sm leading-tight font-bold px-0.5 rounded-sm whitespace-nowrap hover:opacity-80 hover:underline {{ $chipClass }}"
-                                                           title="{{ $title }}／クリックで申請内容">{{ $label }}</a>
+                                                           title="{{ $title }}">{{ $label }}</a>
                                                     @else
                                                         <span class="block w-full text-sm leading-tight font-bold px-0.5 rounded-sm whitespace-nowrap {{ $chipClass }}"
                                                               title="{{ $title }}">{{ $label }}</span>

@@ -263,6 +263,30 @@ class LeaveRequest extends Model
     }
 
     /**
+     * 休出・振休・出勤・代休は必ず2日で1組になる。勤務状況一覧でその日にマウスを
+     * 乗せたとき、相方の日付を出すための表記(例: 休出のセルなら「振休2026/08/24」)。
+     *
+     * $role は勤務状況一覧でのその日の役割(main / substitute / compensatory)。
+     * 組にならない種別(有給休暇・在宅など)はnullを返す。
+     */
+    public function pairedDateNote(string $role): ?string
+    {
+        $format = fn (?\Illuminate\Support\Carbon $date) => $date?->format('Y/m/d');
+
+        return match (true) {
+            // 休出のセル。振替休日を取らない申請もあるため、その旨を出し分ける。
+            $role === 'main' && $this->type === 'holiday_work' => '振休'
+                .($format($this->substitute_holiday_date) ?? ($this->no_substitute_needed ? 'なし' : '未定')),
+            // 代休申請のstart_dateは実際に勤務した日(セルは「出勤」)。
+            $role === 'main' && $this->type === 'compensatory_leave' => '代休'
+                .($format($this->compensatory_date) ?? '未定'),
+            $role === 'substitute' => '休出'.$format($this->start_date),
+            $role === 'compensatory' => '出勤'.$format($this->start_date),
+            default => null,
+        };
+    }
+
+    /**
      * 同じ日に「在宅/休出」と「半日・2時間の有給休暇」が出ているとき、勤務状況一覧の
      * セルを1行に収めるための合成表記(在A半・出P2 など)。組み合わせられない場合はnull。
      *

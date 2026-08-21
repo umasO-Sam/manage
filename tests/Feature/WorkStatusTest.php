@@ -139,6 +139,44 @@ class WorkStatusTest extends TestCase
     }
 
     /**
+     * 休出・振休・出勤・代休は2日で1組。どちらの日にマウスを乗せても相方の日付が分かるようにする。
+     */
+    public function test_paired_days_show_each_others_date_on_hover(): void
+    {
+        $staff = Staff::factory()->create();
+        $approver = Staff::factory()->create(['is_supervisor' => true]);
+
+        // 休出(8/22)と振休(8/24)の組。
+        LeaveRequest::create([
+            'staff_id' => $staff->id, 'approver_id' => $approver->id, 'status' => 'approved',
+            'type' => 'holiday_work', 'start_date' => '2026-08-22', 'end_date' => '2026-08-22',
+            'order_no' => 'A-1', 'work_location' => '本社', 'substitute_holiday_date' => '2026-08-24',
+        ]);
+        // 出勤(8/25)と代休(8/26)の組。
+        LeaveRequest::create([
+            'staff_id' => $staff->id, 'approver_id' => $approver->id, 'status' => 'approved',
+            'type' => 'compensatory_leave', 'start_date' => '2026-08-25', 'end_date' => '2026-08-25',
+            'compensatory_date' => '2026-08-26',
+        ]);
+        // 振替休日を取らない休出。日付が無いことを言葉で出す。
+        LeaveRequest::create([
+            'staff_id' => $staff->id, 'approver_id' => $approver->id, 'status' => 'approved',
+            'type' => 'holiday_work', 'start_date' => '2026-08-29', 'end_date' => '2026-08-29',
+            'order_no' => 'A-2', 'work_location' => '本社', 'no_substitute_needed' => true,
+        ]);
+
+        $content = $this->actingAs($staff)->get(route('work-status.index'))->assertOk()->getContent();
+
+        $this->assertStringContainsString('休日勤務申請（承認済み）／振休2026/08/24', $content);
+        $this->assertStringContainsString('振替休日（承認済み）／休出2026/08/22', $content);
+        $this->assertStringContainsString('代休申請（承認済み）／代休2026/08/26', $content);
+        $this->assertStringContainsString('代休（承認済み）／出勤2026/08/25', $content);
+        $this->assertStringContainsString('休日勤務申請（承認済み）／振休なし', $content);
+        // 操作の説明は吹き出しに出さない。
+        $this->assertStringNotContainsString('クリックで申請内容', $content);
+    }
+
+    /**
      * まとめた表示は2件とも承認済みのときだけ緑にする(片方が未決なら未確定のため橙)。
      */
     public function test_a_combined_chip_stays_amber_until_both_requests_are_approved(): void
