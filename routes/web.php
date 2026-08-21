@@ -66,7 +66,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/leave-requests/proxy/create', [LeaveRequestController::class, 'createProxy'])
         ->middleware('attendance.manager')->name('leave-requests.proxy.create');
     Route::post('/leave-requests', [LeaveRequestController::class, 'store'])->name('leave-requests.store');
-    // 承認待ち一覧は経理資材担当・上長限定。個別の承認/却下(decide)は承認者本人に
+    // 承認待ち一覧は上長・勤怠管理者限定。個別の承認/却下(decide)は承認者本人に
     // 指定された社員であればPolicyで許可する(メール内リンクから詳細経由で操作できる)。
     Route::get('/leave-requests/approvals', [LeaveRequestController::class, 'approvals'])
         ->middleware('leave.approvals')->name('leave-requests.approvals');
@@ -84,11 +84,8 @@ Route::middleware('auth')->group(function () {
     Route::put('/leave-requests/{leaveRequest}/cancel-reflect', [LeaveRequestController::class, 'reflectCancel'])->name('leave-requests.cancel.reflect');
     Route::delete('/leave-requests/{leaveRequest}', [LeaveRequestController::class, 'withdraw'])->name('leave-requests.withdraw');
 
-    // 他の社員の勤怠・原価情報をまとめて見る画面は経理資材担当・上長限定。
-    // 作業日報確認(review)は人工データの確定を伴う経理資材担当の業務のため、
-    // このグループではなくprocurement.managerグループに置く。
-    // 作業日報一覧は作業日報確認と同じ範囲(日報管理者・上長・役員)。操作ログ・原価一覧は
-    // 賃金や原価に触れる別の画面なので、経理資材担当・上長のままにする。
+    // 作業日報一覧は作業日報確認と同じ範囲(日報管理者・上長・役員)。すぐ下の
+    // 操作ログ・原価一覧は賃金や原価に触れる別の画面なので、経理資材担当・上長のまま。
     Route::get('/daily-reports/list', [DailyReportListController::class, 'index'])
         ->middleware('daily.report.viewer')->name('daily-reports.list.index');
 
@@ -173,7 +170,7 @@ Route::middleware('auth')->group(function () {
     Route::put('/category-codes/{categoryCode}/item-name', [CategoryCodeController::class, 'updateItemName'])
         ->name('category-codes.item-name.update');
 
-    // 作業日報確認は経理資材担当・上長・役員・資金管理者が閲覧でき、
+    // 作業日報確認は日報管理者・上長・役員が閲覧でき、
     // 確認と差し戻しは日報管理者フラグを付けた人だけが行う。
     Route::get('/daily-reports/review', [DailyReportReviewController::class, 'index'])
         ->middleware('daily.report.viewer')->name('daily-reports.review.index');

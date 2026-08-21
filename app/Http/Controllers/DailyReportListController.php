@@ -20,7 +20,7 @@ use Illuminate\View\View;
  * 基準日は2週間(14日)単位で前後に動かせるほか、日付を直接指定して飛べる。
  * 右側には人別に、特別条項付き36協定の絶対上限に抵触しそうな兆候(当月の時間外労働・
  * うち休日労働・年度内の月45時間超の回数・複数月平均・取得済み有給)を並べる。
- * ルート側のsupervisor.or.managerミドルウェアにより経理資材担当・上長のみがアクセスできる。
+ * ルート側のdaily.report.viewerミドルウェアにより日報管理者・上長・役員のみがアクセスできる。
  */
 class DailyReportListController extends Controller
 {
