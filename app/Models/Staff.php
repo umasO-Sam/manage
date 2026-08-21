@@ -209,6 +209,19 @@ class Staff extends Authenticatable
     }
 
     /**
+     * 作業日報の「選択中」に出す分類の説明(category_codes.item_name)を書き換えられるか
+     * (日報管理者・勤怠管理者・役員・資金管理者・administrator)。
+     * 全員に見える共通の表記を直す操作なので、日報と勤怠の運用を持つ人に限る。
+     */
+    public function canEditCategoryItemName(): bool
+    {
+        return $this->canReviewDailyReports()
+            || $this->canManageAttendance()
+            || (bool) $this->is_executive
+            || (bool) $this->is_fund_manager;
+    }
+
+    /**
      * 他人の休暇・休出申請の詳細を開けるか(上長・勤怠管理者・役員・資金管理者・administrator)。
      * 勤務状況一覧のセルから中身を確かめるための閲覧で、承認や取消の可否は各policyが別に見る。
      * 経理資材担当は含めない(勤怠の決裁には関わらないため)。

@@ -21,6 +21,7 @@
                 'leave_type' => $e->leave_type,
             ])) }},
             categories: {{ \Illuminate\Support\Js::from($categories) }},
+            itemNameUrl: {{ \Illuminate\Support\Js::from(route('category-codes.item-name.update', ['categoryCode' => '__ID__'])) }},
             orderNoOptionalCodes: {{ \Illuminate\Support\Js::from($orderNoOptionalCodes) }},
             orderNumbers: {{ \Illuminate\Support\Js::from($orderNumbers) }},
             hiddenOrderNumbers: {{ \Illuminate\Support\Js::from($hiddenOrderNumbers) }},
@@ -205,13 +206,35 @@
                                class="w-full border rounded-lg p-2 border-slate-300 text-sm">
                     </div>
 
-                    <div class="p-2.5 rounded-lg bg-slate-50 border border-slate-200 text-xs">
-                        <span class="text-slate-400">選択中：</span>
-                        <span class="font-bold text-slate-800" x-text="selectionSummary()"></span>
-                        <span class="block text-slate-500 mt-0.5" x-show="selectionItemName()" x-text="selectionItemName()"></span>
-                        <span class="block text-amber-600 font-bold mt-0.5"
-                              x-show="selection.type === 'category' && selection.categoryId !== null && categoryRequiresOrderNo(selection.categoryId) && ! selection.orderNo"
-                              x-cloak>この分類は注番を選択しないと反映できません。</span>
+                    <div class="p-2.5 rounded-lg bg-slate-50 border border-slate-200 text-xs flex items-start justify-between gap-2">
+                        <div class="min-w-0">
+                            <span class="text-slate-400">選択中：</span>
+                            <span class="font-bold text-slate-800" x-text="selectionSummary()"></span>
+                            <span class="block text-slate-500 mt-0.5" x-show="selectionItemName() && ! editingItemName" x-text="selectionItemName()"></span>
+                            {{-- 説明の書き換え。全員に見える表記なので、保存前に必ず確認を出す。 --}}
+                            <div class="mt-1 flex items-center gap-2" x-show="editingItemName" x-cloak>
+                                <input type="text" x-model="itemNameDraft" maxlength="255"
+                                       placeholder="例）切出・製缶・塗装・部品製作"
+                                       class="w-72 max-w-full border rounded-lg p-1.5 border-slate-300 text-xs">
+                                <button type="button" @click="saveItemName()" :disabled="savingItemName"
+                                        class="text-xs font-bold px-3 py-1.5 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-40">保存</button>
+                                <button type="button" @click="cancelItemNameEdit()"
+                                        class="text-xs font-bold px-3 py-1.5 rounded-lg border border-slate-300 text-slate-600 hover:bg-white">取消</button>
+                            </div>
+                            <span class="block text-amber-600 font-bold mt-0.5"
+                                  x-show="selection.type === 'category' && selection.categoryId !== null && categoryRequiresOrderNo(selection.categoryId) && ! selection.orderNo"
+                                  x-cloak>この分類は注番を選択しないと反映できません。</span>
+                        </div>
+                        @if ($canEditCategoryItemName)
+                            <button type="button" @click="startItemNameEdit()"
+                                    x-show="! editingItemName && selection.type === 'category' && selection.categoryId !== null"
+                                    x-cloak
+                                    class="shrink-0 inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1.5 rounded-lg border border-slate-300 text-slate-600 bg-white hover:bg-slate-50"
+                                    title="この分類の説明を編集する（全員の画面に出ます）">
+                                <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
+                                <span>説明を編集</span>
+                            </button>
+                        @endif
                     </div>
                 </div>
 
@@ -468,6 +491,11 @@
             Alpine.data('dailyReportForm', (config) => ({
                 workDate: config.workDate,
                 categories: config.categories,
+                // 分類の説明を書き換えるための送信先(__IDを差し替えて使う)と編集状態。
+                itemNameUrl: config.itemNameUrl,
+                editingItemName: false,
+                itemNameDraft: '',
+                savingItemName: false,
                 orderNoOptionalCodes: config.orderNoOptionalCodes,
                 orderNumbers: config.orderNumbers,
                 // プルダウンから外した注番。「非表示の注番も表示する」を押したときだけ選択肢に足す。
@@ -861,6 +889,48 @@
                 selectionItemName() {
                     if (this.selection.type !== 'category' || this.selection.categoryId === null) return '';
                     return this.categoryItemName(this.selection.categoryId);
+                },
+
+                // 分類の説明(選択中の下に出る内訳)の書き換え。日報の入力途中に押せる場所に
+                // あるため、画面は再読み込みせずその場で送って手元の値も差し替える。
+                startItemNameEdit() {
+                    this.itemNameDraft = this.selectionItemName();
+                    this.editingItemName = true;
+                },
+
+                cancelItemNameEdit() {
+                    this.editingItemName = false;
+                    this.itemNameDraft = '';
+                },
+
+                async saveItemName() {
+                    if (this.savingItemName) return;
+                    if (! window.confirm('全員に表示される内容が変更されます。いいですか。')) return;
+
+                    this.savingItemName = true;
+                    try {
+                        const response = await fetch(this.itemNameUrl.replace('__ID__', this.selection.categoryId), {
+                            method: 'PUT',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json',
+                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                            },
+                            body: JSON.stringify({ item_name: this.itemNameDraft }),
+                        });
+
+                        if (! response.ok) {
+                            window.alert('保存できませんでした。権限をご確認のうえ、時間をおいて試してください。');
+                            return;
+                        }
+
+                        const saved = await response.json();
+                        const category = this.categories.find((c) => c.id === this.selection.categoryId);
+                        if (category) category.itemName = saved.item_name ?? '';
+                        this.cancelItemNameEdit();
+                    } finally {
+                        this.savingItemName = false;
+                    }
                 },
 
                 entryLabel(entry) {

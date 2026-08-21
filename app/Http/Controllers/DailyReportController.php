@@ -88,6 +88,8 @@ class DailyReportController extends Controller
             'prevDate' => Carbon::parse($workDate)->subDay()->format('Y-m-d'),
             'nextDate' => Carbon::parse($workDate)->addDay()->format('Y-m-d'),
             'categories' => $categories,
+            // 分類の説明(選択中の下に出る内訳)を直せるか。全員に出る表記のため対象を絞る。
+            'canEditCategoryItemName' => Auth::user()->canEditCategoryItemName(),
             // 注番を選ばなくても反映できる分類。保存時の判定(store)と同じ定義を使う。
             'orderNoOptionalCodes' => CategoryCode::ORDER_NO_OPTIONAL_CODES,
             'orderNumbers' => $orderNumbers,

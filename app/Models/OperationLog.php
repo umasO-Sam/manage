@@ -58,6 +58,9 @@ class OperationLog extends Model
     /** 物件カードの削除(間違って登録したカードの取り消し)。レコードごと消すため記録を残す。 */
     public const ACTION_PROJECT_CARD_DELETE = 'project_card_delete';
 
+    /** 分類の説明(作業日報の「選択中」に出す内訳)の変更。全員の画面に出るため記録を残す。 */
+    public const ACTION_CATEGORY_ITEM_NAME_UPDATE = 'category_item_name_update';
+
     /** @var array<string, string> action値 => 表示名 */
     public const ACTIONS = [
         self::ACTION_PROJECT_CARD_DELETE => '物件カードを削除',
@@ -80,6 +83,7 @@ class OperationLog extends Model
         self::ACTION_LEAVE_REQUEST_ATTENDANCE_REJECT => '休日勤務を差し戻し（勤怠管理者）',
         self::ACTION_LABOR_RECORD_UPDATE => '人工レコードを修正',
         self::ACTION_LABOR_RECORD_DELETE => '人工レコードを削除',
+        self::ACTION_CATEGORY_ITEM_NAME_UPDATE => '分類の説明を変更',
     ];
 
     public function staff(): BelongsTo

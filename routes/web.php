@@ -4,6 +4,7 @@ use App\Http\Controllers\ArchiveController;
 use App\Http\Controllers\BusinessPartnerController;
 use App\Http\Controllers\CardCommentController;
 use App\Http\Controllers\CardController;
+use App\Http\Controllers\CategoryCodeController;
 use App\Http\Controllers\CostAnalysisController;
 use App\Http\Controllers\CostReportController;
 use App\Http\Controllers\DailyReportController;
@@ -162,6 +163,11 @@ Route::middleware('auth')->group(function () {
         Route::post('/staff/bulk-update', [StaffController::class, 'bulkUpdate'])->name('staff.bulk-update');
         Route::delete('/staff/{staff}', [StaffController::class, 'destroy'])->name('staff.destroy');
     });
+
+    // 分類の説明(作業日報の「選択中」に出す内訳)の変更。全員に出る共通の表記のため、
+    // 日報管理者・勤怠管理者・役員・資金管理者・administratorだけが直せる(判定はコントローラ)。
+    Route::put('/category-codes/{categoryCode}/item-name', [CategoryCodeController::class, 'updateItemName'])
+        ->name('category-codes.item-name.update');
 
     // 作業日報確認は経理資材担当・上長・役員・資金管理者が閲覧でき、
     // 確認と差し戻しは日報管理者フラグを付けた人だけが行う。
