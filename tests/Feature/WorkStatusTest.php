@@ -65,10 +65,9 @@ class WorkStatusTest extends TestCase
 
         $content = $this->actingAs($staff)->get(route('work-status.index'))->assertOk()->getContent();
 
-        // セルは短縮表記、マウスを乗せたときは正式名称と決裁の状態を出す。
+        // セルは短縮表記、マウスを乗せたときは正式名称を出す(決裁の状態は色で分かるため書かない)。
         $this->assertStringContainsString('>1日休</span>', $content);
-        $this->assertStringContainsString('有給休暇（承認待ち）', $content);
-        $this->assertStringContainsString('有給休暇（承認済み）', $content);
+        $this->assertStringContainsString('title="有給休暇"', $content);
         $this->assertStringContainsString('bg-amber-500 text-white', $content);
         $this->assertStringContainsString('bg-emerald-500 text-white', $content);
         // 権限で色分けを止めていた頃の灰色のバッジは使わない。
@@ -89,7 +88,7 @@ class WorkStatusTest extends TestCase
         $response = $this->actingAs($supervisor)->get(route('work-status.index'));
 
         $response->assertOk();
-        $response->assertSee('有給休暇（承認済み）');
+        $response->assertSee('title="有給休暇"', false);
     }
 
     /**
@@ -130,7 +129,7 @@ class WorkStatusTest extends TestCase
 
         $this->assertStringContainsString('>在A半</a>', $content);
         $this->assertStringContainsString('>出P2</a>', $content);
-        $this->assertStringContainsString('テレワーク申請（承認済み）＋有給休暇（承認済み）', $content);
+        $this->assertStringContainsString('テレワーク申請＋有給休暇', $content);
         // まとめた分は在宅・休出の単独表示を残さない。
         $this->assertStringNotContainsString('>休出</a>', $content);
         // 1日有休と在宅はまとめずに両方出す。
@@ -167,11 +166,11 @@ class WorkStatusTest extends TestCase
 
         $content = $this->actingAs($staff)->get(route('work-status.index'))->assertOk()->getContent();
 
-        $this->assertStringContainsString('休日勤務申請（承認済み）／振休2026/08/24', $content);
-        $this->assertStringContainsString('振替休日（承認済み）／休出2026/08/22', $content);
-        $this->assertStringContainsString('代休申請（承認済み）／代休2026/08/26', $content);
-        $this->assertStringContainsString('代休（承認済み）／出勤2026/08/25', $content);
-        $this->assertStringContainsString('休日勤務申請（承認済み）／振休なし', $content);
+        $this->assertStringContainsString('休日勤務申請／振休2026/08/24', $content);
+        $this->assertStringContainsString('振替休日／休出2026/08/22', $content);
+        $this->assertStringContainsString('代休申請／代休2026/08/26', $content);
+        $this->assertStringContainsString('代休／出勤2026/08/25', $content);
+        $this->assertStringContainsString('休日勤務申請／振休なし', $content);
         // 操作の説明は吹き出しに出さない。
         $this->assertStringNotContainsString('クリックで申請内容', $content);
     }

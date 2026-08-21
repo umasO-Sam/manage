@@ -88,13 +88,13 @@
                                                             'combined' => $entry['label'],
                                                             default => $leaveRequest->shortLabel(),
                                                         };
-                                                        // セルは短縮表記しか出せないので、マウスを乗せたときは正式名称と決裁の状態を出す。
+                                                        // セルは短縮表記しか出せないので、マウスを乗せたときは正式名称を出す。
+                                                        // 決裁の状態は色(橙=承認待ち・緑=承認済み)で分かるため、吹き出しには書かない。
                                                         $title = match ($entry['role']) {
-                                                            'substitute' => '振替休日（'.$leaveRequest->statusLabel().'）',
-                                                            'compensatory' => '代休（'.$leaveRequest->statusLabel().'）',
-                                                            'combined' => $base->typeLabel().'（'.$base->statusLabel().'）＋'
-                                                                .$leaveRequest->typeLabel().'（'.$leaveRequest->statusLabel().'）',
-                                                            default => $leaveRequest->typeLabel().'（'.$leaveRequest->statusLabel().'）',
+                                                            'substitute' => '振替休日',
+                                                            'compensatory' => '代休',
+                                                            'combined' => $base->typeLabel().'＋'.$leaveRequest->typeLabel(),
+                                                            default => $leaveRequest->typeLabel(),
                                                         };
                                                         // 休出・振休・出勤・代休は2日で1組。相方の日付を続けて出す
                                                         // (まとめた表示のときは、組を持つ休出側の日付を見る)。
