@@ -157,6 +157,64 @@ class OperationLogTest extends TestCase
         $response->assertSee('担当者B');
     }
 
+    /**
+     * 操作の種類と備考で絞り込める。備考には対象日と申請内容が入っているので、
+     * 「休日勤務の日付」を打てばその申請の行だけを出せる。
+     */
+    public function test_the_list_can_be_filtered_by_action_and_by_the_description(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+        $staff = Staff::factory()->create(['name' => '担当者A']);
+
+        $log = fn (string $action, string $description) => OperationLog::create([
+            'staff_id' => $staff->id, 'owner_staff_id' => $staff->id,
+            'action' => $action, 'description' => $description,
+        ]);
+
+        $log(OperationLog::ACTION_LEAVE_REQUEST_CREATE, '休日勤務申請 2026/09/12（注番 A-1／本社／振休 2026/09/16）');
+        $log(OperationLog::ACTION_LEAVE_REQUEST_AMEND_REQUEST, '休日勤務申請 2026/09/12（注番 A-1／本社／振休 2026/09/16）／振替休日 2026/09/16 → 2026/09/24／変更理由: 都合');
+        $log(OperationLog::ACTION_LEAVE_REQUEST_AMEND_REFLECT, '休日勤務申請 2026/09/12（注番 A-1／本社／振休 2026/09/16）／振替休日 2026/09/16 → 2026/09/24');
+        $log(OperationLog::ACTION_LEAVE_REQUEST_CREATE, '有給休暇 2026/10/01（終日／1日）');
+
+        // 操作で絞る（変更を申請だけ）
+        $this->actingAs($manager)->get(route('operation-logs.index', ['action' => OperationLog::ACTION_LEAVE_REQUEST_AMEND_REQUEST]))
+            ->assertOk()
+            ->assertSee('変更理由: 都合')
+            ->assertDontSee('有給休暇 2026/10/01');
+
+        // 操作で絞る（変更を反映だけ）
+        $this->actingAs($manager)->get(route('operation-logs.index', ['action' => OperationLog::ACTION_LEAVE_REQUEST_AMEND_REFLECT]))
+            ->assertOk()
+            ->assertSee('変更を反映（勤怠管理者）')
+            ->assertDontSee('変更理由: 都合');
+
+        // 備考で絞る（休日勤務の日付）
+        $response = $this->actingAs($manager)->get(route('operation-logs.index', ['q' => '2026/09/12']))->assertOk();
+        $response->assertSee('休日勤務申請 2026/09/12', false);
+        $response->assertDontSee('有給休暇 2026/10/01');
+
+        // 操作と備考の併用
+        $this->actingAs($manager)->get(route('operation-logs.index', [
+            'action' => OperationLog::ACTION_LEAVE_REQUEST_AMEND_REFLECT, 'q' => '2026/10/01',
+        ]))->assertOk()->assertSee('条件に合う操作ログがありません。');
+
+        // 絞り込みを外せば全部出る
+        $this->actingAs($manager)->get(route('operation-logs.index'))
+            ->assertOk()
+            ->assertSee('有給休暇 2026/10/01');
+    }
+
+    /** 物件管理側のログは選択肢にも出さない。 */
+    public function test_the_action_filter_does_not_offer_project_actions(): void
+    {
+        $manager = Staff::factory()->procurementManager()->create();
+
+        $this->actingAs($manager)->get(route('operation-logs.index'))
+            ->assertOk()
+            ->assertSee('変更を申請')
+            ->assertDontSee('物件カードを削除');
+    }
+
     public function test_supervisor_sees_logs_of_all_staff(): void
     {
         $staffA = Staff::factory()->create(['name' => '担当者A', 'is_supervisor' => true]);

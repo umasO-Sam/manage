@@ -17,13 +17,29 @@ class OperationLogController extends Controller
 {
     public function index(Request $request): View
     {
-        $query = OperationLog::with(['staff', 'owner'])
+        $action = (string) $request->query('action', '');
+        $keyword = trim((string) $request->query('q', ''));
+
+        // 選べる操作は、この画面に出る種類だけにする(物件管理側のものは並べない)。
+        $actions = collect(OperationLog::ACTIONS)
+            ->except(OperationLog::PROJECT_ACTIONS)
+            ->all();
+
+        $logs = OperationLog::with(['staff', 'owner'])
             ->whereNotIn('action', OperationLog::PROJECT_ACTIONS)
-            ->orderByDesc('created_at');
+            ->when(array_key_exists($action, $actions), fn ($q) => $q->where('action', $action))
+            // 備考には「休日勤務申請 2026/09/12（注番 A-1／本社／振休 2026/09/16）」のように
+            // 対象日と申請内容が入っている。日付や注番をそのまま打って探せるようにする。
+            ->when($keyword !== '', fn ($q) => $q->where('description', 'like', "%{$keyword}%"))
+            ->orderByDesc('created_at')
+            ->paginate(50)
+            ->withQueryString();
 
         return view('operation-logs.index', [
-            'logs' => $query->paginate(50)->withQueryString(),
+            'logs' => $logs,
             'isPrivileged' => true,
+            'actions' => $actions,
+            'filters' => ['action' => array_key_exists($action, $actions) ? $action : '', 'q' => $keyword],
         ]);
     }
 }
