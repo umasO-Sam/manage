@@ -24,6 +24,8 @@
                         // ＩＤ管理は権限付与のために役員・資金管理者も使う。
                         $canManageStaff = $viewer->canManageStaff();
                         $isSupervisorOrManager = $viewer->isSupervisorOrManager();
+                        // 作業日報一覧は日報管理者にも出す(操作ログ・原価一覧は出さない)。
+                        $canViewDailyReportList = $viewer->canViewDailyReportList();
                         // 作業日報確認は経理資材担当・上長・役員・資金管理者が閲覧でき、
                         // 確認と差し戻し(と未確認バッジ)は日報管理者フラグを付けた人だけ。
                         $canViewDailyReportReviews = $viewer->canViewDailyReportReviews();
@@ -194,7 +196,7 @@
                                     @endif
                                 </x-dropdown-link>
                             @endif
-                            @if ($isSupervisorOrManager)
+                            @if ($canViewDailyReportList)
                                 <x-dropdown-link :href="route('daily-reports.list.index')">
                                     <i data-lucide="list-checks" class="w-3.5 h-3.5 inline-block align-text-bottom mr-1"></i> 作業日報一覧
                                 </x-dropdown-link>
@@ -480,7 +482,7 @@
                     @endif
                 </a>
             @endif
-            @if ($isSupervisorOrManager)
+            @if ($canViewDailyReportList)
                 <a href="{{ route('daily-reports.list.index') }}" class="block px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap {{ request()->routeIs('daily-reports.list.*') ? 'bg-slate-200 text-slate-800' : 'text-slate-600' }}">
                     作業日報一覧
                 </a>

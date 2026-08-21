@@ -81,6 +81,27 @@ class DailyReportReviewerFlagTest extends TestCase
         $this->assertFalse(LaborCost::where('daily_report_id', $report->id)->first()->is_provisional);
     }
 
+    /**
+     * 作業日報一覧も日報管理者に見せる(2026-08-21)。確認の前後関係を追うために使う。
+     * 同じ立ち位置にある操作ログ・原価一覧は賃金や原価に触れるため広げない。
+     */
+    public function test_the_reviewer_flag_also_opens_the_daily_report_list(): void
+    {
+        $reviewer = Staff::factory()->create(['is_daily_report_reviewer' => true]);
+
+        $this->actingAs($reviewer)->get(route('daily-reports.list.index'))->assertOk();
+        // メニューからも辿れること。
+        $this->actingAs($reviewer)->get(route('my-calendar.show'))
+            ->assertOk()->assertSee(route('daily-reports.list.index'), false);
+
+        // 操作ログ・原価一覧までは開けない。
+        $this->actingAs($reviewer)->get(route('operation-logs.index'))->assertForbidden();
+        $this->actingAs($reviewer)->get(route('purchasing.cost-report.index'))->assertForbidden();
+
+        // フラグが無ければ従来どおり開けない。
+        $this->actingAs(Staff::factory()->create())->get(route('daily-reports.list.index'))->assertForbidden();
+    }
+
     public function test_only_a_flagged_reviewer_can_confirm_or_reject(): void
     {
         [$report] = $this->pendingReport();

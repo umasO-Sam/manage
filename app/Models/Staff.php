@@ -151,6 +151,16 @@ class Staff extends Authenticatable
     }
 
     /**
+     * 作業日報一覧(誰が出した/確認されたかの一覧)を開けるかどうか。
+     * 経理資材担当・上長・資金管理者・administratorに加え、日報管理者(2026-08-21)。
+     * 同じ立ち位置の操作ログ・原価一覧は賃金や原価に触れるため広げていない。
+     */
+    public function canViewDailyReportList(): bool
+    {
+        return $this->isSupervisorOrManager() || $this->canReviewDailyReports();
+    }
+
+    /**
      * 作業日報確認の画面を開けるかどうか
      * (経理資材担当・上長・役員・資金管理者・administrator、および日報管理者)。
      * 提出された日報の内容と確認済/未確認は見られるが、確定・差し戻しは日報管理者だけが行う。

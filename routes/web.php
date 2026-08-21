@@ -87,8 +87,12 @@ Route::middleware('auth')->group(function () {
     // 他の社員の勤怠・原価情報をまとめて見る画面は経理資材担当・上長限定。
     // 作業日報確認(review)は人工データの確定を伴う経理資材担当の業務のため、
     // このグループではなくprocurement.managerグループに置く。
+    // 作業日報一覧は日報管理者も開ける(確認の前後関係を追うため)。操作ログ・原価一覧は
+    // 賃金や原価に触れるので、経理資材担当・上長のままにする。
+    Route::get('/daily-reports/list', [DailyReportListController::class, 'index'])
+        ->middleware('daily.report.list')->name('daily-reports.list.index');
+
     Route::middleware('supervisor.or.manager')->group(function () {
-        Route::get('/daily-reports/list', [DailyReportListController::class, 'index'])->name('daily-reports.list.index');
         Route::get('/operation-logs', [OperationLogController::class, 'index'])->name('operation-logs.index');
         Route::get('/purchasing/cost-report', [CostReportController::class, 'index'])->name('purchasing.cost-report.index');
         Route::get('/purchasing/cost-report/results', [CostReportController::class, 'results'])->name('purchasing.cost-report.results');
