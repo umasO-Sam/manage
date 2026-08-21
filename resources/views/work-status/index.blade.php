@@ -8,6 +8,14 @@
 
     {{-- プロジェクタ投影で遠くからも読めるよう表の文字を大きくする。代わりに表以外(操作欄・凡例)は
          すべて表の下へ回し、画面の上端から表が始まるようにして1画面に入る行数を稼ぐ。 --}}
+    @php
+        // 申請の中身を開けるのは本人と、上長・勤怠管理者・役員・資金管理者・administrator。
+        // 参照ユーザは詳細画面そのものが403のため、自分の分でもリンクにしない。
+        $viewer = Auth::user();
+        $canOpenOthers = ! $viewer->isReferenceViewer() && $viewer->canViewOthersLeaveRequests();
+        $canOpenOwn = ! $viewer->isReferenceViewer();
+    @endphp
+
     <div class="py-4">
         <div class="max-w-full mx-auto sm:px-6 lg:px-8 space-y-3">
 
@@ -73,26 +81,40 @@
                                                 @foreach ($entries as $entry)
                                                     @php
                                                         $leaveRequest = $entry['request'];
+                                                        $base = $entry['base'] ?? null;
                                                         $label = match ($entry['role']) {
                                                             'substitute' => '振休',
                                                             'compensatory' => '代休',
+                                                            'combined' => $entry['label'],
                                                             default => $leaveRequest->shortLabel(),
                                                         };
-                                                        // セルは短縮表記しか出せないので、マウスを乗せたときは正式名称を出す。
-                                                        $fullLabel = match ($entry['role']) {
-                                                            'substitute' => '振替休日',
-                                                            'compensatory' => '代休',
-                                                            default => $leaveRequest->typeLabel(),
+                                                        // セルは短縮表記しか出せないので、マウスを乗せたときは正式名称と決裁の状態を出す。
+                                                        $title = match ($entry['role']) {
+                                                            'substitute' => '振替休日（'.$leaveRequest->statusLabel().'）',
+                                                            'compensatory' => '代休（'.$leaveRequest->statusLabel().'）',
+                                                            'combined' => $base->typeLabel().'（'.$base->statusLabel().'）＋'
+                                                                .$leaveRequest->typeLabel().'（'.$leaveRequest->statusLabel().'）',
+                                                            default => $leaveRequest->typeLabel().'（'.$leaveRequest->statusLabel().'）',
                                                         };
                                                         // 承認待ち(オレンジ)と承認済み(緑)は権限によらず全員に見せる。
                                                         // 誰がいつ休むかは全員が予定を立てるのに使うため。
-                                                        $chipClass = $leaveRequest->isApproved()
+                                                        // まとめた表示は2件とも承認済みのときだけ緑にする(片方が未決なら未確定)。
+                                                        $approved = $leaveRequest->isApproved() && (! $base || $base->isApproved());
+                                                        $chipClass = $approved
                                                             ? 'bg-emerald-500 text-white'
                                                             : 'bg-amber-500 text-white';
+                                                        // まとめた分のリンク先は有給休暇の申請(日数の消費に関わる側)。
+                                                        $canOpen = $leaveRequest->staff_id === $viewer->id ? $canOpenOwn : $canOpenOthers;
                                                     @endphp
                                                     {{-- 表記は全角3文字(46px)までに収める。text-smで4文字だと60pxになり列からはみ出す。 --}}
-                                                    <span class="block w-full text-sm leading-tight font-bold px-0.5 rounded-sm whitespace-nowrap {{ $chipClass }}"
-                                                          title="{{ $fullLabel }}（{{ $leaveRequest->statusLabel() }}）">{{ $label }}</span>
+                                                    @if ($canOpen)
+                                                        <a href="{{ route('leave-requests.show', $leaveRequest) }}"
+                                                           class="block w-full text-sm leading-tight font-bold px-0.5 rounded-sm whitespace-nowrap hover:opacity-80 hover:underline {{ $chipClass }}"
+                                                           title="{{ $title }}／クリックで申請内容">{{ $label }}</a>
+                                                    @else
+                                                        <span class="block w-full text-sm leading-tight font-bold px-0.5 rounded-sm whitespace-nowrap {{ $chipClass }}"
+                                                              title="{{ $title }}">{{ $label }}</span>
+                                                    @endif
                                                 @endforeach
                                             </div>
                                         </td>
@@ -133,6 +155,11 @@
                 <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded bg-pink-50 border border-pink-100 inline-block"></span>土日・祝日・会社休日</span>
                 {{-- セルは短縮表記のため、ここで全部の読み方を出す(マウスを乗せれば正式名称も出る)。 --}}
                 <span class="text-slate-400">1日休・AM半・PM半・AM2H・PM2H=有給休暇／在宅=テレワーク／休出=休日勤務／振休=振替休日／代休=代休（出勤=代休の元になった勤務日）／慶弔・忌引=慶弔休暇／特休有・特休無=特別休暇（有給・無給）／裁判員=裁判員休暇／ボラ=ボランティア休暇／積立有=積立有給休暇</span>
+                {{-- まとめ表示とクリックの説明。表の中には書ききれないのでここに置く。 --}}
+                <span class="text-slate-400">在A半・出P2 などは同じ日の在宅・休出と半休・2時間有休をまとめた表示（在=在宅／出=休出、A=午前／P=午後、半=半休／2=2時間）</span>
+                @if ($canOpenOwn)
+                    <span class="text-slate-400">表示をクリックすると申請内容を開けます（{{ $canOpenOthers ? '他の人の分も開けます' : '開けるのは自分の分だけです' }}）</span>
+                @endif
             </div>
         </div>
     </div>

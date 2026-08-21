@@ -205,6 +205,18 @@ class Staff extends Authenticatable
     }
 
     /**
+     * 他人の休暇・休出申請の詳細を開けるか(上長・勤怠管理者・役員・資金管理者・administrator)。
+     * 勤務状況一覧のセルから中身を確かめるための閲覧で、承認や取消の可否は各policyが別に見る。
+     * 経理資材担当は含めない(勤怠の決裁には関わらないため)。
+     */
+    public function canViewOthersLeaveRequests(): bool
+    {
+        return (bool) $this->is_supervisor
+            || $this->canManageAttendance()
+            || $this->hasElevatedFlag();
+    }
+
+    /**
      * 他の社員の勤怠・原価情報をまとめて閲覧できる立場かどうか(経理資材担当・上長)。
      * 作業日報確認・作業日報一覧・操作ログ・原価一覧・申請承認一覧の表示可否に使う。
      */

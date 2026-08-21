@@ -263,6 +263,42 @@ class LeaveRequest extends Model
     }
 
     /**
+     * 同じ日に「在宅/休出」と「半日・2時間の有給休暇」が出ているとき、勤務状況一覧の
+     * セルを1行に収めるための合成表記(在A半・出P2 など)。組み合わせられない場合はnull。
+     *
+     * 在宅・休出は1日の枠を決める申請、半休・2時間有休はその中の一部を休む申請なので、
+     * 同じ日に並んでも矛盾しない。1日有休など終日休む申請とは重ねない(矛盾するため
+     * まとめずに2行のまま出し、おかしいことが見えるようにする)。
+     */
+    public static function combinedShortLabel(self $base, self $paidLeave): ?string
+    {
+        $prefix = match ($base->type) {
+            'telework' => '在',
+            'holiday_work' => '出',
+            default => null,
+        };
+
+        $period = match ($paidLeave->half_day_period) {
+            'am' => 'A',
+            'pm' => 'P',
+            // 午前/午後を持たない古い申請は、どちらを休むか書けないのでまとめない。
+            default => null,
+        };
+
+        $unit = match ($paidLeave->granularity) {
+            'half_day' => '半',
+            'hours' => '2',
+            default => null,
+        };
+
+        if ($prefix === null || $period === null || $unit === null || $paidLeave->type !== 'paid_leave') {
+            return null;
+        }
+
+        return $prefix.$period.$unit;
+    }
+
+    /**
      * start_date〜end_dateが終日休みになるか（＝その日は作業日報が不要）。
      *
      * 半日・2時間の有給休暇は残りの時間を勤務するため日報が必要で、falseを返す。

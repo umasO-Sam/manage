@@ -92,6 +92,118 @@ class WorkStatusTest extends TestCase
         $response->assertSee('有給休暇（承認済み）');
     }
 
+    /**
+     * 同じ日の在宅・休出と半日/2時間の有給休暇は1つにまとめて出す(行を増やさないため)。
+     */
+    public function test_same_day_telework_or_holiday_work_is_combined_with_a_partial_paid_leave(): void
+    {
+        $staff = Staff::factory()->create(['name' => '合成太郎']);
+        $approver = Staff::factory()->create(['is_supervisor' => true]);
+
+        $make = fn (array $overrides) => LeaveRequest::create([
+            'staff_id' => $staff->id, 'approver_id' => $approver->id, 'status' => 'approved', ...$overrides,
+        ]);
+
+        // 在宅＋AM半休 → 在A半
+        $make(['type' => 'telework', 'start_date' => '2026-08-12', 'end_date' => '2026-08-12']);
+        $make([
+            'type' => 'paid_leave', 'start_date' => '2026-08-12', 'end_date' => '2026-08-12',
+            'granularity' => 'half_day', 'half_day_period' => 'am', 'day_count' => 0.5,
+        ]);
+        // 休出＋PM2H有休 → 出P2
+        $make([
+            'type' => 'holiday_work', 'start_date' => '2026-08-13', 'end_date' => '2026-08-13',
+            'order_no' => 'A-1', 'work_location' => '本社', 'no_substitute_needed' => true,
+        ]);
+        $make([
+            'type' => 'paid_leave', 'start_date' => '2026-08-13', 'end_date' => '2026-08-13',
+            'granularity' => 'hours', 'half_day_period' => 'pm', 'hours' => 2, 'day_count' => 0.25,
+        ]);
+        // 在宅＋1日有休は矛盾するのでまとめず、2つのまま出す。
+        $make(['type' => 'telework', 'start_date' => '2026-08-14', 'end_date' => '2026-08-14']);
+        $make([
+            'type' => 'paid_leave', 'start_date' => '2026-08-14', 'end_date' => '2026-08-14',
+            'granularity' => 'full_day', 'day_count' => 1.0,
+        ]);
+
+        $content = $this->actingAs($staff)->get(route('work-status.index'))->assertOk()->getContent();
+
+        $this->assertStringContainsString('>在A半</a>', $content);
+        $this->assertStringContainsString('>出P2</a>', $content);
+        $this->assertStringContainsString('テレワーク申請（承認済み）＋有給休暇（承認済み）', $content);
+        // まとめた分は在宅・休出の単独表示を残さない。
+        $this->assertStringNotContainsString('>休出</a>', $content);
+        // 1日有休と在宅はまとめずに両方出す。
+        $this->assertStringContainsString('>1日休</a>', $content);
+        $this->assertStringContainsString('>在宅</a>', $content);
+    }
+
+    /**
+     * まとめた表示は2件とも承認済みのときだけ緑にする(片方が未決なら未確定のため橙)。
+     */
+    public function test_a_combined_chip_stays_amber_until_both_requests_are_approved(): void
+    {
+        $staff = Staff::factory()->create();
+        $approver = Staff::factory()->create(['is_supervisor' => true]);
+
+        LeaveRequest::create([
+            'staff_id' => $staff->id, 'approver_id' => $approver->id, 'status' => 'approved',
+            'type' => 'telework', 'start_date' => '2026-08-12', 'end_date' => '2026-08-12',
+        ]);
+        LeaveRequest::create([
+            'staff_id' => $staff->id, 'approver_id' => $approver->id, 'status' => 'pending',
+            'type' => 'paid_leave', 'start_date' => '2026-08-12', 'end_date' => '2026-08-12',
+            'granularity' => 'half_day', 'half_day_period' => 'pm', 'day_count' => 0.5,
+        ]);
+
+        $content = $this->actingAs($staff)->get(route('work-status.index'))->assertOk()->getContent();
+
+        $this->assertMatchesRegularExpression('/bg-amber-500[^>]*>在P半</u', $content);
+    }
+
+    /**
+     * 自分の申請はセルから開ける。他人の分を開けるのは上長・勤怠管理者・役員・
+     * 資金管理者・administratorだけ。
+     */
+    public function test_only_permitted_viewers_get_a_link_to_someone_elses_request(): void
+    {
+        $applicant = Staff::factory()->create(['name' => '申請太郎']);
+        $approver = Staff::factory()->create(['is_supervisor' => true]);
+
+        $leaveRequest = LeaveRequest::create([
+            'staff_id' => $applicant->id, 'approver_id' => $approver->id, 'status' => 'approved',
+            'type' => 'paid_leave', 'start_date' => '2026-08-12', 'end_date' => '2026-08-12',
+            'granularity' => 'full_day', 'day_count' => 1.0,
+        ]);
+        $url = route('leave-requests.show', $leaveRequest);
+
+        // 本人は開ける。
+        $this->actingAs($applicant)->get(route('work-status.index'))->assertOk()->assertSee($url, false);
+
+        foreach ([
+            ['is_supervisor' => true],
+            ['is_attendance_manager' => true],
+            ['is_executive' => true],
+            ['is_fund_manager' => true],
+            ['is_administrator' => true],
+        ] as $flags) {
+            $viewer = Staff::factory()->create($flags);
+            $this->actingAs($viewer)->get(route('work-status.index'))->assertOk()->assertSee($url, false);
+            $this->actingAs($viewer)->get($url)->assertOk();
+        }
+
+        // 一般社員・経理資材担当は他人の分を開けない。
+        foreach ([Staff::factory()->create(), Staff::factory()->procurementManager()->create()] as $viewer) {
+            $this->actingAs($viewer)->get(route('work-status.index'))->assertOk()->assertDontSee($url, false);
+            $this->actingAs($viewer)->get($url)->assertForbidden();
+        }
+
+        // 参照ユーザは詳細画面自体が403なので、リンクにしない。
+        $viewer = Staff::factory()->viewer()->create();
+        $this->actingAs($viewer)->get(route('work-status.index'))->assertOk()->assertDontSee($url, false);
+        $this->actingAs($viewer)->get($url)->assertForbidden();
+    }
+
     public function test_daily_report_status_is_not_shown(): void
     {
         $manager = Staff::factory()->procurementManager()->create();

@@ -113,6 +113,55 @@ class WorkStatusController extends Controller
             }
         }
 
+        foreach ($result as $staffId => $entriesByDate) {
+            foreach ($entriesByDate as $date => $entries) {
+                $result[$staffId][$date] = $this->combineSameDayEntries($entries);
+            }
+        }
+
         return $result;
+    }
+
+    /**
+     * 同じ日の「在宅/休出」と「半日・2時間の有給休暇」を1つにまとめる(在A半 など)。
+     * 行数を増やさずにその日の勤務の形が分かるようにするため。
+     *
+     * まとめた分の役割は combined で、リンク先は有給休暇の申請にする(日数の消費に
+     * 関わる側を開けるようにする)。振替休日・代休はその日の役割が別なのでまとめない。
+     *
+     * @param  array<int, array{request: LeaveRequest, role: string}>  $entries
+     * @return array<int, array{request: LeaveRequest, role: string, base?: LeaveRequest, label?: string}>
+     */
+    private function combineSameDayEntries(array $entries): array
+    {
+        $mainIndexes = array_keys(array_filter($entries, fn (array $e) => $e['role'] === 'main'));
+
+        foreach ($mainIndexes as $baseIndex) {
+            foreach ($mainIndexes as $leaveIndex) {
+                if ($baseIndex === $leaveIndex) {
+                    continue;
+                }
+
+                $base = $entries[$baseIndex]['request'];
+                $paidLeave = $entries[$leaveIndex]['request'];
+                $label = LeaveRequest::combinedShortLabel($base, $paidLeave);
+
+                if ($label === null) {
+                    continue;
+                }
+
+                $entries[$baseIndex] = [
+                    'request' => $paidLeave,
+                    'role' => 'combined',
+                    'base' => $base,
+                    'label' => $label,
+                ];
+                unset($entries[$leaveIndex]);
+
+                return array_values($entries);
+            }
+        }
+
+        return $entries;
     }
 }

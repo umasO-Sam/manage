@@ -23,7 +23,10 @@ class LeaveRequestPolicy
         // 勤怠管理者は状態を問わず中身を見られる。取消の反映確認・休日勤務の承認・承認済みの
         // お知らせがいずれも勤怠管理者へ飛ぶため、対応が済んだあとに通知のリンクを開いただけで
         // 403になっていた。判断材料として見るだけで、操作できるかは各policyが別に判定する。
-        if ($staff->canManageAttendance()) {
+        //
+        // 上長・役員・資金管理者・administratorも同様に閲覧できる。勤務状況一覧のセルから
+        // 「誰がどの申請で休むのか」をその場で確かめるため(2026-08-21)。
+        if ($staff->canViewOthersLeaveRequests()) {
             return true;
         }
 
