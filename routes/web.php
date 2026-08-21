@@ -80,6 +80,9 @@ Route::middleware('auth')->group(function () {
     Route::get('/leave-requests/{leaveRequest}', [LeaveRequestController::class, 'show'])->name('leave-requests.show');
     Route::put('/leave-requests/{leaveRequest}/decide', [LeaveRequestController::class, 'decide'])->name('leave-requests.decide');
     Route::post('/leave-requests/{leaveRequest}/cancel-request', [LeaveRequestController::class, 'requestCancel'])->name('leave-requests.cancel.request');
+    // 承認済みの休日勤務・代休の変更申請。決裁は通常の承認(decide)・勤怠管理者の確認
+    // (attendance-decide)と同じ経路を通るため、専用のルートは申請だけ。
+    Route::post('/leave-requests/{leaveRequest}/amend-request', [LeaveRequestController::class, 'requestAmend'])->name('leave-requests.amend.request');
     Route::put('/leave-requests/{leaveRequest}/cancel-decide', [LeaveRequestController::class, 'decideCancel'])->name('leave-requests.cancel.decide');
     Route::put('/leave-requests/{leaveRequest}/cancel-reflect', [LeaveRequestController::class, 'reflectCancel'])->name('leave-requests.cancel.reflect');
     Route::delete('/leave-requests/{leaveRequest}', [LeaveRequestController::class, 'withdraw'])->name('leave-requests.withdraw');

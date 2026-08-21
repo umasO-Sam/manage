@@ -431,6 +431,12 @@ class LeaveRequestController extends Controller
 
         $approved = $data['action'] === 'approve';
 
+        // 変更申請の決裁は、元の申請の可否ではなく「変更してよいか」の判断。
+        // 差し戻しても元の承認済みの内容は残る。
+        if ($leaveRequest->isAmendRequested()) {
+            return $this->decideAmendment($leaveRequest, $approved, $data['rejection_reason'] ?? null);
+        }
+
         // 状態更新と操作ログは必ず対で残す(片方だけ成立して履歴が欠けるのを防ぐ)。
         DB::transaction(function () use ($leaveRequest, $data, $approved) {
             $leaveRequest->update([
@@ -543,6 +549,12 @@ class LeaveRequestController extends Controller
 
         $approved = $data['action'] === 'approve';
 
+        // 変更申請の反映。承認すれば新しい振替休日・代休日が本体へ移り、
+        // 差し戻せば元の承認済みの内容のまま戻る。
+        if ($leaveRequest->isAmendPendingReflection()) {
+            return $this->reflectAmendment($leaveRequest, $approved, $data['rejection_reason'] ?? null);
+        }
+
         DB::transaction(function () use ($leaveRequest, $data, $approved) {
             $leaveRequest->update([
                 'status' => $approved ? LeaveRequest::STATUS_APPROVED : LeaveRequest::STATUS_REJECTED,
@@ -593,6 +605,8 @@ class LeaveRequestController extends Controller
             ->whereIn('id', $data['ids'])
             ->where('approver_id', Auth::id())
             ->where('status', LeaveRequest::STATUS_PENDING)
+            // 変更申請は「何がどう変わるか」を見てから判断してほしいので一括では通さない。
+            ->whereNull('amend_status')
             ->get();
 
         if ($leaveRequests->isEmpty()) {
@@ -633,6 +647,218 @@ class LeaveRequestController extends Controller
      * 承認済み申請の取消を本人が申請する。理由は必須(上長と勤怠管理者が
      * 可否を判断する材料になるため)。
      */
+    /**
+     * 承認済みの休日勤務・代休の変更申請。出勤した日は動かせないので、変えられるのは
+     * 振替休日(取らない選択を含む)と代休日だけ。
+     *
+     * 出した時点で承認済みから承認待ちへ戻し、上長→勤怠管理者の順に決裁をやり直す。
+     * 新しい値は反映されるまで amend_* に置き、元の内容はそのまま残す
+     * (差し戻されたら元の承認済みの状態に戻るだけで済むようにするため)。
+     */
+    public function requestAmend(Request $request, LeaveRequest $leaveRequest): RedirectResponse
+    {
+        $this->authorize('requestAmend', $leaveRequest);
+
+        $data = $request->validate([
+            'amend_reason' => ['required', 'string', 'max:2000'],
+            'substitute_holiday_date' => ['nullable', 'date'],
+            'no_substitute_needed' => ['nullable', 'boolean'],
+            'compensatory_date' => ['nullable', 'date'],
+        ], ['amend_reason.required' => '変更の理由を入力してください。']);
+
+        $changes = $this->amendmentFields($leaveRequest, $data);
+
+        DB::transaction(function () use ($leaveRequest, $data, $changes) {
+            // 「旧→新」の一文は、値を移す前の状態で作る必要がある。
+            $leaveRequest->fill($changes);
+            $summary = $leaveRequest->amendmentSummary();
+
+            $leaveRequest->update([
+                ...$changes,
+                'amend_status' => LeaveRequest::AMEND_REQUESTED,
+                'amend_reason' => $data['amend_reason'],
+                'amend_rejection_reason' => null,
+                'amend_requested_at' => now(),
+                // 承認済みから承認待ちへ戻す。振替休日・代休日が未確定になるため、
+                // 勤務状況一覧・カレンダーでも承認待ちとして見えるのが正しい。
+                'status' => LeaveRequest::STATUS_PENDING,
+                'supervisor_approved_at' => null,
+            ]);
+
+            OperationLog::record(
+                OperationLog::ACTION_LEAVE_REQUEST_AMEND_REQUEST,
+                $leaveRequest,
+                $leaveRequest->staff_id,
+                $summary.'／理由: '.$data['amend_reason']
+            );
+        });
+
+        $this->sendNotification(
+            $leaveRequest->approver->email,
+            new LeaveRequestNotificationMail($leaveRequest, '承認済み申請の変更申請が届きました')
+        );
+
+        return redirect()->route('leave-requests.index')->with('status', 'leave-request-amend-requested');
+    }
+
+    /**
+     * 変更申請で預かる新しい値を組み立てる。出勤日(start_date)は対象にしない。
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    private function amendmentFields(LeaveRequest $leaveRequest, array $data): array
+    {
+        if ($leaveRequest->type === 'holiday_work') {
+            $noSubstituteNeeded = (bool) ($data['no_substitute_needed'] ?? false);
+
+            if (! $noSubstituteNeeded && empty($data['substitute_holiday_date'])) {
+                throw ValidationException::withMessages([
+                    'substitute_holiday_date' => '振替休日とする日を指定するか、「振り替えない」にチェックしてください。',
+                ]);
+            }
+
+            $fields = [
+                'amend_substitute_holiday_date' => $noSubstituteNeeded ? null : $data['substitute_holiday_date'],
+                'amend_no_substitute_needed' => $noSubstituteNeeded,
+                'amend_compensatory_date' => null,
+            ];
+
+            $sameDate = (string) $fields['amend_substitute_holiday_date']
+                === (string) $leaveRequest->substitute_holiday_date?->format('Y-m-d');
+
+            if ($fields['amend_no_substitute_needed'] === (bool) $leaveRequest->no_substitute_needed && $sameDate) {
+                throw ValidationException::withMessages([
+                    'substitute_holiday_date' => '今の内容と同じです。変更したい振替休日を指定してください。',
+                ]);
+            }
+
+            return $fields;
+        }
+
+        if (empty($data['compensatory_date'])) {
+            throw ValidationException::withMessages(['compensatory_date' => '新しい代休日を指定してください。']);
+        }
+
+        if ($data['compensatory_date'] === $leaveRequest->compensatory_date?->format('Y-m-d')) {
+            throw ValidationException::withMessages(['compensatory_date' => '今の代休日と同じです。']);
+        }
+
+        return [
+            'amend_compensatory_date' => $data['compensatory_date'],
+            'amend_substitute_holiday_date' => null,
+            'amend_no_substitute_needed' => null,
+        ];
+    }
+
+    /**
+     * 変更申請に対する上長の判断。承認なら勤怠管理者の反映確認へ、
+     * 差し戻しなら元の承認済みの内容のまま戻す(元の申請は生きたまま)。
+     */
+    private function decideAmendment(LeaveRequest $leaveRequest, bool $approved, ?string $rejectionReason): RedirectResponse
+    {
+        $summary = $leaveRequest->amendmentSummary();
+
+        DB::transaction(function () use ($leaveRequest, $approved, $rejectionReason, $summary) {
+            $leaveRequest->update($approved
+                ? [
+                    'amend_status' => LeaveRequest::AMEND_PENDING_REFLECTION,
+                    'status' => LeaveRequest::STATUS_PENDING_ATTENDANCE,
+                    'supervisor_approved_at' => now(),
+                ]
+                : [
+                    'amend_status' => null,
+                    'amend_rejection_reason' => $rejectionReason,
+                    'amend_substitute_holiday_date' => null,
+                    'amend_no_substitute_needed' => null,
+                    'amend_compensatory_date' => null,
+                    'status' => LeaveRequest::STATUS_APPROVED,
+                ]);
+
+            OperationLog::record(
+                $approved ? OperationLog::ACTION_LEAVE_REQUEST_AMEND_APPROVE : OperationLog::ACTION_LEAVE_REQUEST_AMEND_REJECT,
+                $leaveRequest,
+                $leaveRequest->staff_id,
+                $approved ? $summary : $summary.'／差し戻し理由: '.$rejectionReason
+            );
+        });
+
+        if ($approved) {
+            foreach ($this->attendanceManagers() as $manager) {
+                $this->sendNotification(
+                    $manager->email,
+                    new LeaveRequestNotificationMail($leaveRequest, '変更申請の反映確認をお願いします')
+                );
+            }
+        } else {
+            $this->sendNotification(
+                $leaveRequest->staff->email,
+                new LeaveRequestNotificationMail($leaveRequest, '変更申請が上長により差し戻されました')
+            );
+        }
+
+        return redirect()->route('leave-requests.approvals')->with('status', 'leave-request-amend-decided');
+    }
+
+    /**
+     * 変更申請に対する勤怠管理者の判断。承認すると新しい値が本体へ移り、承認済みに戻る。
+     */
+    private function reflectAmendment(LeaveRequest $leaveRequest, bool $approved, ?string $rejectionReason): RedirectResponse
+    {
+        $summary = $leaveRequest->amendmentSummary();
+
+        DB::transaction(function () use ($leaveRequest, $approved, $rejectionReason, $summary) {
+            $applied = $approved
+                ? [
+                    'substitute_holiday_date' => $leaveRequest->type === 'holiday_work'
+                        ? $leaveRequest->amend_substitute_holiday_date
+                        : $leaveRequest->substitute_holiday_date,
+                    'no_substitute_needed' => $leaveRequest->type === 'holiday_work'
+                        ? (bool) $leaveRequest->amend_no_substitute_needed
+                        : $leaveRequest->no_substitute_needed,
+                    'compensatory_date' => $leaveRequest->type === 'compensatory_leave'
+                        ? $leaveRequest->amend_compensatory_date
+                        : $leaveRequest->compensatory_date,
+                    'amended_at' => now(),
+                ]
+                : ['amend_rejection_reason' => $rejectionReason];
+
+            $leaveRequest->update([
+                ...$applied,
+                'amend_status' => null,
+                'amend_substitute_holiday_date' => null,
+                'amend_no_substitute_needed' => null,
+                'amend_compensatory_date' => null,
+                'status' => LeaveRequest::STATUS_APPROVED,
+                'approved_at' => now(),
+            ]);
+
+            OperationLog::record(
+                $approved ? OperationLog::ACTION_LEAVE_REQUEST_AMEND_REFLECT : OperationLog::ACTION_LEAVE_REQUEST_AMEND_SEND_BACK,
+                $leaveRequest,
+                $leaveRequest->staff_id,
+                $approved ? $summary : $summary.'／差し戻し理由: '.$rejectionReason
+            );
+        });
+
+        // 差し戻しは本人と上長の双方に伝える(上長が一度通した判断を覆すため)。
+        $recipients = $approved
+            ? [$leaveRequest->staff->email]
+            : [$leaveRequest->staff->email, $leaveRequest->approver->email];
+
+        foreach ($recipients as $email) {
+            $this->sendNotification(
+                $email,
+                new LeaveRequestNotificationMail(
+                    $leaveRequest,
+                    $approved ? '変更が反映されました' : '変更申請が勤怠管理者により差し戻されました'
+                )
+            );
+        }
+
+        return redirect()->route('leave-requests.cancellations')->with('status', 'leave-request-amend-reflected');
+    }
+
     public function requestCancel(Request $request, LeaveRequest $leaveRequest): RedirectResponse
     {
         $this->authorize('requestCancel', $leaveRequest);

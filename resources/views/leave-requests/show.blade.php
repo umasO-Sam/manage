@@ -134,6 +134,23 @@
                     @if ($leaveRequest->isRejected() && $leaveRequest->rejection_reason)
                         <div class="py-2 flex justify-between"><dt class="text-slate-500">却下理由</dt><dd class="text-red-700">{{ $leaveRequest->rejection_reason }}</dd></div>
                     @endif
+                    @if ($leaveRequest->isAmending())
+                        @foreach ($leaveRequest->amendmentChanges() as $change)
+                            <div class="py-2 flex justify-between">
+                                <dt class="text-slate-500">変更申請（{{ $change['label'] }}）</dt>
+                                <dd class="font-mono">{{ $change['before'] }} <span class="font-sans">→</span> <span class="font-bold text-blue-700">{{ $change['after'] }}</span></dd>
+                            </div>
+                        @endforeach
+                    @endif
+                    @if ($leaveRequest->amend_reason && ($leaveRequest->isAmending() || $leaveRequest->amended_at))
+                        <div class="py-2 flex justify-between"><dt class="text-slate-500">変更の理由</dt><dd>{{ $leaveRequest->amend_reason }}</dd></div>
+                    @endif
+                    @if ($leaveRequest->amend_rejection_reason && ! $leaveRequest->isAmending())
+                        <div class="py-2 flex justify-between"><dt class="text-slate-500">変更の差し戻し理由</dt><dd class="text-red-700">{{ $leaveRequest->amend_rejection_reason }}</dd></div>
+                    @endif
+                    @if ($leaveRequest->amended_at)
+                        <div class="py-2 flex justify-between"><dt class="text-slate-500">変更の反映</dt><dd class="font-mono">{{ $leaveRequest->amended_at->format('Y/m/d H:i') }}</dd></div>
+                    @endif
                     @if ($leaveRequest->cancel_reason)
                         <div class="py-2 flex justify-between"><dt class="text-slate-500">取消理由</dt><dd>{{ $leaveRequest->cancel_reason }}</dd></div>
                     @endif
@@ -145,6 +162,57 @@
                     @endif
                 </dl>
             </div>
+
+            {{-- 出勤した日は動かせないが、振替休日・代休日は後から変わる。取り消して出し直すと
+                 出勤の事実まで消えてしまうため、同じ申請のまま決裁をやり直せるようにする。 --}}
+            @can('requestAmend', $leaveRequest)
+                <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5 space-y-3">
+                    <h3 class="text-sm font-bold text-slate-800">
+                        {{ $leaveRequest->type === 'holiday_work' ? '振替休日の変更を申請する' : '代休日の変更を申請する' }}
+                    </h3>
+                    <p class="text-[11px] text-slate-500">
+                        出勤した日（{{ $leaveRequest->start_date->format('Y/m/d') }}）は変更できません。
+                        申請すると<span class="font-bold">承認待ちに戻り</span>、上長 → 勤怠管理者の順に承認を受けて反映されます。
+                    </p>
+                    <form method="POST" action="{{ route('leave-requests.amend.request', $leaveRequest) }}" class="space-y-3">
+                        @csrf
+                        @if ($leaveRequest->type === 'holiday_work')
+                            <div x-data="{ noSubstitute: {{ old('no_substitute_needed') ? 'true' : 'false' }} }">
+                                <x-input-label value="新しい振替休日" />
+                                <input type="date" name="substitute_holiday_date" :disabled="noSubstitute"
+                                       value="{{ old('substitute_holiday_date', $leaveRequest->substitute_holiday_date?->format('Y-m-d')) }}"
+                                       class="mt-1 block w-full rounded-lg border-slate-300 text-sm disabled:bg-slate-100">
+                                <label class="mt-2 flex items-center gap-2 text-xs text-slate-600">
+                                    <input type="hidden" name="no_substitute_needed" value="0">
+                                    <input type="checkbox" name="no_substitute_needed" value="1" x-model="noSubstitute"
+                                           class="rounded border-slate-300">
+                                    <span>振替休日を取得しない（トラブルor業務繁忙）</span>
+                                </label>
+                                <x-input-error class="mt-1" :messages="$errors->get('substitute_holiday_date')" />
+                            </div>
+                        @else
+                            <div>
+                                <x-input-label value="新しい代休日" />
+                                <input type="date" name="compensatory_date"
+                                       value="{{ old('compensatory_date', $leaveRequest->compensatory_date?->format('Y-m-d')) }}"
+                                       class="mt-1 block w-full rounded-lg border-slate-300 text-sm">
+                                <x-input-error class="mt-1" :messages="$errors->get('compensatory_date')" />
+                            </div>
+                        @endif
+                        <div>
+                            <x-input-label value="変更の理由（必須）" />
+                            <textarea name="amend_reason" rows="3" class="mt-1 block w-full rounded-lg border-slate-300 text-sm">{{ old('amend_reason') }}</textarea>
+                            <x-input-error class="mt-1" :messages="$errors->get('amend_reason')" />
+                        </div>
+                        <div class="flex justify-end">
+                            <button type="submit"
+                                    class="text-xs font-bold px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700">
+                                変更を申請する
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            @endcan
 
             {{-- 承認済みになったあとの取消は、本人が理由を書いて上長に申請する。 --}}
             @can('requestCancel', $leaveRequest)
@@ -222,7 +290,14 @@
             {{-- 休日勤務の勤怠管理者承認。上長が通したあと、ここで承認して初めて承認済みになる。 --}}
             @can('attendanceDecide', $leaveRequest)
                 <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5 space-y-3">
-                    <h3 class="text-sm font-bold text-slate-800">休日勤務の確認（勤怠管理者）</h3>
+                    <h3 class="text-sm font-bold text-slate-800">
+                        {{ $leaveRequest->isAmendPendingReflection() ? '変更の反映確認（勤怠管理者）' : '休日勤務の確認（勤怠管理者）' }}
+                    </h3>
+                    @if ($leaveRequest->isAmendPendingReflection())
+                        <p class="text-[11px] text-slate-500">
+                            承認すると、上の「変更申請」の新しい日付が反映され、承認済みに戻ります。
+                        </p>
+                    @endif
                     <p class="text-[11px] text-slate-500">
                         上長（{{ $leaveRequest->approver->name }}）が
                         {{ $leaveRequest->supervisor_approved_at?->format('Y/m/d H:i') }} に承認しました。
@@ -274,7 +349,13 @@
 
             @if ($leaveRequest->isPending() && $leaveRequest->approver_id === auth()->id())
                 <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5 space-y-3">
-                    <h3 class="text-sm font-bold text-slate-800">承認/却下</h3>
+                    <h3 class="text-sm font-bold text-slate-800">{{ $leaveRequest->isAmendRequested() ? '変更の承認/差し戻し' : '承認/却下' }}</h3>
+                    @if ($leaveRequest->isAmendRequested())
+                        <p class="text-[11px] text-slate-500">
+                            上の「変更申請」の内容（旧→新）を確認してください。承認すると勤怠管理者の反映確認へ進みます。
+                            差し戻した場合、元の承認済みの内容がそのまま残ります。
+                        </p>
+                    @endif
                     <form method="POST" action="{{ route('leave-requests.decide', $leaveRequest) }}" class="space-y-3">
                         @csrf
                         @method('PUT')

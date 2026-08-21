@@ -63,14 +63,24 @@
                         @forelse ($leaveRequests as $leaveRequest)
                             <tr class="hover:bg-slate-50">
                                 <td class="p-3">
-                                    <input type="checkbox" name="ids[]" value="{{ $leaveRequest->id }}"
-                                           x-model.number="selected" class="rounded border-slate-300">
+                                    {{-- 変更申請は「何がどう変わるか」を見てから判断してほしいので、
+                                         一括承認には含めない(チェックボックスを出さない)。 --}}
+                                    @unless ($leaveRequest->isAmendRequested())
+                                        <input type="checkbox" name="ids[]" value="{{ $leaveRequest->id }}"
+                                               x-model.number="selected" class="rounded border-slate-300">
+                                    @endunless
                                 </td>
                                 <td class="p-3 font-semibold">{{ $leaveRequest->staff->name }}</td>
                                 <td class="p-3">
                                     {{ $leaveRequest->typeLabel() }}
                                     @if ($leaveRequest->reasonLabel())
                                         <span class="text-xs text-slate-400">（{{ $leaveRequest->reasonLabel() }}）</span>
+                                    @endif
+                                    @if ($leaveRequest->isAmendRequested())
+                                        <span class="ml-1 text-[11px] font-bold px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">変更申請</span>
+                                        @foreach ($leaveRequest->amendmentChanges() as $change)
+                                            <span class="block text-[11px] text-slate-500 font-mono">{{ $change['label'] }} {{ $change['before'] }} → {{ $change['after'] }}</span>
+                                        @endforeach
                                     @endif
                                 </td>
                                 <td class="p-3 font-mono">

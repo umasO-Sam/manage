@@ -17,12 +17,13 @@
             @endif
 
             {{-- 上長承認済みの休日勤務。ここで承認して初めて承認済みになる。 --}}
-            <h3 class="text-sm font-bold text-slate-800 pt-2">休日勤務の承認（{{ $attendanceApprovals->count() }} 件）</h3>
+            <h3 class="text-sm font-bold text-slate-800 pt-2">休日勤務の承認・変更の反映（{{ $attendanceApprovals->count() }} 件）</h3>
 
             <div class="p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-600">
-                上長が承認した休日勤務申請です。<span class="font-bold">ここで承認するまでは承認済みになりません</span>
+                上長が承認した休日勤務申請と、上長が認めた<span class="font-bold">変更申請</span>（振替休日・代休日の付け替え）です。
+                <span class="font-bold">ここで承認するまでは承認済みになりません</span>
                 （勤務状況一覧・カレンダーには「承認待ち」として橙色で出ています）。
-                差し戻すと却下となり、本人と上長の双方に通知されます。
+                差し戻すと本人と上長の双方に通知されます。変更申請を差し戻した場合は、元の承認済みの内容がそのまま残ります。
             </div>
 
             <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
@@ -49,7 +50,14 @@
                                 </td>
                                 <td class="p-3 text-xs">{{ $leaveRequest->order_no }}／{{ $leaveRequest->work_location }}</td>
                                 <td class="p-3 font-mono text-xs">
-                                    {{ $leaveRequest->no_substitute_needed ? '振り替えない' : $leaveRequest->substitute_holiday_date?->format('Y/m/d') }}
+                                    @if ($leaveRequest->isAmendPendingReflection())
+                                        <span class="font-sans text-[11px] font-bold px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">変更</span>
+                                        @foreach ($leaveRequest->amendmentChanges() as $change)
+                                            <span class="block">{{ $change['before'] }} → <span class="font-bold text-blue-700">{{ $change['after'] }}</span></span>
+                                        @endforeach
+                                    @else
+                                        {{ $leaveRequest->no_substitute_needed ? '振り替えない' : $leaveRequest->substitute_holiday_date?->format('Y/m/d') }}
+                                    @endif
                                 </td>
                                 <td class="p-3 text-xs">
                                     {{ $leaveRequest->approver->name }}

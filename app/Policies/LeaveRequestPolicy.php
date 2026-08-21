@@ -60,6 +60,14 @@ class LeaveRequestPolicy
     }
 
     /**
+     * 承認済みの休日勤務・代休の変更申請も、本人だけが言い出せる。
+     */
+    public function requestAmend(Staff $staff, LeaveRequest $leaveRequest): bool
+    {
+        return $staff->id === $leaveRequest->staff_id && $leaveRequest->canRequestAmend();
+    }
+
+    /**
      * 承認済みになったあとの取消は本人だけが言い出せる。
      */
     public function requestCancel(Staff $staff, LeaveRequest $leaveRequest): bool

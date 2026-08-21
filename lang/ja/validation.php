@@ -292,6 +292,7 @@ return [
         'rejection_reason' => '却下理由',
         'half_day_period' => '午前／午後',
         'cancel_reason' => '取消の理由',
+        'amend_reason' => '変更の理由',
         'cancel_rejection_reason' => '差し戻しの理由',
 
         // 作業日報の1コマごとの項目。「entries.3.order_no」のような添字付きでも

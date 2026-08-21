@@ -14,6 +14,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'approved_at', 'supervisor_approved_at', 'remarks',
     'cancel_status', 'cancel_reason', 'cancel_rejection_reason',
     'cancel_requested_at', 'cancelled_at',
+    'amend_status', 'amend_reason', 'amend_rejection_reason', 'amend_requested_at', 'amended_at',
+    'amend_substitute_holiday_date', 'amend_no_substitute_needed', 'amend_compensatory_date',
     'funeral_venue_address', 'funeral_venue_phone', 'wake_datetime',
     'funeral_datetime', 'flowers_declined', 'telegram_declined',
 ])]
@@ -42,6 +44,20 @@ class LeaveRequest extends Model
 
     /** 上長が取消を認めた。勤怠管理者の反映確認待ち。 */
     public const CANCEL_PENDING_REFLECTION = 'pending_reflection';
+
+    /** 変更申請中。上長の判断待ち(statusは承認待ちに戻っている)。 */
+    public const AMEND_REQUESTED = 'requested';
+
+    /** 上長が変更を認めた。勤怠管理者の反映確認待ち(statusは承認待ち(勤怠管理者))。 */
+    public const AMEND_PENDING_REFLECTION = 'pending_reflection';
+
+    /**
+     * 承認後に変更申請を出せる種別。出勤した事実は動かせないが、振替休日・代休日は
+     * あとから変わるため、取り消して出し直さずに決裁をやり直せるようにする。
+     *
+     * @var array<int, string>
+     */
+    public const AMENDABLE_TYPES = ['holiday_work', 'compensatory_leave'];
 
     /**
      * まだ決裁が終わっていない状態。勤務状況一覧・個人カレンダーはどちらも
@@ -112,6 +128,11 @@ class LeaveRequest extends Model
             'supervisor_approved_at' => 'datetime',
             'cancel_requested_at' => 'datetime',
             'cancelled_at' => 'datetime',
+            'amend_requested_at' => 'datetime',
+            'amended_at' => 'datetime',
+            'amend_substitute_holiday_date' => 'date',
+            'amend_compensatory_date' => 'date',
+            'amend_no_substitute_needed' => 'boolean',
             'hours' => 'decimal:1',
             'day_count' => 'decimal:2',
             'actual_worked_hours' => 'decimal:1',
@@ -368,6 +389,15 @@ class LeaveRequest extends Model
             };
         }
 
+        // 変更申請中は承認待ちへ戻っている。何の承認待ちかが分かるようにする。
+        if ($this->isAmendRequested()) {
+            return '変更の承認待ち';
+        }
+
+        if ($this->isAmendPendingReflection()) {
+            return '変更の承認待ち（勤怠管理者）';
+        }
+
         return match ($this->status) {
             self::STATUS_PENDING => '承認待ち',
             // 上長は通したがまだ確定していない。承認済みと誤読されないよう待ち先を添える。
@@ -396,6 +426,75 @@ class LeaveRequest extends Model
     public function isCancelPendingReflection(): bool
     {
         return $this->status === self::STATUS_APPROVED && $this->cancel_status === self::CANCEL_PENDING_REFLECTION;
+    }
+
+    /**
+     * 承認後の変更申請を出せるか。出勤日は動かせないため、変えられるのは
+     * 振替休日(取らない選択を含む)と代休日だけ。取消手続き中は出せない。
+     */
+    public function canRequestAmend(): bool
+    {
+        return $this->status === self::STATUS_APPROVED
+            && $this->cancel_status === null
+            && $this->amend_status === null
+            && in_array($this->type, self::AMENDABLE_TYPES, true);
+    }
+
+    /** 変更申請が上長の判断を待っている状態か。 */
+    public function isAmendRequested(): bool
+    {
+        return $this->amend_status === self::AMEND_REQUESTED;
+    }
+
+    /** 変更申請が勤怠管理者の反映確認を待っている状態か。 */
+    public function isAmendPendingReflection(): bool
+    {
+        return $this->amend_status === self::AMEND_PENDING_REFLECTION;
+    }
+
+    /** 変更の決裁が途中か(上長待ち・勤怠管理者待ちのどちらか)。 */
+    public function isAmending(): bool
+    {
+        return $this->amend_status !== null;
+    }
+
+    /**
+     * 変更申請の中身。「何が」「今どうで」「どう変わるか」を1か所で作り、
+     * 画面の表示と操作ログの記録で同じ文言を使う。
+     *
+     * @return array<int, array{label: string, before: string, after: string}>
+     */
+    public function amendmentChanges(): array
+    {
+        $date = fn (?\Illuminate\Support\Carbon $d) => $d?->format('Y/m/d');
+
+        if ($this->type === 'holiday_work') {
+            $before = $this->no_substitute_needed ? '振り替えなし' : ($date($this->substitute_holiday_date) ?? '未定');
+            $after = $this->amend_no_substitute_needed
+                ? '振り替えなし'
+                : ($date($this->amend_substitute_holiday_date) ?? '未定');
+
+            return [['label' => '振替休日', 'before' => $before, 'after' => $after]];
+        }
+
+        if ($this->type === 'compensatory_leave') {
+            return [[
+                'label' => '代休日',
+                'before' => $date($this->compensatory_date) ?? '未定',
+                'after' => $date($this->amend_compensatory_date) ?? '未定',
+            ]];
+        }
+
+        return [];
+    }
+
+    /** 操作ログに残す「旧→新」の一文。 */
+    public function amendmentSummary(): string
+    {
+        return implode('／', array_map(
+            fn (array $c) => $c['label'].' '.$c['before'].' → '.$c['after'],
+            $this->amendmentChanges()
+        ));
     }
 
     public function isCancelled(): bool

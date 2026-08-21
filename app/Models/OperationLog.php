@@ -47,6 +47,17 @@ class OperationLog extends Model
 
     public const ACTION_LEAVE_REQUEST_CANCEL_SEND_BACK = 'leave_request_cancel_send_back';
 
+    /** 承認済みの休日勤務・代休の変更(振替休日・代休日の付け替え)。 */
+    public const ACTION_LEAVE_REQUEST_AMEND_REQUEST = 'leave_request_amend_request';
+
+    public const ACTION_LEAVE_REQUEST_AMEND_APPROVE = 'leave_request_amend_approve';
+
+    public const ACTION_LEAVE_REQUEST_AMEND_REJECT = 'leave_request_amend_reject';
+
+    public const ACTION_LEAVE_REQUEST_AMEND_REFLECT = 'leave_request_amend_reflect';
+
+    public const ACTION_LEAVE_REQUEST_AMEND_SEND_BACK = 'leave_request_amend_send_back';
+
     public const ACTION_LEAVE_REQUEST_ATTENDANCE_APPROVE = 'leave_request_attendance_approve';
 
     public const ACTION_LEAVE_REQUEST_ATTENDANCE_REJECT = 'leave_request_attendance_reject';
@@ -79,6 +90,11 @@ class OperationLog extends Model
         self::ACTION_LEAVE_REQUEST_CANCEL_REJECT => '取消申請を差し戻し（上長）',
         self::ACTION_LEAVE_REQUEST_CANCEL_REFLECT => '取消を反映（勤怠管理者）',
         self::ACTION_LEAVE_REQUEST_CANCEL_SEND_BACK => '取消を差し戻し（勤怠管理者）',
+        self::ACTION_LEAVE_REQUEST_AMEND_REQUEST => '変更を申請',
+        self::ACTION_LEAVE_REQUEST_AMEND_APPROVE => '変更を承認（上長）',
+        self::ACTION_LEAVE_REQUEST_AMEND_REJECT => '変更を差し戻し（上長）',
+        self::ACTION_LEAVE_REQUEST_AMEND_REFLECT => '変更を反映（勤怠管理者）',
+        self::ACTION_LEAVE_REQUEST_AMEND_SEND_BACK => '変更を差し戻し（勤怠管理者）',
         self::ACTION_LEAVE_REQUEST_ATTENDANCE_APPROVE => '休日勤務を承認（勤怠管理者）',
         self::ACTION_LEAVE_REQUEST_ATTENDANCE_REJECT => '休日勤務を差し戻し（勤怠管理者）',
         self::ACTION_LABOR_RECORD_UPDATE => '人工レコードを修正',
